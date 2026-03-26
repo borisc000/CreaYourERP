@@ -242,7 +242,7 @@ def quote_form_page(quote_id=None):
         <a href="/app/quotes/{quote_id}/preview" target="_blank" class="btn btn-secondary" style="text-decoration:none; display:flex; align-items:center;">&#128436; Previsualizar / PDF</a>
         """
 
-    content += """
+    content += f"""
         <button class="btn btn-ghost" onclick="window.location.href='/app/quotes'">Cancelar</button>
         <button class="btn btn-secondary" id="btn-save-draft" onclick="saveQuote('draft')">Guardar Borrador</button>
         <button class="btn btn-primary" id="btn-save-send" onclick="saveQuote('send')">Guardar y Enviar</button>
