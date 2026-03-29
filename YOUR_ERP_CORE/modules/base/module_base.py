@@ -350,7 +350,7 @@ class BaseModule(BaseModule):
         
         # Registrar rutas
         self.register_route('/auth/login', self.login, methods=['POST'], auth_required=False)
-        self.register_route('/auth/demo-login', self.demo_login, methods=['GET'], auth_required=False)
+        self.register_route('/auth/demologin', self.demo_login, methods=['GET'], auth_required=False)
         self.register_route('/auth/logout', self.logout, methods=['POST'], auth_required=True)
         self.register_route('/auth/register', self.register, methods=['POST'], auth_required=False)
         self.register_route('/auth/forgot-password', self.forgot_password, methods=['POST'], auth_required=False)
@@ -394,33 +394,29 @@ class BaseModule(BaseModule):
         """
         email = request.get_data('email')
         password = request.get_data('password')
+        is_demo = request.get_data('is_demo') == 'true'
 
-        if not email or not password:
-            return Response.bad_request("Email and password required")
+        if not email:
+            return Response.bad_request("Email required")
 
-        # DEBUG
-        import logging
-        logger = logging.getLogger('auth')
-        logger.info(f"LOGIN attempt: {email}, users={len(User._store)}")
+        # Si es demo login, usar demo@pedroconstruction.cl
+        if is_demo:
+            email = 'demo@pedroconstruction.cl'
 
         # Buscar usuario
         users = User.search([('email', '=', email)])
-        logger.info(f"Search result: {len(users)} users")
 
         if not users:
-            all_emails = [u.email for u in User._store.values()]
-            logger.info(f"Available users: {all_emails}")
             return Response.unauthorized("Invalid credentials")
 
         user = users[0]
-        logger.info(f"Found user, hash={'YES' if user.password_hash else 'NO'}")
 
-        # Verificar contraseña
-        verify_result = user.verify_password(password)
-        logger.info(f"Password check: {verify_result}")
-
-        if not verify_result:
-            return Response.unauthorized("Invalid credentials")
+        # Verificar contraseña (omitir si es demo login)
+        if not is_demo:
+            if not password:
+                return Response.bad_request("Password required")
+            if not user.verify_password(password):
+                return Response.unauthorized("Invalid credentials")
         
         # Verificar que esté activo
         if not user.is_active:

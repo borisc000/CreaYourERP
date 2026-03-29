@@ -68,11 +68,14 @@ async function loginDemo() {
     btn.textContent = 'Entrando...';
 
     try {
-        const res = await API.get('/auth/demo-login');
+        const res = await API.post('/auth/login', {
+            email: 'demo@pedroconstruction.cl',
+            is_demo: 'true'
+        });
         btn.disabled = false;
         btn.textContent = 'Demo';
 
-        if (res && res.success && res.data) {
+        if (res && res.success) {
             API.setToken(res.data.token);
             API.setUser(res.data.user);
             window.location.href = '/app/dashboard';
