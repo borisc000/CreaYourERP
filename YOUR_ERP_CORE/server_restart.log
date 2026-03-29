@@ -1,0 +1,452 @@
+2026-03-26 01:08:00,631 - __main__ - INFO - Initializing ERP Framework...
+2026-03-26 01:08:00,631 - CoreFramework - INFO - CoreFramework logging configured
+2026-03-26 01:08:00,632 - ModuleRegistry - DEBUG - Registered module class: Base
+2026-03-26 01:08:00,632 - ModuleRegistry - DEBUG - Registered module class: Signature
+2026-03-26 01:08:00,632 - ModuleRegistry - DEBUG - Registered module class: CRM
+2026-03-26 01:08:00,632 - ModuleRegistry - DEBUG - Registered module class: Quotes
+2026-03-26 01:08:00,632 - CoreFramework - INFO - Initializing CoreFramework...
+2026-03-26 01:08:00,632 - DatabaseAdapter - INFO - Connecting to database: postgresql://user:password@localhost/your_erp
+2026-03-26 01:08:00,632 - BaseModule - INFO - Initializing module: Base
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: company
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: group
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: user
+2026-03-26 01:08:00,632 - BaseModule - INFO - Base module initialized
+2026-03-26 01:08:00,632 - ModuleRegistry - INFO - Loaded module: base
+2026-03-26 01:08:00,632 - SignatureModule - INFO - Initializing module: Signature
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: signature.request
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: signature.log
+2026-03-26 01:08:00,632 - SignatureModule - INFO - Signature module initialized
+2026-03-26 01:08:00,632 - ModuleRegistry - INFO - Loaded module: signature
+2026-03-26 01:08:00,632 - CRMModule - INFO - Initializing module: CRM
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: crm.stage
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: crm.customer
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: crm.mandante
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: crm.lead
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: crm.lead_note
+2026-03-26 01:08:00,632 - ModelRegistry - DEBUG - Registered model: crm.activity_log
+2026-03-26 01:08:00,633 - ModelRegistry - DEBUG - Registered model: crm.document
+2026-03-26 01:08:00,633 - ModelRegistry - DEBUG - Registered model: crm.service_type
+2026-03-26 01:08:00,633 - CRMModule - INFO - CRM module initialized
+2026-03-26 01:08:00,633 - ModuleRegistry - INFO - Loaded module: crm
+2026-03-26 01:08:00,633 - QuotesModule - INFO - Initializing module: Quotes
+2026-03-26 01:08:00,633 - ModelRegistry - DEBUG - Registered model: quotes.service_catalog
+2026-03-26 01:08:00,633 - ModelRegistry - DEBUG - Registered model: quotes.worker_catalog
+2026-03-26 01:08:00,633 - ModelRegistry - DEBUG - Registered model: quotes.item_catalog
+2026-03-26 01:08:00,633 - ModelRegistry - DEBUG - Registered model: quotes.quote
+2026-03-26 01:08:00,633 - ModelRegistry - DEBUG - Registered model: quotes.quote_line
+2026-03-26 01:08:00,633 - ModelRegistry - DEBUG - Registered model: quotes.quote_template
+2026-03-26 01:08:00,633 - ModelRegistry - DEBUG - Registered model: quotes.quote_template_line
+2026-03-26 01:08:00,633 - QuotesModule - INFO - Quotes module v2 initialized (3 catalogs)
+2026-03-26 01:08:00,633 - ModuleRegistry - INFO - Loaded module: quotes
+2026-03-26 01:08:00,633 - CoreFramework - INFO - CoreFramework initialized successfully
+2026-03-26 01:08:00,633 - __main__ - INFO - Framework initialized successfully
+2026-03-26 01:08:00,750 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-03-26 01:08:00,795 - main - INFO - Initializing ERP Framework...
+2026-03-26 01:08:00,795 - CoreFramework - INFO - CoreFramework logging configured
+2026-03-26 01:08:00,795 - ModuleRegistry - DEBUG - Registered module class: Base
+2026-03-26 01:08:00,795 - ModuleRegistry - DEBUG - Registered module class: Signature
+2026-03-26 01:08:00,795 - ModuleRegistry - DEBUG - Registered module class: CRM
+2026-03-26 01:08:00,795 - ModuleRegistry - DEBUG - Registered module class: Quotes
+2026-03-26 01:08:00,795 - CoreFramework - INFO - Initializing CoreFramework...
+2026-03-26 01:08:00,795 - DatabaseAdapter - INFO - Connecting to database: postgresql://user:password@localhost/your_erp
+2026-03-26 01:08:00,796 - BaseModule - INFO - Initializing module: Base
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: company
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: group
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: user
+2026-03-26 01:08:00,796 - BaseModule - INFO - Base module initialized
+2026-03-26 01:08:00,796 - ModuleRegistry - INFO - Loaded module: base
+2026-03-26 01:08:00,796 - SignatureModule - INFO - Initializing module: Signature
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: signature.request
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: signature.log
+2026-03-26 01:08:00,796 - SignatureModule - INFO - Signature module initialized
+2026-03-26 01:08:00,796 - ModuleRegistry - INFO - Loaded module: signature
+2026-03-26 01:08:00,796 - CRMModule - INFO - Initializing module: CRM
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: crm.stage
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: crm.customer
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: crm.mandante
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: crm.lead
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: crm.lead_note
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: crm.activity_log
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: crm.document
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: crm.service_type
+2026-03-26 01:08:00,796 - CRMModule - INFO - CRM module initialized
+2026-03-26 01:08:00,796 - ModuleRegistry - INFO - Loaded module: crm
+2026-03-26 01:08:00,796 - QuotesModule - INFO - Initializing module: Quotes
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: quotes.service_catalog
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: quotes.worker_catalog
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: quotes.item_catalog
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: quotes.quote
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: quotes.quote_line
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: quotes.quote_template
+2026-03-26 01:08:00,796 - ModelRegistry - DEBUG - Registered model: quotes.quote_template_line
+2026-03-26 01:08:00,796 - QuotesModule - INFO - Quotes module v2 initialized (3 catalogs)
+2026-03-26 01:08:00,796 - ModuleRegistry - INFO - Loaded module: quotes
+2026-03-26 01:08:00,797 - CoreFramework - INFO - CoreFramework initialized successfully
+2026-03-26 01:08:00,797 - main - INFO - Framework initialized successfully
+INFO:     Started server process [44832]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit)
+
+    +-------------------------------------------+
+    |       YOUR ERP - Framework Core           |
+    |       Starting Development Server         |
+    +-------------------------------------------+
+
+  Modules loaded: ['base', 'signature', 'crm', 'quotes']
+  Debug mode: True
+  Server running at: http://localhost:8000
+  API docs at: http://localhost:8000/docs
+INFO:     127.0.0.1:59188 - "GET /app/quotes/new?lead_id=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59189 - "GET /static/js/api.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59188 - "GET /static/css/theme.css?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59189 - "GET /static/js/quote_form.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59189 - "GET /quotes/catalog/services HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59188 - "GET /quotes/catalog/workers HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59189 - "GET /quotes/catalog/items HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59189 - "GET /app/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59188 - "GET /company/settings HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59189 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59189 - "GET /static/js/auth.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59189 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59192 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59271 - "GET /app/quotes/new?lead_id=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59271 - "GET /static/js/quote_form.js?v=4.0 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59271 - "GET /app/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59287 - "GET /app/quotes/new?lead_id=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59293 - "GET /app/quotes/new?lead_id=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59296 - "GET /app/quotes/new?lead_id=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59299 - "GET /app/quotes/new?lead_id=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59302 - "GET /app/quotes/new?lead_id=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59308 - "GET /app/quotes/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59317 - "GET /app/quotes/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59478 - "GET /app/login HTTP/1.1" 200 OK
+2026-03-26 01:17:17,352 - Company - DEBUG - Inserted Company #1
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #1
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #2
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #3
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #4
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #5
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #6
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #7
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #8
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #9
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #10
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #11
+2026-03-26 01:17:17,352 - Stage - DEBUG - Inserted Stage #12
+2026-03-26 01:17:17,398 - User - DEBUG - Inserted User #1
+2026-03-26 01:17:17,398 - User - DEBUG - Updated User #1
+INFO:     127.0.0.1:59551 - "POST /auth/register HTTP/1.1" 201 Created
+INFO:     127.0.0.1:59551 - "GET /app/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59551 - "GET /static/js/dashboard.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59551 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59551 - "GET /signature/requests HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59553 - "GET /app/crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59553 - "GET /static/js/crm_customers.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59553 - "GET /crm/customers HTTP/1.1" 200 OK
+2026-03-26 01:17:28,063 - Customer - DEBUG - Inserted Customer #1
+INFO:     127.0.0.1:59553 - "POST /crm/customers HTTP/1.1" 201 Created
+INFO:     127.0.0.1:59553 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59553 - "GET /app/quotes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59553 - "GET /static/js/quotes.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59553 - "GET /quotes?limit=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59553 - "GET /app/catalogs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59553 - "GET /static/js/catalogs.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59553 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+2026-03-26 01:17:40,155 - ServiceCatalog - DEBUG - Inserted ServiceCatalog #1
+INFO:     127.0.0.1:59554 - "POST /quotes/catalog/services HTTP/1.1" 201 Created
+INFO:     127.0.0.1:59554 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59572 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59572 - "GET /static/js/crm.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59572 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59572 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59572 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59572 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59572 - "GET /users HTTP/1.1" 200 OK
+2026-03-26 01:17:46,278 - ServiceType - DEBUG - Inserted ServiceType #1
+2026-03-26 01:17:46,278 - ServiceType - DEBUG - Inserted ServiceType #2
+2026-03-26 01:17:46,278 - ServiceType - DEBUG - Inserted ServiceType #3
+2026-03-26 01:17:46,278 - ServiceType - DEBUG - Inserted ServiceType #4
+INFO:     127.0.0.1:59572 - "GET /crm/service-types HTTP/1.1" 200 OK
+2026-03-26 01:17:52,467 - Company - DEBUG - Updated Company #1
+2026-03-26 01:17:52,467 - Lead - DEBUG - Inserted Lead #1
+2026-03-26 01:17:52,467 - ActivityLog - DEBUG - Inserted ActivityLog #1
+INFO:     127.0.0.1:59576 - "POST /crm/leads HTTP/1.1" 201 Created
+INFO:     127.0.0.1:59576 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59577 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59578 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59579 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59580 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59580 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59580 - "GET /app/crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59580 - "GET /static/js/crm_lead_detail.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59580 - "GET /crm/leads/1/dossier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59579 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59591 - "GET /app/quotes/new?lead_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59591 - "GET /static/js/quote_form.js?v=4.0 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59591 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59592 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59591 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59591 - "GET /company/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59591 - "GET /crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59592 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59592 - "GET /crm/documents/Lead/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59592 - "GET /quotes/templates HTTP/1.1" 200 OK
+2026-03-26 01:18:21,454 - Quote - DEBUG - Inserted Quote #1
+2026-03-26 01:18:21,454 - QuoteLine - DEBUG - Inserted QuoteLine #1
+2026-03-26 01:18:21,454 - Lead - DEBUG - Updated Lead #1
+2026-03-26 01:18:21,454 - ActivityLog - DEBUG - Inserted ActivityLog #2
+2026-03-26 01:18:21,454 - ActivityLog - DEBUG - Inserted ActivityLog #3
+INFO:     127.0.0.1:59593 - "POST /quotes HTTP/1.1" 201 Created
+2026-03-26 01:18:21,456 - Quote - DEBUG - Updated Quote #1
+2026-03-26 01:18:21,456 - ActivityLog - DEBUG - Inserted ActivityLog #4
+2026-03-26 01:18:21,456 - Lead - DEBUG - Updated Lead #1
+2026-03-26 01:18:21,456 - ActivityLog - DEBUG - Inserted ActivityLog #5
+INFO:     127.0.0.1:59593 - "POST /quotes/1/send HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59593 - "GET /app/quotes/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59593 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59593 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59593 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59593 - "GET /quotes/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59593 - "GET /crm/documents/Lead/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59593 - "GET /app/quotes/1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59593 - "GET /static/js/quote_preview.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59593 - "GET /quotes/1/export-data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59610 - "GET /app/quotes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59610 - "GET /quotes?limit=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59610 - "GET /app/quotes/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59610 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59611 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59610 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59610 - "GET /quotes/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59610 - "GET /crm/documents/Lead/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59610 - "GET /app/quotes/1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59610 - "GET /quotes/1/export-data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59617 - "GET /app/catalogs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59617 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59617 - "GET /app/quotes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59617 - "GET /quotes?limit=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59617 - "GET /app/quotes/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59617 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59624 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59617 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59617 - "GET /quotes/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59617 - "GET /crm/documents/Lead/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59627 - "GET /app/catalogs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59627 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59627 - "GET /app/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59627 - "GET /static/js/settings.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59627 - "GET /company/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59636 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59627 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59636 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59636 - "GET /crm/service-types HTTP/1.1" 200 OK
+2026-03-26 01:19:26,792 - WorkerCatalog - DEBUG - Inserted WorkerCatalog #1
+INFO:     127.0.0.1:59643 - "POST /quotes/catalog/workers HTTP/1.1" 201 Created
+INFO:     127.0.0.1:59643 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+2026-03-26 01:19:34,298 - ItemCatalog - DEBUG - Inserted ItemCatalog #1
+INFO:     127.0.0.1:59644 - "POST /quotes/catalog/items HTTP/1.1" 201 Created
+INFO:     127.0.0.1:59644 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59661 - "GET /app/catalogs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59661 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+2026-03-26 01:20:05,404 - ServiceCatalog - DEBUG - Inserted ServiceCatalog #2
+INFO:     127.0.0.1:59662 - "POST /quotes/catalog/services HTTP/1.1" 201 Created
+INFO:     127.0.0.1:59662 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59662 - "GET /app/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59662 - "GET /static/js/users.js?v=4.0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59662 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59662 - "GET /app/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59662 - "GET /company/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59663 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59662 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59663 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59662 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59679 - "GET /app/catalogs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59679 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+2026-03-26 01:20:25,860 - ServiceCatalog - DEBUG - Inserted ServiceCatalog #3
+INFO:     127.0.0.1:59680 - "POST /quotes/catalog/services HTTP/1.1" 201 Created
+INFO:     127.0.0.1:59680 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59680 - "GET /app/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59680 - "GET /company/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59680 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59680 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59680 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59680 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59696 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59696 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59697 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59698 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59699 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59696 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59697 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59697 - "GET /app/crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59697 - "GET /crm/leads/1/dossier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59696 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59696 - "GET /app/quotes/new?lead_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59696 - "GET /static/js/quote_form.js?v=4.0 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59696 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59697 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59718 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59718 - "GET /company/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59718 - "GET /crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59697 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59697 - "GET /crm/documents/Lead/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59697 - "GET /quotes/templates HTTP/1.1" 200 OK
+2026-03-26 01:21:35,644 - Quote - DEBUG - Inserted Quote #2
+2026-03-26 01:21:35,644 - QuoteLine - DEBUG - Inserted QuoteLine #2
+2026-03-26 01:21:35,644 - QuoteLine - DEBUG - Inserted QuoteLine #3
+2026-03-26 01:21:35,644 - ActivityLog - DEBUG - Inserted ActivityLog #6
+INFO:     127.0.0.1:59719 - "POST /quotes HTTP/1.1" 201 Created
+INFO:     127.0.0.1:59719 - "GET /app/quotes/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /quotes/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /crm/documents/Lead/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /app/quotes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /quotes?limit=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59735 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59736 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59735 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59736 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59736 - "GET /app/crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59736 - "GET /crm/leads/1/dossier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59735 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59741 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59741 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59742 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59743 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59741 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59742 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59743 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59756 - "GET /crm/customers/1/mandantes HTTP/1.1" 200 OK
+2026-03-26 01:22:06,397 - Company - DEBUG - Updated Company #1
+2026-03-26 01:22:06,397 - Lead - DEBUG - Inserted Lead #2
+2026-03-26 01:22:06,397 - ActivityLog - DEBUG - Inserted ActivityLog #7
+INFO:     127.0.0.1:59756 - "POST /crm/leads HTTP/1.1" 201 Created
+INFO:     127.0.0.1:59756 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59757 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59758 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59756 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59757 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59757 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59757 - "GET /app/crm/leads/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59757 - "GET /crm/leads/2/dossier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59756 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59756 - "GET /app/quotes/new?lead_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59756 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59757 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59758 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59758 - "GET /company/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59758 - "GET /crm/leads/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59757 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59757 - "GET /crm/documents/Lead/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59757 - "GET /quotes/templates HTTP/1.1" 200 OK
+2026-03-26 01:22:15,157 - Quote - DEBUG - Inserted Quote #3
+2026-03-26 01:22:15,157 - QuoteLine - DEBUG - Inserted QuoteLine #4
+2026-03-26 01:22:15,157 - Lead - DEBUG - Updated Lead #2
+2026-03-26 01:22:15,157 - ActivityLog - DEBUG - Inserted ActivityLog #8
+2026-03-26 01:22:15,157 - ActivityLog - DEBUG - Inserted ActivityLog #9
+INFO:     127.0.0.1:59764 - "POST /quotes HTTP/1.1" 201 Created
+2026-03-26 01:22:15,159 - Quote - DEBUG - Updated Quote #3
+2026-03-26 01:22:15,159 - ActivityLog - DEBUG - Inserted ActivityLog #10
+2026-03-26 01:22:15,159 - Lead - DEBUG - Updated Lead #2
+2026-03-26 01:22:15,159 - ActivityLog - DEBUG - Inserted ActivityLog #11
+INFO:     127.0.0.1:59764 - "POST /quotes/3/send HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59764 - "GET /app/quotes/3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59764 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59765 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59764 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59764 - "GET /quotes/3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59764 - "GET /crm/documents/Lead/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59793 - "GET /app/quotes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59793 - "GET /quotes?limit=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59794 - "GET /app/crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59794 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59794 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59794 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59795 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59794 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59795 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59794 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59795 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59818 - "GET /app/crm/leads/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59818 - "GET /crm/leads/2/dossier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59819 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59820 - "GET /app/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59820 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59821 - "GET /signature/requests HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59835 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59835 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59835 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59835 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59835 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59835 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59835 - "GET /crm/service-types HTTP/1.1" 200 OK
+2026-03-26 01:23:41,039 - Lead - DEBUG - Updated Lead #2
+2026-03-26 01:23:41,039 - ActivityLog - DEBUG - Inserted ActivityLog #12
+INFO:     127.0.0.1:59839 - "PUT /crm/leads/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59839 - "GET /crm/stats HTTP/1.1" 200 OK
+2026-03-26 01:23:41,720 - Lead - DEBUG - Updated Lead #2
+2026-03-26 01:23:41,720 - ActivityLog - DEBUG - Inserted ActivityLog #13
+INFO:     127.0.0.1:59839 - "PUT /crm/leads/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59839 - "GET /crm/stats HTTP/1.1" 200 OK
+2026-03-26 01:23:43,968 - Lead - DEBUG - Updated Lead #1
+2026-03-26 01:23:43,968 - ActivityLog - DEBUG - Inserted ActivityLog #14
+INFO:     127.0.0.1:59839 - "PUT /crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59839 - "GET /crm/stats HTTP/1.1" 200 OK
+2026-03-26 01:23:45,772 - Lead - DEBUG - Updated Lead #2
+2026-03-26 01:23:45,772 - ActivityLog - DEBUG - Inserted ActivityLog #15
+INFO:     127.0.0.1:59839 - "PUT /crm/leads/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59839 - "GET /crm/stats HTTP/1.1" 200 OK
+2026-03-26 01:23:53,794 - Lead - DEBUG - Updated Lead #1
+2026-03-26 01:23:53,794 - ActivityLog - DEBUG - Inserted ActivityLog #16
+INFO:     127.0.0.1:59840 - "PUT /crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59840 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59841 - "GET /app/crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59841 - "GET /crm/leads/1/dossier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59842 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59933 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59933 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59933 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59933 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59933 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59933 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59933 - "GET /crm/service-types HTTP/1.1" 200 OK
+2026-03-26 01:27:47,599 - Lead - DEBUG - Updated Lead #2
+2026-03-26 01:27:47,599 - ActivityLog - DEBUG - Inserted ActivityLog #17
+INFO:     127.0.0.1:60011 - "PUT /crm/leads/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60011 - "GET /crm/stats HTTP/1.1" 200 OK
+2026-03-26 01:27:57,974 - Lead - DEBUG - Updated Lead #2
+2026-03-26 01:27:57,974 - ActivityLog - DEBUG - Inserted ActivityLog #18
+INFO:     127.0.0.1:60012 - "PUT /crm/leads/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60012 - "GET /crm/stats HTTP/1.1" 200 OK
+2026-03-26 01:27:59,115 - Lead - DEBUG - Updated Lead #1
+2026-03-26 01:27:59,115 - ActivityLog - DEBUG - Inserted ActivityLog #19
+INFO:     127.0.0.1:60012 - "PUT /crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60012 - "GET /crm/stats HTTP/1.1" 200 OK
+2026-03-26 01:28:13,518 - Lead - DEBUG - Updated Lead #1
+2026-03-26 01:28:13,518 - ActivityLog - DEBUG - Inserted ActivityLog #20
+INFO:     127.0.0.1:60031 - "PUT /crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60031 - "GET /crm/stats HTTP/1.1" 200 OK
+2026-03-26 01:28:15,669 - Lead - DEBUG - Updated Lead #1
+2026-03-26 01:28:15,669 - ActivityLog - DEBUG - Inserted ActivityLog #21
+INFO:     127.0.0.1:60031 - "PUT /crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60031 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60032 - "GET /app/crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60032 - "GET /crm/leads/1/dossier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60032 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61063 - "GET /app/crm/leads/5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61067 - "GET /app/crm/leads/5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61071 - "GET /app/crm/leads/5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61073 - "GET /app/crm/leads/5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61089 - "GET /app/crm/leads/5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61091 - "GET / HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:61099 - "GET /app/crm/leads/5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61122 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61138 - "GET /app/crm/leads/5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61234 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:61519 - "GET /app/crm/leads/1 HTTP/1.1" 200 OK

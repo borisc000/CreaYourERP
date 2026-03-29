@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "YOUR ERP API",
+      "runtimeExecutable": "YOUR_ERP_CORE/venv/Scripts/python.exe",
+      "runtimeArgs": ["YOUR_ERP_CORE/main.py"],
+      "port": 8000
+    }
+  ]
+}

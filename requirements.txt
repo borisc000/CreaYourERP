@@ -1,0 +1,62 @@
+# YOUR ERP - Dependencias del Core Framework
+# 
+
+# Framework Web
+fastapi
+uvicorn[standard]
+starlette
+
+# ORM & Base de Datos
+sqlalchemy
+alembic
+psycopg2-binary
+pymysql
+
+
+# Validación & Serialización
+pydantic
+pydantic-core
+
+# Autenticación & Seguridad
+python-jose[cryptography]
+PyJWT
+passlib[bcrypt]
+cryptography
+bcrypt
+
+# Utilidades
+python-dotenv
+python-multipart
+aiofiles
+requests
+
+# Procesamiento de archivos
+python-pptx
+openpyxl
+reportlab
+pillow
+
+# Email
+aiosmtplib
+email-validator
+
+# Logging & Monitoring
+python-json-logger
+sentry-sdk
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+
+# Development
+black
+flake8
+mypy
+isort
+pylint
+
+# Documentation
+sphinx
+sphinx-rtd-theme

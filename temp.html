@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Settings - YOUR ERP</title>
+<link rel="stylesheet" href="/static/css/theme.css">
+</head>
+<body>
+<div class="app-layout">
+
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h2><span>YOUR</span> ERP</h2>
+                <div class="ver">v1.0.0 - Local Dev</div>
+            </div>
+            <nav>
+                <!-- ── Principal ──────────────────────────── -->
+                <a href="/app/dashboard" data-roles="superadmin,company_admin,employee">
+                    <span class="icon">&#9632;</span> Dashboard
+                </a>
+
+                <!-- ── CRM ────────────────────────────────── -->
+                <div class="nav-section" data-roles="superadmin,company_admin,employee">CRM</div>
+                <a href="/app/crm" class="nav-child" data-roles="superadmin,company_admin,employee">
+                    <span class="icon">&#128200;</span> Pipeline
+                </a>
+                <a href="/app/crm/customers" class="nav-child" data-roles="superadmin,company_admin,employee">
+                    <span class="icon">&#127970;</span> Clientes
+                </a>
+
+                <!-- ── Operaciones ────────────────────────── -->
+                <div class="nav-section" data-roles="superadmin,company_admin,employee">Operaciones</div>
+                <a href="/app/signatures" class="nav-child" data-roles="superadmin,company_admin,employee">
+                    <span class="icon">&#9998;</span> Firmas
+                </a>
+
+                <!-- ── Administraci&oacute;n ──────────────── -->
+                <div class="nav-section" data-roles="superadmin,company_admin">Administraci&oacute;n</div>
+                <a href="/app/users" class="nav-child" data-roles="superadmin,company_admin">
+                    <span class="icon">&#9679;</span> Usuarios
+                </a>
+                <a href="/app/settings" class="nav-child" data-roles="superadmin,company_admin">
+                    <span class="icon">&#9881;</span> Configuraci&oacute;n
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <a href="/app/profile" class="user-name" id="sidebar-user-name"
+                       style="text-decoration:none;color:inherit">User</a>
+                    <span id="sidebar-user-email" class="text-sm text-muted"></span>
+                    <span id="sidebar-role-badge" class="role-badge"></span>
+                </div>
+                <div style="display:flex;gap:0.75rem;align-items:center;margin-top:0.5rem">
+                    <a href="/app/profile" class="profile-link">My Profile</a>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </aside>
+<main class="main-content" id="page-settings">
+
+    <div class="page-header">
+        <h1>Company Settings</h1>
+        <p>Manage your company profile and branding</p>
+    </div>
+
+    <!-- Logo preview card -->
+    <div class="card" id="logo-card" style="display:none">
+        <div style="display:flex;align-items:center;gap:1.5rem">
+            <img id="logo-preview" src="" alt="Company Logo"
+                 style="height:64px;max-width:200px;object-fit:contain;border-radius:8px;background:#0f172a;padding:0.5rem">
+            <div>
+                <div id="settings-company-name" style="font-size:1.2rem;font-weight:700;color:#f1f5f9"></div>
+                <div id="settings-tax-id" style="font-size:0.8rem;color:#64748b;margin-top:0.25rem"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-grid">
+        <!-- LEFT: Company Info -->
+        <div class="card">
+            <h3>Company Information</h3>
+            <form id="settings-form" onsubmit="saveSettings(event)">
+
+                <div class="form-group">
+                    <label>Display Name *</label>
+                    <input type="text" id="s-name" placeholder="Mi Empresa" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Legal Name</label>
+                    <input type="text" id="s-legal-name" placeholder="Mi Empresa Servicios S.A.">
+                    <small class="field-hint">Full legal name used on invoices and documents</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tax ID / RUT</label>
+                        <input type="text" id="s-tax-id" placeholder="76.123.456-7">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="text" id="s-phone" placeholder="+56 9 1234 5678">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Address</label>
+                    <textarea id="s-address" placeholder="Av. Providencia 123, Santiago, Chile" rows="2"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Contact Email</label>
+                    <input type="email" id="s-email" placeholder="contacto@empresa.com" disabled
+                           style="opacity:0.5;cursor:not-allowed">
+                    <small class="field-hint">Email is set at registration and cannot be changed here</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="save-btn">Save Changes</button>
+                    <span id="save-status" style="font-size:0.8rem;color:#22c55e;display:none">&#10003; Saved</span>
+                </div>
+            </form>
+        </div>
+
+        <!-- RIGHT: Branding -->
+        <div class="card">
+            <h3>Branding & Logo</h3>
+
+            <div class="form-group">
+                <label>Logo URL</label>
+                <input type="url" id="s-logo-url" placeholder="https://your-cdn.com/logo.png"
+                       oninput="previewLogo(this.value)">
+                <small class="field-hint">Paste the URL of your logo. It will appear on documents and PDFs.</small>
+            </div>
+
+            <div id="logo-preview-box" style="margin-top:1rem;text-align:center;min-height:100px;
+                 background:#0f172a;border:1px dashed #334155;border-radius:8px;padding:1rem;display:flex;
+                 align-items:center;justify-content:center;flex-direction:column;gap:0.5rem">
+                <img id="logo-preview-inline" src="" alt="" style="max-height:80px;max-width:180px;display:none;object-fit:contain">
+                <span id="logo-preview-placeholder" style="color:#475569;font-size:0.8rem">Logo preview will appear here</span>
+            </div>
+
+            <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid #334155">
+                <h4 style="font-size:0.85rem;color:#94a3b8;margin-bottom:0.75rem">PDF HEADER PREVIEW</h4>
+                <div id="pdf-preview" style="background:#1a2744;border:1px solid #334155;border-radius:8px;
+                     padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:0.75rem">
+                        <img id="pdf-logo" src="" alt="" style="height:36px;display:none;object-fit:contain">
+                        <div>
+                            <div id="pdf-name" style="font-weight:700;color:#f1f5f9;font-size:0.95rem">Company Name</div>
+                            <div id="pdf-taxid" style="font-size:0.7rem;color:#64748b"></div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;font-size:0.7rem;color:#64748b">
+                        <div id="pdf-address"></div>
+                        <div id="pdf-phone"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</main>
+</div>
+<div id="toast" class="toast"></div>
+<script src="/static/js/api.js"></script>
+<script src="/static/js/settings.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    initSidebar();
+});
+</script>
+</body>
+</html>

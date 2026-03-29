@@ -1,0 +1,61 @@
+from frontend.pages.layout import base_layout
+
+def login_page():
+    content = """
+    <div class="login-container">
+        <div class="login-box">
+            <h1>YOUR <span style="color:#3b82f6">ERP</span></h1>
+            <p class="sub">Open Source ERP Platform</p>
+
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('login')">Login</div>
+                <div class="tab" onclick="switchTab('register')">Register</div>
+            </div>
+
+            <div class="form-error" id="form-error"></div>
+
+            <!-- LOGIN -->
+            <div class="tab-content active" id="tab-login">
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="login-email" placeholder="admin@erp.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="login-pass" placeholder="Password" required>
+                    </div>
+                    <button class="btn btn-primary" type="submit" id="login-btn">Login</button>
+                    <div style="text-align:center;margin-top:0.85rem">
+                        <a href="/app/forgot-password"
+                           style="font-size:0.78rem;color:#64748b">Forgot your password?</a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- REGISTER -->
+            <div class="tab-content" id="tab-register">
+                <form onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="reg-name" placeholder="John Doe" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="reg-email" placeholder="john@company.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password (min 8 chars)</label>
+                        <input type="password" id="reg-pass" placeholder="Password" required minlength="8">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" id="reg-pass2" placeholder="Repeat password" required>
+                    </div>
+                    <button class="btn btn-primary" type="submit" id="reg-btn">Create Account</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    """
+    return base_layout("Login", "login", content, scripts=["auth.js"], no_sidebar=True)
