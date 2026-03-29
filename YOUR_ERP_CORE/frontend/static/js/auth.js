@@ -64,19 +64,25 @@ async function loginDemo() {
     const btn = document.getElementById('demo-btn');
     const err = document.getElementById('form-error');
     err.textContent = '';
-    btn.disabled = true; btn.textContent = 'Logging in...';
+    btn.disabled = true;
+    btn.textContent = 'Entrando...';
 
-    const email = 'demo@pedroconstruction.cl';
-    const password = 'demo123';
+    try {
+        const res = await API.get('/auth/demo-login');
+        btn.disabled = false;
+        btn.textContent = 'Demo';
 
-    const res = await API.post('/auth/login', { email, password });
-    btn.disabled = false; btn.textContent = '🎯 Demo Access (No Registration)';
-
-    if (res && res.success) {
-        API.setToken(res.data.token);
-        API.setUser(res.data.user);
-        window.location.href = '/app/dashboard';
-    } else {
-        err.textContent = 'Demo login failed - seed data may not be loaded. Run: python YOUR_ERP_CORE/seed_demo_data.py';
+        if (res && res.success && res.data) {
+            API.setToken(res.data.token);
+            API.setUser(res.data.user);
+            window.location.href = '/app/dashboard';
+        } else {
+            err.textContent = res?.errors?.[0] || 'Error al acceder como demo';
+            btn.textContent = 'Demo';
+        }
+    } catch (e) {
+        err.textContent = 'Error de conexión';
+        btn.disabled = false;
+        btn.textContent = 'Demo';
     }
 }

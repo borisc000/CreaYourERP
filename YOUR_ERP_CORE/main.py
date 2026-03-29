@@ -214,29 +214,6 @@ async def debug_users():
         "users": users_list
     })
 
-@app.post("/debug/test-login")
-async def debug_test_login():
-    """Test endpoint to debug login"""
-    from modules.base.module_base import User
-
-    # Find demo user
-    users = User.search([('email', '=', 'demo@pedroconstruction.cl')])
-
-    if not users:
-        return JSONResponse({"error": "User not found", "total_users": len(User._store)}, status_code=404)
-
-    user = users[0]
-
-    # Try to verify password
-    verify_result = user.verify_password('demo123')
-
-    return JSONResponse({
-        "user": user.email,
-        "has_hash": bool(user.password_hash),
-        "is_active": user.is_active,
-        "password_verified": verify_result,
-        "total_users": len(User._store)
-    })
 
 # ============================================================================
 # CONVERTIR FASTAPI REQUEST A REQUEST UNIVERSAL

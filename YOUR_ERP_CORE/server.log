@@ -1,88 +1,88 @@
-2026-03-29 14:36:15,493 - __main__ - INFO - Initializing ERP Framework...
-2026-03-29 14:36:15,493 - CoreFramework - INFO - CoreFramework logging configured
-2026-03-29 14:36:15,493 - ModuleRegistry - DEBUG - Registered module class: Base
-2026-03-29 14:36:15,493 - ModuleRegistry - DEBUG - Registered module class: Signature
-2026-03-29 14:36:15,493 - ModuleRegistry - DEBUG - Registered module class: CRM
-2026-03-29 14:36:15,493 - ModuleRegistry - DEBUG - Registered module class: Quotes
-2026-03-29 14:36:15,494 - ModuleRegistry - DEBUG - Registered module class: Reports
-2026-03-29 14:36:15,494 - ModuleRegistry - DEBUG - Registered module class: HR
-2026-03-29 14:36:15,494 - ModuleRegistry - DEBUG - Registered module class: Recruitment
-2026-03-29 14:36:15,494 - ModuleRegistry - DEBUG - Registered module class: Safety
-2026-03-29 14:36:15,494 - ModuleRegistry - DEBUG - Registered module class: Inventory
-2026-03-29 14:36:15,494 - CoreFramework - INFO - Initializing CoreFramework...
-2026-03-29 14:36:15,494 - DatabaseAdapter - INFO - Connecting to database: postgresql://user:password@localhost/your_erp
-2026-03-29 14:36:15,494 - BaseModule - INFO - Initializing module: Base
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: company
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: group
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: user
-2026-03-29 14:36:15,494 - BaseModule - INFO - Base module initialized
-2026-03-29 14:36:15,494 - ModuleRegistry - INFO - Loaded module: base
-2026-03-29 14:36:15,494 - SignatureModule - INFO - Initializing module: Signature
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: signature.request
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: signature.log
-2026-03-29 14:36:15,494 - SignatureModule - INFO - Signature module initialized
-2026-03-29 14:36:15,494 - ModuleRegistry - INFO - Loaded module: signature
-2026-03-29 14:36:15,494 - CRMModule - INFO - Initializing module: CRM
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: crm.stage
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: crm.customer
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: crm.mandante
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: crm.lead
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: crm.lead_note
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: crm.activity_log
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: crm.document
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: crm.service_type
-2026-03-29 14:36:15,494 - CRMModule - INFO - CRM module initialized
-2026-03-29 14:36:15,494 - ModuleRegistry - INFO - Loaded module: crm
-2026-03-29 14:36:15,494 - QuotesModule - INFO - Initializing module: Quotes
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: quotes.service_catalog
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: quotes.worker_catalog
-2026-03-29 14:36:15,494 - ModelRegistry - DEBUG - Registered model: quotes.item_catalog
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: quotes.quote
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: quotes.quote_line
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: quotes.quote_template
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: quotes.quote_template_line
-2026-03-29 14:36:15,495 - QuotesModule - INFO - Quotes module v2 initialized (3 catalogs)
-2026-03-29 14:36:15,495 - ModuleRegistry - INFO - Loaded module: quotes
-2026-03-29 14:36:15,495 - ReportsModule - INFO - Initializing module: Reports
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: reports.report
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: reports.checkpoint
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: reports.photo
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: reports.area_faena
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: reports.sector_faena
-2026-03-29 14:36:15,495 - ModuleRegistry - INFO - Loaded module: reports
-2026-03-29 14:36:15,495 - HRModule - INFO - Initializing module: HR
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: hr.department
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: hr.employee
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: hr.contract
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: hr.time_off_request
-2026-03-29 14:36:15,495 - HRModule - INFO - HR module initialized
-2026-03-29 14:36:15,495 - ModuleRegistry - INFO - Loaded module: hr
-2026-03-29 14:36:15,495 - RecruitmentModule - INFO - Initializing module: Recruitment
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: recruitment.stage
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: recruitment.job
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: recruitment.candidate
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: recruitment.application
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: recruitment.interview
-2026-03-29 14:36:15,495 - RecruitmentModule - INFO - Recruitment module initialized
-2026-03-29 14:36:15,495 - ModuleRegistry - INFO - Loaded module: recruitment
-2026-03-29 14:36:15,495 - SafetyModule - INFO - Initializing module: Safety
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: safety.service_profile
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: safety.folder
-2026-03-29 14:36:15,495 - ModelRegistry - DEBUG - Registered model: safety.document
-2026-03-29 14:36:15,496 - ModelRegistry - DEBUG - Registered model: safety.risk_matrix
-2026-03-29 14:36:15,496 - ModelRegistry - DEBUG - Registered model: safety.ppe_delivery
-2026-03-29 14:36:15,496 - ModelRegistry - DEBUG - Registered model: safety.talk
-2026-03-29 14:36:15,496 - ModelRegistry - DEBUG - Registered model: safety.checklist
-2026-03-29 14:36:15,496 - SafetyModule - INFO - Safety module initialized
-2026-03-29 14:36:15,496 - ModuleRegistry - INFO - Loaded module: safety
-2026-03-29 14:36:15,496 - InventoryModule - INFO - Initializing module: Inventory
-2026-03-29 14:36:15,496 - ModelRegistry - DEBUG - Registered model: inventory.item
-2026-03-29 14:36:15,496 - ModelRegistry - DEBUG - Registered model: inventory.movement
-2026-03-29 14:36:15,496 - ModelRegistry - DEBUG - Registered model: inventory.backup
-2026-03-29 14:36:15,496 - InventoryModule - INFO - Inventory module initialized
-2026-03-29 14:36:15,496 - ModuleRegistry - INFO - Loaded module: inventory
-2026-03-29 14:36:15,496 - CoreFramework - INFO - CoreFramework initialized successfully
-2026-03-29 14:36:15,496 - __main__ - INFO - Framework initialized successfully
+2026-03-29 14:45:13,817 - __main__ - INFO - Initializing ERP Framework...
+2026-03-29 14:45:13,817 - CoreFramework - INFO - CoreFramework logging configured
+2026-03-29 14:45:13,817 - ModuleRegistry - DEBUG - Registered module class: Base
+2026-03-29 14:45:13,817 - ModuleRegistry - DEBUG - Registered module class: Signature
+2026-03-29 14:45:13,817 - ModuleRegistry - DEBUG - Registered module class: CRM
+2026-03-29 14:45:13,817 - ModuleRegistry - DEBUG - Registered module class: Quotes
+2026-03-29 14:45:13,817 - ModuleRegistry - DEBUG - Registered module class: Reports
+2026-03-29 14:45:13,817 - ModuleRegistry - DEBUG - Registered module class: HR
+2026-03-29 14:45:13,817 - ModuleRegistry - DEBUG - Registered module class: Recruitment
+2026-03-29 14:45:13,817 - ModuleRegistry - DEBUG - Registered module class: Safety
+2026-03-29 14:45:13,817 - ModuleRegistry - DEBUG - Registered module class: Inventory
+2026-03-29 14:45:13,818 - CoreFramework - INFO - Initializing CoreFramework...
+2026-03-29 14:45:13,818 - DatabaseAdapter - INFO - Connecting to database: postgresql://user:password@localhost/your_erp
+2026-03-29 14:45:13,818 - BaseModule - INFO - Initializing module: Base
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: company
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: group
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: user
+2026-03-29 14:45:13,818 - BaseModule - INFO - Base module initialized
+2026-03-29 14:45:13,818 - ModuleRegistry - INFO - Loaded module: base
+2026-03-29 14:45:13,818 - SignatureModule - INFO - Initializing module: Signature
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: signature.request
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: signature.log
+2026-03-29 14:45:13,818 - SignatureModule - INFO - Signature module initialized
+2026-03-29 14:45:13,818 - ModuleRegistry - INFO - Loaded module: signature
+2026-03-29 14:45:13,818 - CRMModule - INFO - Initializing module: CRM
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: crm.stage
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: crm.customer
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: crm.mandante
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: crm.lead
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: crm.lead_note
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: crm.activity_log
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: crm.document
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: crm.service_type
+2026-03-29 14:45:13,818 - CRMModule - INFO - CRM module initialized
+2026-03-29 14:45:13,818 - ModuleRegistry - INFO - Loaded module: crm
+2026-03-29 14:45:13,818 - QuotesModule - INFO - Initializing module: Quotes
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: quotes.service_catalog
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: quotes.worker_catalog
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: quotes.item_catalog
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: quotes.quote
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: quotes.quote_line
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: quotes.quote_template
+2026-03-29 14:45:13,818 - ModelRegistry - DEBUG - Registered model: quotes.quote_template_line
+2026-03-29 14:45:13,818 - QuotesModule - INFO - Quotes module v2 initialized (3 catalogs)
+2026-03-29 14:45:13,819 - ModuleRegistry - INFO - Loaded module: quotes
+2026-03-29 14:45:13,819 - ReportsModule - INFO - Initializing module: Reports
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: reports.report
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: reports.checkpoint
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: reports.photo
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: reports.area_faena
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: reports.sector_faena
+2026-03-29 14:45:13,819 - ModuleRegistry - INFO - Loaded module: reports
+2026-03-29 14:45:13,819 - HRModule - INFO - Initializing module: HR
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: hr.department
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: hr.employee
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: hr.contract
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: hr.time_off_request
+2026-03-29 14:45:13,819 - HRModule - INFO - HR module initialized
+2026-03-29 14:45:13,819 - ModuleRegistry - INFO - Loaded module: hr
+2026-03-29 14:45:13,819 - RecruitmentModule - INFO - Initializing module: Recruitment
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: recruitment.stage
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: recruitment.job
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: recruitment.candidate
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: recruitment.application
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: recruitment.interview
+2026-03-29 14:45:13,819 - RecruitmentModule - INFO - Recruitment module initialized
+2026-03-29 14:45:13,819 - ModuleRegistry - INFO - Loaded module: recruitment
+2026-03-29 14:45:13,819 - SafetyModule - INFO - Initializing module: Safety
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: safety.service_profile
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: safety.folder
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: safety.document
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: safety.risk_matrix
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: safety.ppe_delivery
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: safety.talk
+2026-03-29 14:45:13,819 - ModelRegistry - DEBUG - Registered model: safety.checklist
+2026-03-29 14:45:13,819 - SafetyModule - INFO - Safety module initialized
+2026-03-29 14:45:13,819 - ModuleRegistry - INFO - Loaded module: safety
+2026-03-29 14:45:13,819 - InventoryModule - INFO - Initializing module: Inventory
+2026-03-29 14:45:13,820 - ModelRegistry - DEBUG - Registered model: inventory.item
+2026-03-29 14:45:13,820 - ModelRegistry - DEBUG - Registered model: inventory.movement
+2026-03-29 14:45:13,820 - ModelRegistry - DEBUG - Registered model: inventory.backup
+2026-03-29 14:45:13,820 - InventoryModule - INFO - Inventory module initialized
+2026-03-29 14:45:13,820 - ModuleRegistry - INFO - Loaded module: inventory
+2026-03-29 14:45:13,820 - CoreFramework - INFO - CoreFramework initialized successfully
+2026-03-29 14:45:13,820 - __main__ - INFO - Framework initialized successfully
 C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE\main.py:101: DeprecationWarning: 
         on_event is deprecated, use lifespan event handlers instead.
 
@@ -90,97 +90,97 @@ C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE\main.py:101: DeprecationWarning:
         [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
         
   @app.on_event("startup")
-2026-03-29 14:36:15,613 - asyncio - DEBUG - Using proactor: IocpProactor
-2026-03-29 14:36:15,658 - main - INFO - Initializing ERP Framework...
-2026-03-29 14:36:15,659 - CoreFramework - INFO - CoreFramework logging configured
-2026-03-29 14:36:15,659 - ModuleRegistry - DEBUG - Registered module class: Base
-2026-03-29 14:36:15,659 - ModuleRegistry - DEBUG - Registered module class: Signature
-2026-03-29 14:36:15,659 - ModuleRegistry - DEBUG - Registered module class: CRM
-2026-03-29 14:36:15,659 - ModuleRegistry - DEBUG - Registered module class: Quotes
-2026-03-29 14:36:15,659 - ModuleRegistry - DEBUG - Registered module class: Reports
-2026-03-29 14:36:15,659 - ModuleRegistry - DEBUG - Registered module class: HR
-2026-03-29 14:36:15,659 - ModuleRegistry - DEBUG - Registered module class: Recruitment
-2026-03-29 14:36:15,659 - ModuleRegistry - DEBUG - Registered module class: Safety
-2026-03-29 14:36:15,659 - ModuleRegistry - DEBUG - Registered module class: Inventory
-2026-03-29 14:36:15,659 - CoreFramework - INFO - Initializing CoreFramework...
-2026-03-29 14:36:15,659 - DatabaseAdapter - INFO - Connecting to database: postgresql://user:password@localhost/your_erp
-2026-03-29 14:36:15,659 - BaseModule - INFO - Initializing module: Base
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: company
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: group
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: user
-2026-03-29 14:36:15,659 - BaseModule - INFO - Base module initialized
-2026-03-29 14:36:15,659 - ModuleRegistry - INFO - Loaded module: base
-2026-03-29 14:36:15,659 - SignatureModule - INFO - Initializing module: Signature
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: signature.request
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: signature.log
-2026-03-29 14:36:15,659 - SignatureModule - INFO - Signature module initialized
-2026-03-29 14:36:15,659 - ModuleRegistry - INFO - Loaded module: signature
-2026-03-29 14:36:15,659 - CRMModule - INFO - Initializing module: CRM
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: crm.stage
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: crm.customer
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: crm.mandante
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: crm.lead
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: crm.lead_note
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: crm.activity_log
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: crm.document
-2026-03-29 14:36:15,659 - ModelRegistry - DEBUG - Registered model: crm.service_type
-2026-03-29 14:36:15,659 - CRMModule - INFO - CRM module initialized
-2026-03-29 14:36:15,660 - ModuleRegistry - INFO - Loaded module: crm
-2026-03-29 14:36:15,660 - QuotesModule - INFO - Initializing module: Quotes
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: quotes.service_catalog
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: quotes.worker_catalog
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: quotes.item_catalog
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: quotes.quote
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: quotes.quote_line
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: quotes.quote_template
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: quotes.quote_template_line
-2026-03-29 14:36:15,660 - QuotesModule - INFO - Quotes module v2 initialized (3 catalogs)
-2026-03-29 14:36:15,660 - ModuleRegistry - INFO - Loaded module: quotes
-2026-03-29 14:36:15,660 - ReportsModule - INFO - Initializing module: Reports
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: reports.report
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: reports.checkpoint
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: reports.photo
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: reports.area_faena
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: reports.sector_faena
-2026-03-29 14:36:15,660 - ModuleRegistry - INFO - Loaded module: reports
-2026-03-29 14:36:15,660 - HRModule - INFO - Initializing module: HR
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: hr.department
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: hr.employee
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: hr.contract
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: hr.time_off_request
-2026-03-29 14:36:15,660 - HRModule - INFO - HR module initialized
-2026-03-29 14:36:15,660 - ModuleRegistry - INFO - Loaded module: hr
-2026-03-29 14:36:15,660 - RecruitmentModule - INFO - Initializing module: Recruitment
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: recruitment.stage
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: recruitment.job
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: recruitment.candidate
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: recruitment.application
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: recruitment.interview
-2026-03-29 14:36:15,660 - RecruitmentModule - INFO - Recruitment module initialized
-2026-03-29 14:36:15,660 - ModuleRegistry - INFO - Loaded module: recruitment
-2026-03-29 14:36:15,660 - SafetyModule - INFO - Initializing module: Safety
-2026-03-29 14:36:15,660 - ModelRegistry - DEBUG - Registered model: safety.service_profile
-2026-03-29 14:36:15,661 - ModelRegistry - DEBUG - Registered model: safety.folder
-2026-03-29 14:36:15,661 - ModelRegistry - DEBUG - Registered model: safety.document
-2026-03-29 14:36:15,661 - ModelRegistry - DEBUG - Registered model: safety.risk_matrix
-2026-03-29 14:36:15,661 - ModelRegistry - DEBUG - Registered model: safety.ppe_delivery
-2026-03-29 14:36:15,661 - ModelRegistry - DEBUG - Registered model: safety.talk
-2026-03-29 14:36:15,661 - ModelRegistry - DEBUG - Registered model: safety.checklist
-2026-03-29 14:36:15,661 - SafetyModule - INFO - Safety module initialized
-2026-03-29 14:36:15,661 - ModuleRegistry - INFO - Loaded module: safety
-2026-03-29 14:36:15,661 - InventoryModule - INFO - Initializing module: Inventory
-2026-03-29 14:36:15,661 - ModelRegistry - DEBUG - Registered model: inventory.item
-2026-03-29 14:36:15,661 - ModelRegistry - DEBUG - Registered model: inventory.movement
-2026-03-29 14:36:15,661 - ModelRegistry - DEBUG - Registered model: inventory.backup
-2026-03-29 14:36:15,661 - InventoryModule - INFO - Inventory module initialized
-2026-03-29 14:36:15,661 - ModuleRegistry - INFO - Loaded module: inventory
-2026-03-29 14:36:15,661 - CoreFramework - INFO - CoreFramework initialized successfully
-2026-03-29 14:36:15,661 - main - INFO - Framework initialized successfully
-INFO:     Started server process [40012]
+2026-03-29 14:45:13,935 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-03-29 14:45:13,988 - main - INFO - Initializing ERP Framework...
+2026-03-29 14:45:13,988 - CoreFramework - INFO - CoreFramework logging configured
+2026-03-29 14:45:13,988 - ModuleRegistry - DEBUG - Registered module class: Base
+2026-03-29 14:45:13,988 - ModuleRegistry - DEBUG - Registered module class: Signature
+2026-03-29 14:45:13,988 - ModuleRegistry - DEBUG - Registered module class: CRM
+2026-03-29 14:45:13,988 - ModuleRegistry - DEBUG - Registered module class: Quotes
+2026-03-29 14:45:13,988 - ModuleRegistry - DEBUG - Registered module class: Reports
+2026-03-29 14:45:13,988 - ModuleRegistry - DEBUG - Registered module class: HR
+2026-03-29 14:45:13,988 - ModuleRegistry - DEBUG - Registered module class: Recruitment
+2026-03-29 14:45:13,988 - ModuleRegistry - DEBUG - Registered module class: Safety
+2026-03-29 14:45:13,988 - ModuleRegistry - DEBUG - Registered module class: Inventory
+2026-03-29 14:45:13,988 - CoreFramework - INFO - Initializing CoreFramework...
+2026-03-29 14:45:13,988 - DatabaseAdapter - INFO - Connecting to database: postgresql://user:password@localhost/your_erp
+2026-03-29 14:45:13,988 - BaseModule - INFO - Initializing module: Base
+2026-03-29 14:45:13,988 - ModelRegistry - DEBUG - Registered model: company
+2026-03-29 14:45:13,988 - ModelRegistry - DEBUG - Registered model: group
+2026-03-29 14:45:13,988 - ModelRegistry - DEBUG - Registered model: user
+2026-03-29 14:45:13,988 - BaseModule - INFO - Base module initialized
+2026-03-29 14:45:13,988 - ModuleRegistry - INFO - Loaded module: base
+2026-03-29 14:45:13,988 - SignatureModule - INFO - Initializing module: Signature
+2026-03-29 14:45:13,988 - ModelRegistry - DEBUG - Registered model: signature.request
+2026-03-29 14:45:13,988 - ModelRegistry - DEBUG - Registered model: signature.log
+2026-03-29 14:45:13,988 - SignatureModule - INFO - Signature module initialized
+2026-03-29 14:45:13,988 - ModuleRegistry - INFO - Loaded module: signature
+2026-03-29 14:45:13,988 - CRMModule - INFO - Initializing module: CRM
+2026-03-29 14:45:13,988 - ModelRegistry - DEBUG - Registered model: crm.stage
+2026-03-29 14:45:13,988 - ModelRegistry - DEBUG - Registered model: crm.customer
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: crm.mandante
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: crm.lead
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: crm.lead_note
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: crm.activity_log
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: crm.document
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: crm.service_type
+2026-03-29 14:45:13,989 - CRMModule - INFO - CRM module initialized
+2026-03-29 14:45:13,989 - ModuleRegistry - INFO - Loaded module: crm
+2026-03-29 14:45:13,989 - QuotesModule - INFO - Initializing module: Quotes
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: quotes.service_catalog
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: quotes.worker_catalog
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: quotes.item_catalog
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: quotes.quote
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: quotes.quote_line
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: quotes.quote_template
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: quotes.quote_template_line
+2026-03-29 14:45:13,989 - QuotesModule - INFO - Quotes module v2 initialized (3 catalogs)
+2026-03-29 14:45:13,989 - ModuleRegistry - INFO - Loaded module: quotes
+2026-03-29 14:45:13,989 - ReportsModule - INFO - Initializing module: Reports
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: reports.report
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: reports.checkpoint
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: reports.photo
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: reports.area_faena
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: reports.sector_faena
+2026-03-29 14:45:13,989 - ModuleRegistry - INFO - Loaded module: reports
+2026-03-29 14:45:13,989 - HRModule - INFO - Initializing module: HR
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: hr.department
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: hr.employee
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: hr.contract
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: hr.time_off_request
+2026-03-29 14:45:13,989 - HRModule - INFO - HR module initialized
+2026-03-29 14:45:13,989 - ModuleRegistry - INFO - Loaded module: hr
+2026-03-29 14:45:13,989 - RecruitmentModule - INFO - Initializing module: Recruitment
+2026-03-29 14:45:13,989 - ModelRegistry - DEBUG - Registered model: recruitment.stage
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: recruitment.job
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: recruitment.candidate
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: recruitment.application
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: recruitment.interview
+2026-03-29 14:45:13,990 - RecruitmentModule - INFO - Recruitment module initialized
+2026-03-29 14:45:13,990 - ModuleRegistry - INFO - Loaded module: recruitment
+2026-03-29 14:45:13,990 - SafetyModule - INFO - Initializing module: Safety
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: safety.service_profile
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: safety.folder
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: safety.document
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: safety.risk_matrix
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: safety.ppe_delivery
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: safety.talk
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: safety.checklist
+2026-03-29 14:45:13,990 - SafetyModule - INFO - Safety module initialized
+2026-03-29 14:45:13,990 - ModuleRegistry - INFO - Loaded module: safety
+2026-03-29 14:45:13,990 - InventoryModule - INFO - Initializing module: Inventory
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: inventory.item
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: inventory.movement
+2026-03-29 14:45:13,990 - ModelRegistry - DEBUG - Registered model: inventory.backup
+2026-03-29 14:45:13,990 - InventoryModule - INFO - Inventory module initialized
+2026-03-29 14:45:13,990 - ModuleRegistry - INFO - Loaded module: inventory
+2026-03-29 14:45:13,990 - CoreFramework - INFO - CoreFramework initialized successfully
+2026-03-29 14:45:13,990 - main - INFO - Framework initialized successfully
+INFO:     Started server process [41480]
 INFO:     Waiting for application startup.
-2026-03-29 14:36:15,667 - Company - DEBUG - Inserted Company #1
-2026-03-29 14:36:15,668 - Company - DEBUG - Updated Company #1
-2026-03-29 14:36:15,712 - User - DEBUG - Inserted User #1
+2026-03-29 14:45:13,998 - Company - DEBUG - Inserted Company #1
+2026-03-29 14:45:13,998 - Company - DEBUG - Updated Company #1
+2026-03-29 14:45:14,043 - User - DEBUG - Inserted User #1
 INFO:     Application startup complete.
 ERROR:    [Errno 10048] error while attempting to bind on address ('0.0.0.0', 8000): [winerror 10048] solo se permite un uso de cada dirección de socket (protocolo/dirección de red/puerto)
 INFO:     Waiting for application shutdown.

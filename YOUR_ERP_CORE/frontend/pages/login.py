@@ -33,19 +33,12 @@ def login_page():
                 </form>
 
                 <!-- DEMO LOGIN SECTION -->
-                <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid #334155">
-                    <p style="font-size:0.8rem;color:#94a3b8;text-align:center;margin-bottom:0.75rem">
-                        Want to test the system?
-                    </p>
-                    <button class="btn" id="demo-btn" onclick="loginDemo()"
-                            style="width:100%;background:#10b981;border:none;color:#fff;padding:0.6rem;
-                                   border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:600;">
-                        🎯 Demo Access (No Registration)
-                    </button>
-                    <p style="font-size:0.7rem;color:#64748b;text-align:center;margin-top:0.5rem">
-                        Test account with fictional data pre-loaded
-                    </p>
-                </div>
+                <button class="btn" id="demo-btn" onclick="loginDemo()"
+                        style="width:100%;background:#10b981;border:none;color:#fff;padding:0.5rem;
+                               border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;
+                               margin-top:0.75rem;">
+                    Demo
+                </button>
             </div>
 
             <!-- REGISTER -->

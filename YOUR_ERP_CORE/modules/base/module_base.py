@@ -350,6 +350,7 @@ class BaseModule(BaseModule):
         
         # Registrar rutas
         self.register_route('/auth/login', self.login, methods=['POST'], auth_required=False)
+        self.register_route('/auth/demo-login', self.demo_login, methods=['GET'], auth_required=False)
         self.register_route('/auth/logout', self.logout, methods=['POST'], auth_required=True)
         self.register_route('/auth/register', self.register, methods=['POST'], auth_required=False)
         self.register_route('/auth/forgot-password', self.forgot_password, methods=['POST'], auth_required=False)
@@ -441,7 +442,42 @@ class BaseModule(BaseModule):
                 "allowed_modules": user.allowed_modules or [],
             }
         })
-    
+
+    async def demo_login(self, request: Request) -> Response:
+        """
+        Demo login - acceso directo sin verificación de contraseña.
+
+        GET /auth/demo-login
+        """
+        # Buscar usuario demo
+        demo_users = User.search([('email', '=', 'demo@pedroconstruction.cl')])
+
+        if not demo_users:
+            return Response.unauthorized("Demo user not available")
+
+        user = demo_users[0]
+
+        # Verificar que esté activo
+        if not user.is_active:
+            return Response.forbidden("Demo user is not active")
+
+        # Generar token
+        token = user.generate_auth_token()
+        user.save()
+
+        return Response.ok({
+            "token": token,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "role": user.role or 'employee',
+                "company_id": user.company_id,
+                "is_admin": user.is_admin,
+                "allowed_modules": user.allowed_modules or [],
+            }
+        })
+
     async def logout(self, request: Request) -> Response:
         """Logout de usuario"""
         # Invalidar token
