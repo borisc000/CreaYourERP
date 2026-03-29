@@ -59,3 +59,24 @@ async function handleRegister(e) {
         err.textContent = (res && res.errors && res.errors[0]) || 'Registration failed';
     }
 }
+
+async function loginDemo() {
+    const btn = document.getElementById('demo-btn');
+    const err = document.getElementById('form-error');
+    err.textContent = '';
+    btn.disabled = true; btn.textContent = 'Logging in...';
+
+    const email = 'demo@pedroconstruction.cl';
+    const password = 'demo123';
+
+    const res = await API.post('/auth/login', { email, password });
+    btn.disabled = false; btn.textContent = '🎯 Demo Access (No Registration)';
+
+    if (res && res.success) {
+        API.setToken(res.data.token);
+        API.setUser(res.data.user);
+        window.location.href = '/app/dashboard';
+    } else {
+        err.textContent = 'Demo login failed - seed data may not be loaded. Run: python YOUR_ERP_CORE/seed_demo_data.py';
+    }
+}
