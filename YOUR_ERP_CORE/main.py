@@ -102,13 +102,46 @@ app = FastAPI(
 async def startup_seed():
     """Seed demo data on startup if database is empty"""
     try:
-        from seed_demo_data import seed_if_empty
-        if seed_if_empty():
-            print("  [+] Demo data seeded successfully")
-        else:
-            print("  [i] Database already contains data")
+        from modules.base.module_base import User, Company
+        from modules.crm.module_crm import Customer
+        from datetime import datetime
+
+        # Check if demo user exists
+        demo_users = User.search([('email', '=', 'demo@pedroconstruction.cl')])
+        if demo_users:
+            print("  [i] Demo user already exists")
+            return
+
+        print("  [*] Seeding demo data...")
+
+        # Create company
+        company = Company.create({
+            'name': 'Pedro Construction',
+            'legal_name': 'PEDRO CONSTRUCCION E.I.R.L.',
+            'tax_id': '76.123.456-7',
+            'email': 'info@pedroconstruction.cl',
+            'address': 'Calle Principal 123, Santiago',
+            'city': 'Santiago',
+            'country': 'Chile'
+        })
+        company.save()
+
+        # Create demo user
+        user = User(
+            company_id=company.id,
+            email='demo@pedroconstruction.cl',
+            name='Usuario Demo',
+            is_active=True,
+            role='manager'
+        )
+        user.set_password('demo123')
+        user.auth_token = f"demo_token_{user.id}_{datetime.utcnow().timestamp()}"
+        user.save()
+
+        print(f"  [+] Demo data seeded - Email: demo@pedroconstruction.cl / Password: demo123")
+
     except Exception as e:
-        print(f"  [!] Seed initialization warning: {e}")
+        print(f"  [!] Seed error: {str(e)[:100]}")
 
 # Middleware CORS
 app.add_middleware(
@@ -179,6 +212,30 @@ async def debug_users():
     return JSONResponse({
         "total_users": len(users_list),
         "users": users_list
+    })
+
+@app.post("/debug/test-login")
+async def debug_test_login():
+    """Test endpoint to debug login"""
+    from modules.base.module_base import User
+
+    # Find demo user
+    users = User.search([('email', '=', 'demo@pedroconstruction.cl')])
+
+    if not users:
+        return JSONResponse({"error": "User not found", "total_users": len(User._store)}, status_code=404)
+
+    user = users[0]
+
+    # Try to verify password
+    verify_result = user.verify_password('demo123')
+
+    return JSONResponse({
+        "user": user.email,
+        "has_hash": bool(user.password_hash),
+        "is_active": user.is_active,
+        "password_verified": verify_result,
+        "total_users": len(User._store)
     })
 
 # ============================================================================
