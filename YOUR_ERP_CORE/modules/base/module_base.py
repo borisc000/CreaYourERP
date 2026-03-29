@@ -393,19 +393,30 @@ class BaseModule(BaseModule):
         """
         email = request.get_data('email')
         password = request.get_data('password')
-        
+
         if not email or not password:
             return Response.bad_request("Email and password required")
-        
+
+        # DEBUG
+        print(f"[LOGIN] Attempting: {email}, Users in store: {len(User._store)}")
+
         # Buscar usuario
         users = User.search([('email', '=', email)])
+        print(f"[LOGIN] Search found: {len(users)} users")
+
         if not users:
+            all_emails = [u.email for u in User._store.values()]
+            print(f"[LOGIN] Available emails: {all_emails}")
             return Response.unauthorized("Invalid credentials")
-        
+
         user = users[0]
-        
+        print(f"[LOGIN] User hash exists: {bool(user.password_hash)}")
+
         # Verificar contraseña
-        if not user.verify_password(password):
+        verify_result = user.verify_password(password)
+        print(f"[LOGIN] Password verified: {verify_result}")
+
+        if not verify_result:
             return Response.unauthorized("Invalid credentials")
         
         # Verificar que esté activo

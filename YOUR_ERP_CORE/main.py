@@ -97,6 +97,19 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Startup event - seed demo data if empty
+@app.on_event("startup")
+async def startup_seed():
+    """Seed demo data on startup if database is empty"""
+    try:
+        from seed_demo_data import seed_if_empty
+        if seed_if_empty():
+            print("  [+] Demo data seeded successfully")
+        else:
+            print("  [i] Database already contains data")
+    except Exception as e:
+        print(f"  [!] Seed initialization warning: {e}")
+
 # Middleware CORS
 app.add_middleware(
     CORSMiddleware,
@@ -119,6 +132,54 @@ _uploads_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "uplo
 _os.makedirs(_uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
 
+
+# ============================================================================
+# DEBUG ENDPOINT - MANUAL SEED (development only)
+# ============================================================================
+
+@app.post("/debug/seed")
+async def debug_seed():
+    """Manual seeding endpoint for development"""
+    try:
+        from seed_demo_data import seed_if_empty
+        from modules.base.module_base import User
+
+        # Force seed even if data exists
+        from seed_demo_data import seed_demo
+        seed_demo()
+
+        # Verify
+        users = User.search([('email', '=', 'demo@pedroconstruction.cl')])
+        return JSONResponse({
+            "success": True,
+            "message": "Data seeded",
+            "users_created": len(users),
+            "demo_user": users[0].email if users else None
+        })
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+@app.get("/debug/users")
+async def debug_users():
+    """Debug endpoint to check all users in database"""
+    from modules.base.module_base import User
+
+    users_list = []
+    for user_id, user in User._store.items():
+        users_list.append({
+            "id": user_id,
+            "email": user.email,
+            "is_active": user.is_active,
+            "password_hash_prefix": user.password_hash[:40] if user.password_hash else None
+        })
+
+    return JSONResponse({
+        "total_users": len(users_list),
+        "users": users_list
+    })
 
 # ============================================================================
 # CONVERTIR FASTAPI REQUEST A REQUEST UNIVERSAL
