@@ -1,21 +1,19 @@
 """
-Cursos y Certificaciones - Capacitaciones requeridas
+Cursos y Certificaciones - Versión SQLAlchemy
 """
-from dataclasses import dataclass
-from typing import Optional
+from sqlalchemy import Column, String, Integer, Boolean
+from core.models import BaseModel
 
 
-@dataclass
-class Course:
-    """Modelo de Curso"""
-    id: Optional[int] = None
-    name: str = ""  # "Manejo de altura"
-    code: str = ""
-    duration_hours: int = 0
-    certification_body: str = ""  # "ACHS", "Institución X"
-    expiration_months: Optional[int] = None
-    is_active: bool = True
-    created_at: Optional[str] = None
+class Course(BaseModel):
+    __tablename__ = "courses"
+
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    code = Column(String(50), unique=True)
+    duration_hours = Column(Integer, default=0)
+    certification_body = Column(String(100))
+    expiration_months = Column(Integer, nullable=True)
+    is_active = Column(Boolean, default=True, index=True)
 
     def to_dict(self):
         return {
@@ -26,5 +24,5 @@ class Course:
             'certification_body': self.certification_body,
             'expiration_months': self.expiration_months,
             'is_active': self.is_active,
-            'created_at': self.created_at
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }

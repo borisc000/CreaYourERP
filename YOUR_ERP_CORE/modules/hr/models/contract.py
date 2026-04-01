@@ -1,42 +1,49 @@
 """
-Contrato - Documentos de empleo con flujo de workflow
+Contrato - Versión SQLAlchemy
 """
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict
+from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean
+from core.models import BaseModel
 from datetime import datetime
 
-@dataclass
-class Contract:
-    """Contrato de empleo con gestión de workflow"""
-    id: Optional[int] = None
-    employee_id: int = 0
-    job_profile_id: Optional[int] = None
-    template_id: Optional[int] = None
-    workflow_state: str = "draft"  # draft → submitted → approved → pending_signature → signed
 
-    # Datos del contrato
-    contract_type: str = "Indefinido"  # "Indefinido", "Plazo Fijo", "Por obra"
-    start_date: str = ""
-    end_date: Optional[str] = None
+class Contract(BaseModel):
+    __tablename__ = "contracts"
 
-    # Personalización
-    personalization_data: Dict = field(default_factory=dict)
+    employee_id = Column(Integer, nullable=False, index=True)
+    job_profile_id = Column(Integer, ForeignKey("job_profiles.id"), nullable=True)
+    template_id = Column(Integer, nullable=True)
+    workflow_state = Column(String(50), default="draft", index=True)
 
-    # Aprobación y firma
-    submitted_by: Optional[int] = None  # user_id
-    submitted_at: Optional[str] = None
-    approved_by: Optional[int] = None
-    approved_at: Optional[str] = None
+    contract_type = Column(String(50))
+    start_date = Column(String(50))
+    end_date = Column(String(50), nullable=True)
 
-    # Firma digital
-    signature_request_id: Optional[int] = None
-    signed_by: Optional[int] = None
-    signed_at: Optional[str] = None
-    signature_position: Optional[Dict] = None  # {'x': 100, 'y': 200, 'page': 1}
+    personalization_data = Column(JSON, default={})
 
-    # Auditoria
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    submitted_by = Column(Integer, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    approved_by = Column(Integer, nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+
+    signature_request_id = Column(Integer, nullable=True)
+    signed_by = Column(Integer, nullable=True)
+    signed_at = Column(DateTime, nullable=True)
+    signature_position = Column(JSON, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'employee_id': self.employee_id,
+            'job_profile_id': self.job_profile_id,
+            'template_id': self.template_id,
+            'workflow_state': self.workflow_state,
+            'contract_type': self.contract_type,
+            'start_date': self.start_date,
+            'end_date': self.end_date,
+            'personalization_data': self.personalization_data,
+            'signature_request_id': self.signature_request_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
 
     def transition_to(self, new_state: str):
         """Cambiar estado del contrato"""
@@ -57,19 +64,4 @@ class Contract:
             )
 
         self.workflow_state = new_state
-        self.updated_at = datetime.now().isoformat()
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'employee_id': self.employee_id,
-            'job_profile_id': self.job_profile_id,
-            'template_id': self.template_id,
-            'workflow_state': self.workflow_state,
-            'contract_type': self.contract_type,
-            'start_date': self.start_date,
-            'end_date': self.end_date,
-            'personalization_data': self.personalization_data,
-            'signature_request_id': self.signature_request_id,
-            'created_at': self.created_at
-        }
+        self.updated_at = datetime.utcnow()
