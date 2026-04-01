@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 from ..models.contract import Contract
 from datetime import datetime
+from core.event_bus import EventBus
 
 router = APIRouter(prefix="/api/hr/contracts", tags=["hr-contracts"])
 
@@ -52,5 +53,14 @@ async def approve_contract(contract_id: int):
         if contract.id == contract_id:
             contract.transition_to('approved')
             contract.approved_at = datetime.now().isoformat()
+
+            # Emitir evento para flujo de correspondencia
+            print(f"\n[EventBus] Emitiendo evento: contract.approved")
+            EventBus.emit('contract.approved', {
+                'contract_id': contract_id,
+                'template_id': getattr(contract, 'template_id', 1),
+                'personalization_data': getattr(contract, 'personalization_data', {})
+            })
+
             return contract.to_dict()
     raise HTTPException(status_code=404, detail="Contrato no encontrado")
