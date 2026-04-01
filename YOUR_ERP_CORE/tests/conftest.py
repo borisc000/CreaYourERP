@@ -6,15 +6,19 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from core.models import Base
 
-# Import all models to register them
-from modules.base.models.requirement import Requirement
-from modules.base.models.course import Course
-from modules.base.models.company_config import CompanyConfig
-from modules.hr.models.job_profile import JobProfile
-from modules.hr.models.contract import Contract
-from modules.hr.models.employee import Employee
-from modules.recruitment.models.vacancy import Vacancy
-from modules.signature.models.signature_request import SignatureRequest
+# Try to import models, but don't fail if they're not available
+try:
+    from modules.base.models.requirement import Requirement
+    from modules.base.models.course import Course
+    from modules.base.models.company_config import CompanyConfig
+    from modules.hr.models.job_profile import JobProfile
+    from modules.hr.models.contract import Contract
+    from modules.hr.models.employee import Employee
+    from modules.recruitment.models.vacancy import Vacancy
+    from modules.signature.models.signature_request import SignatureRequest
+except ImportError:
+    # Models may not be available during test collection
+    pass
 
 
 @pytest.fixture

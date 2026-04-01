@@ -44,6 +44,7 @@ from modules.google_workspace.module_google_workspace import GoogleWorkspaceModu
 from modules.job_profiles.module_job_profiles import JobProfilesModule
 from modules.ai.module_ai import AIModule
 from core.config import settings, validate_config
+from config.database import init_db, SessionLocal
 from core.time_utils import utc_now, utc_strftime
 from modules.base.api.config_routes import router as config_router
 from modules.hr.api.job_profile_routes import router as job_profile_router
@@ -275,6 +276,7 @@ async def startup_seed():
 async def app_lifespan(_: FastAPI):
     """Lifespan hook used instead of deprecated startup events."""
     await startup_seed()
+    init_db()
     setup_notification_listeners()
     yield
 
