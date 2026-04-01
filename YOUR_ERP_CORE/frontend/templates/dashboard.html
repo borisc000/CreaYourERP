@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - YOUR ERP{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1>Dashboard de Recursos Humanos</h1>
+        <p class="text-muted">Resumen de KPIs y actividad reciente</p>
+    </div>
+</div>
+
+<div class="row" id="kpi-container">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Total Empleados</h5>
+                <p class="display-4" id="total-employees">-</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Total Contratos</h5>
+                <p class="display-4" id="total-contracts">-</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Firmas Pendientes</h5>
+                <p class="display-4" id="pending-signatures">-</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Tasa Completación</h5>
+                <p class="display-4" id="completion-rate">-</p>
+                <small class="text-muted">% Contratos Firmados</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Contratos por Estado</h5>
+            </div>
+            <div class="card-body" id="status-breakdown">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Actividad Reciente</h5>
+            </div>
+            <div class="card-body" id="recent-activity">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboard();
+});
+
+function loadDashboard() {
+    // Load summary KPIs
+    fetch('/api/hr/dashboard')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('total-employees').textContent = data.total_employees;
+            document.getElementById('total-contracts').textContent = data.total_contracts;
+            document.getElementById('pending-signatures').textContent = data.pending_signatures;
+            document.getElementById('completion-rate').textContent = data.completion_rate + '%';
+        })
+        .catch(err => console.error('Error loading summary:', err));
+
+    // Load contracts by status
+    fetch('/api/hr/dashboard/contracts-by-status')
+        .then(res => res.json())
+        .then(data => {
+            let html = '<ul class="list-group">';
+            for (const [status, count] of Object.entries(data.breakdown)) {
+                html += `<li class="list-group-item d-flex justify-content-between">
+                    <span>${capitalizeStatus(status)}</span>
+                    <span class="badge bg-primary rounded-pill">${count}</span>
+                </li>`;
+            }
+            html += '</ul>';
+            document.getElementById('status-breakdown').innerHTML = html;
+        })
+        .catch(err => console.error('Error loading status breakdown:', err));
+
+    // Load recent activity
+    fetch('/api/hr/dashboard/recent-activity')
+        .then(res => res.json())
+        .then(data => {
+            let html = '<ul class="list-group">';
+            for (const activity of data.activity.slice(0, 5)) {
+                const time = new Date(activity.timestamp).toLocaleString('es-ES');
+                html += `<li class="list-group-item">
+                    <small class="text-muted">${time}</small><br>
+                    <strong>${activity.event_type}</strong>
+                </li>`;
+            }
+            html += '</ul>';
+            document.getElementById('recent-activity').innerHTML = html;
+        })
+        .catch(err => console.error('Error loading activity:', err));
+}
+
+function capitalizeStatus(status) {
+    const map = {
+        'draft': 'Borrador',
+        'submitted': 'Enviado',
+        'approved': 'Aprobado',
+        'pending_signature': 'Firma Pendiente',
+        'signed': 'Firmado',
+        'rejected': 'Rechazado'
+    };
+    return map[status] || status;
+}
+</script>
+{% endblock %}

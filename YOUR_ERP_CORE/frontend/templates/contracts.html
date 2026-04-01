@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Contratos - YOUR ERP{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1>Gestión de Contratos</h1>
+        <p class="text-muted">Seguimiento de contratos y flujo de firmas</p>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover" id="contracts-table">
+        <thead class="table-dark">
+            <tr>
+                <th>ID</th>
+                <th>Empleado</th>
+                <th>Puesto</th>
+                <th>Estado</th>
+                <th>Fecha Inicio</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="contracts-body">
+            <tr>
+                <td colspan="6" class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadContracts();
+});
+
+function loadContracts() {
+    fetch('/api/hr/contracts')
+        .then(res => res.json())
+        .then(data => {
+            let html = '';
+            for (const contract of data) {
+                const statusBadge = getStatusBadge(contract.status);
+                html += `<tr>
+                    <td>#${contract.id}</td>
+                    <td>${contract.employee_name || 'N/A'}</td>
+                    <td>${contract.job_title || 'N/A'}</td>
+                    <td>${statusBadge}</td>
+                    <td>${new Date(contract.start_date).toLocaleDateString('es-ES')}</td>
+                    <td>
+                        <a href="/contract/${contract.id}" class="btn btn-sm btn-info">Detalle</a>
+                    </td>
+                </tr>`;
+            }
+            document.getElementById('contracts-body').innerHTML = html || '<tr><td colspan="6" class="text-center">No hay contratos</td></tr>';
+        })
+        .catch(err => console.error('Error loading contracts:', err));
+}
+
+function getStatusBadge(status) {
+    const colors = {
+        'draft': 'secondary',
+        'submitted': 'info',
+        'approved': 'primary',
+        'pending_signature': 'warning',
+        'signed': 'success',
+        'rejected': 'danger'
+    };
+    const labels = {
+        'draft': 'Borrador',
+        'submitted': 'Enviado',
+        'approved': 'Aprobado',
+        'pending_signature': 'Firma Pendiente',
+        'signed': 'Firmado',
+        'rejected': 'Rechazado'
+    };
+    const color = colors[status] || 'secondary';
+    const label = labels[status] || status;
+    return `<span class="badge bg-${color}">${label}</span>`;
+}
+</script>
+{% endblock %}

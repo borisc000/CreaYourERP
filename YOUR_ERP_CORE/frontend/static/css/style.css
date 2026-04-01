@@ -1,0 +1,115 @@
+:root {
+    --primary-color: #0056b3;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --light-bg: #f8f9fa;
+}
+
+body {
+    background-color: var(--light-bg);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+main {
+    min-height: calc(100vh - 200px);
+}
+
+footer {
+    margin-top: 50px;
+    border-top: 1px solid #dee2e6;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.card-header {
+    background-color: var(--light-bg);
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+.table {
+    background-color: white;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table thead {
+    background-color: #212529;
+    color: white;
+}
+
+.badge {
+    padding: 6px 12px;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: #003d82;
+    border-color: #003d82;
+}
+
+.display-4 {
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.modal-header {
+    background-color: var(--light-bg);
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 10px;
+    }
+
+    .card {
+        margin-bottom: 15px;
+    }
+
+    h1 {
+        font-size: 1.75rem;
+    }
+}
+
+/* Spinner styling */
+.spinner-border {
+    color: var(--primary-color);
+}
+
+/* Form styling */
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(0, 86, 179, 0.25);
+}
+
+.form-label {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+/* List group styling */
+.list-group-item {
+    border-left: 3px solid transparent;
+}
+
+.list-group-item:hover {
+    background-color: var(--light-bg);
+}

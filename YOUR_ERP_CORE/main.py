@@ -54,6 +54,7 @@ from modules.recruitment.api.vacancy_routes import router as vacancy_router
 from modules.cross_correspondence.api.hiring_routes import router as hiring_router
 from modules.crm.api.customer_documents_routes import router as customer_documents_router
 from modules.signature.api.signature_routes import router as signature_router
+from modules.frontend.routes import router as frontend_template_router
 
 # Import and register event listeners
 from modules.signature import listeners  # This imports and registers all listeners
@@ -300,6 +301,9 @@ app.add_middleware(
 from fastapi.staticfiles import StaticFiles
 from frontend.routes import router as frontend_router
 app.include_router(frontend_router)
+
+# New Template-based frontend routes (for HR module)
+app.include_router(frontend_template_router)
 
 # Base API config routes
 app.include_router(config_router)
