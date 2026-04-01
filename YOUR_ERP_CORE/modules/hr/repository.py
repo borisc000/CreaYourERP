@@ -82,6 +82,11 @@ class ContractRepository:
         return contract
 
     @staticmethod
+    def get_all(db: Session):
+        """Obtener todos los contratos"""
+        return db.query(Contract).all()
+
+    @staticmethod
     def get_by_id(db: Session, contract_id: int):
         return db.query(Contract).filter(Contract.id == contract_id).first()
 

@@ -49,6 +49,7 @@ from modules.base.api.config_routes import router as config_router
 from modules.hr.api.job_profile_routes import router as job_profile_router
 from modules.hr.api.contract_routes import router as contract_router
 from modules.hr.api.employee_routes import router as employee_router
+from modules.hr.api.dashboard_routes import router as dashboard_router
 from modules.recruitment.api.vacancy_routes import router as vacancy_router
 from modules.cross_correspondence.api.hiring_routes import router as hiring_router
 from modules.crm.api.customer_documents_routes import router as customer_documents_router
@@ -307,6 +308,7 @@ app.include_router(config_router)
 app.include_router(job_profile_router)
 app.include_router(contract_router)
 app.include_router(employee_router)
+app.include_router(dashboard_router)
 
 # Recruitment API routes
 app.include_router(vacancy_router)
