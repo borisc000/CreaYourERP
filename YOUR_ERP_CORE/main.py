@@ -55,9 +55,11 @@ from modules.cross_correspondence.api.hiring_routes import router as hiring_rout
 from modules.crm.api.customer_documents_routes import router as customer_documents_router
 from modules.signature.api.signature_routes import router as signature_router
 from modules.frontend.routes import router as frontend_template_router
+from modules.notifications.api.notification_routes import router as notification_router
 
 # Import and register event listeners
 from modules.signature import listeners  # This imports and registers all listeners
+from modules.notifications.listeners import setup_notification_listeners
 
 
 # ============================================================================
@@ -273,6 +275,7 @@ async def startup_seed():
 async def app_lifespan(_: FastAPI):
     """Lifespan hook used instead of deprecated startup events."""
     await startup_seed()
+    setup_notification_listeners()
     yield
 
 
@@ -325,6 +328,9 @@ app.include_router(customer_documents_router)
 
 # Signature API routes
 app.include_router(signature_router)
+
+# Notification API routes
+app.include_router(notification_router)
 
 import os as _os
 _static_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "frontend", "static")
