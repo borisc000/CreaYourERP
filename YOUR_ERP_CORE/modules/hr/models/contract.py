@@ -30,6 +30,14 @@ class Contract(BaseModel):
     signed_at = Column(DateTime, nullable=True)
     signature_position = Column(JSON, nullable=True)
 
+    def __init__(self, **kwargs):
+        # Set defaults for fields if not provided
+        if 'workflow_state' not in kwargs:
+            kwargs['workflow_state'] = 'draft'
+        if 'personalization_data' not in kwargs:
+            kwargs['personalization_data'] = {}
+        super().__init__(**kwargs)
+
     def to_dict(self):
         return {
             'id': self.id,

@@ -20,6 +20,24 @@ class JobProfile(BaseModel):
     salary_range_max = Column(Float, default=0)
     is_active = Column(Boolean, default=True, index=True)
 
+    def __init__(self, **kwargs):
+        # Set defaults for fields if not provided
+        if 'risk_level' not in kwargs:
+            kwargs['risk_level'] = "Medio"
+        if 'risk_ids' not in kwargs:
+            kwargs['risk_ids'] = []
+        if 'required_course_ids' not in kwargs:
+            kwargs['required_course_ids'] = []
+        if 'required_requirement_ids' not in kwargs:
+            kwargs['required_requirement_ids'] = []
+        if 'salary_range_min' not in kwargs:
+            kwargs['salary_range_min'] = 0
+        if 'salary_range_max' not in kwargs:
+            kwargs['salary_range_max'] = 0
+        if 'is_active' not in kwargs:
+            kwargs['is_active'] = True
+        super().__init__(**kwargs)
+
     def to_dict(self):
         return {
             'id': self.id,

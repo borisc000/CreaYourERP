@@ -15,6 +15,14 @@ class Course(BaseModel):
     expiration_months = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True, index=True)
 
+    def __init__(self, **kwargs):
+        # Set defaults for fields if not provided
+        if 'duration_hours' not in kwargs:
+            kwargs['duration_hours'] = 0
+        if 'is_active' not in kwargs:
+            kwargs['is_active'] = True
+        super().__init__(**kwargs)
+
     def to_dict(self):
         return {
             'id': self.id,

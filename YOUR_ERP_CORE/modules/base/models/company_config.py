@@ -16,6 +16,18 @@ class CompanyConfig(BaseModel):
     enable_digital_signature = Column(Boolean, default=True)
     signature_authority = Column(String(255))
 
+    def __init__(self, **kwargs):
+        # Set defaults for fields if not provided
+        if 'required_courses' not in kwargs:
+            kwargs['required_courses'] = []
+        if 'required_requirements' not in kwargs:
+            kwargs['required_requirements'] = []
+        if 'document_template_ids' not in kwargs:
+            kwargs['document_template_ids'] = []
+        if 'enable_digital_signature' not in kwargs:
+            kwargs['enable_digital_signature'] = True
+        super().__init__(**kwargs)
+
     def to_dict(self):
         return {
             'id': self.id,
