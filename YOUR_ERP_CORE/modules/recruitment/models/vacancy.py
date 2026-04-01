@@ -1,30 +1,29 @@
 """
 Vacancy - Posiciones abiertas basadas en Job Profiles
 """
-from dataclasses import dataclass, field
-from typing import Optional, List
+from sqlalchemy import Column, String, Integer, Float, ForeignKey, JSON, Boolean
+from core.models import BaseModel
 
 
-@dataclass
-class Vacancy:
+class Vacancy(BaseModel):
     """Posición abierta para reclutamiento"""
-    id: Optional[int] = None
-    job_profile_id: int = 0  # NUEVO: Link a JobProfile
-    title: str = ""
-    description: str = ""
-    quantity: int = 1
-    salary_min: float = 0
-    salary_max: float = 0
+    __tablename__ = "vacancies"
+
+    job_profile_id = Column(Integer, ForeignKey("job_profiles.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(String(1000))
+    quantity = Column(Integer, default=1)
+    salary_min = Column(Float, default=0)
+    salary_max = Column(Float, default=0)
 
     # Heredar del JobProfile
-    required_course_ids: List[int] = field(default_factory=list)
-    required_requirement_ids: List[int] = field(default_factory=list)
-    risk_level: str = "Medio"
+    required_course_ids = Column(JSON, default=[])
+    required_requirement_ids = Column(JSON, default=[])
+    risk_level = Column(String(50), default="Medio")
 
-    status: str = "open"  # open, closed, filled
-    posted_date: Optional[str] = None
-    closing_date: Optional[str] = None
-    created_at: Optional[str] = None
+    status = Column(String(50), default="open", index=True)  # open, closed, filled
+    posted_date = Column(String(50), nullable=True)
+    closing_date = Column(String(50), nullable=True)
 
     def populate_from_job_profile(self, job_profile):
         """Llenar datos desde Job Profile"""
@@ -47,5 +46,5 @@ class Vacancy:
             'status': self.status,
             'posted_date': self.posted_date,
             'closing_date': self.closing_date,
-            'created_at': self.created_at
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
