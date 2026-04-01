@@ -13,6 +13,7 @@ from modules.base.models.company_config import CompanyConfig
 from modules.hr.models.job_profile import JobProfile
 from modules.hr.models.contract import Contract
 from modules.recruitment.models.vacancy import Vacancy
+from modules.signature.models.signature_request import SignatureRequest
 
 
 @pytest.fixture
