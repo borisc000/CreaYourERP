@@ -4,6 +4,39 @@ Repository para modelos HR
 from sqlalchemy.orm import Session
 from modules.hr.models.job_profile import JobProfile
 from modules.hr.models.contract import Contract
+from modules.hr.models.employee import Employee
+
+
+class EmployeeRepository:
+    @staticmethod
+    def create(db: Session, first_name: str, last_name: str, email: str, **kwargs):
+        employee = Employee(first_name=first_name, last_name=last_name, email=email, **kwargs)
+        db.add(employee)
+        db.commit()
+        db.refresh(employee)
+        return employee
+
+    @staticmethod
+    def get_all(db: Session):
+        return db.query(Employee).filter(Employee.is_active == True).all()
+
+    @staticmethod
+    def get_by_id(db: Session, emp_id: int):
+        return db.query(Employee).filter(Employee.id == emp_id).first()
+
+    @staticmethod
+    def get_by_email(db: Session, email: str):
+        return db.query(Employee).filter(Employee.email == email).first()
+
+    @staticmethod
+    def get_by_status(db: Session, status: str):
+        return db.query(Employee).filter(Employee.status == status).all()
+
+    @staticmethod
+    def update(db: Session, emp_id: int, **kwargs):
+        db.query(Employee).filter(Employee.id == emp_id).update(kwargs)
+        db.commit()
+        return EmployeeRepository.get_by_id(db, emp_id)
 
 
 class JobProfileRepository:
