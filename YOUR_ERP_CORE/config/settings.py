@@ -4,8 +4,14 @@ Configuración y variables de entorno
 """
 import os
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(
+        env_file=".env",
+        extra='ignore'
+    )
+
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
         "postgresql://user:password@localhost:5432/erp_dev"
@@ -18,8 +24,5 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
     TWILIO_PHONE: str = os.getenv("TWILIO_PHONE", "")
-
-    class Config:
-        env_file = ".env"
 
 settings = Settings()
