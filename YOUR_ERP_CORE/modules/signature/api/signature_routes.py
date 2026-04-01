@@ -1,39 +1,41 @@
 """
 API Routes - Firma Digital
 """
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
-from core.database import get_db
-from modules.signature.repository import SignatureRequestRepository
-from modules.signature.models.signature_request import SignatureRequest
+from fastapi import APIRouter, HTTPException
 from core.event_bus import EventBus
 from datetime import datetime
 from typing import List
 
 router = APIRouter(prefix="/api/signature", tags=["signature"])
 
+# In-memory storage for signature requests
+_signature_requests_db = {}
+
 @router.get("/requests", response_model=List[dict])
-async def get_pending_signatures(db: Session = Depends(get_db)):
+async def get_pending_signatures():
     """Obtener solicitudes de firma pendientes"""
-    requests = SignatureRequestRepository.get_all_pending(db)
-    return [r.to_dict() for r in requests]
+    return [
+        req.to_dict() if hasattr(req, 'to_dict') else req
+        for req in _signature_requests_db.values()
+        if isinstance(req, dict) and req.get('status') == 'pending' or
+           (hasattr(req, 'status') and req.status == 'pending')
+    ]
 
 @router.get("/requests/{request_id}")
-async def get_signature_request(request_id: int, db: Session = Depends(get_db)):
+async def get_signature_request(request_id: int):
     """Obtener solicitud específica"""
-    req = SignatureRequestRepository.get_by_id(db, request_id)
+    req = _signature_requests_db.get(request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
-    return req.to_dict()
+    return req.to_dict() if hasattr(req, 'to_dict') else req
 
 @router.post("/requests/{request_id}/sign")
 async def sign_document(
     request_id: int,
-    signature_data: dict,
-    db: Session = Depends(get_db)
+    signature_data: dict
 ):
     """Firmar documento"""
-    sig_req = SignatureRequestRepository.get_by_id(db, request_id)
+    sig_req = _signature_requests_db.get(request_id)
     if not sig_req:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
@@ -61,23 +63,21 @@ async def sign_document(
             'correspondence_id': sig_req.correspondence_id
         })
 
-    db.commit()
-    db.refresh(sig_req)
     return sig_req.to_dict()
 
 @router.post("/requests/{request_id}/reject")
 async def reject_signature(
     request_id: int,
-    rejection_data: dict,
-    db: Session = Depends(get_db)
+    rejection_data: dict
 ):
     """Rechazar documento para firma"""
-    sig_req = SignatureRequestRepository.get_by_id(db, request_id)
+    sig_req = _signature_requests_db.get(request_id)
     if not sig_req:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
     reason = rejection_data.get('reason', 'No reason provided')
-    sig_req = SignatureRequestRepository.mark_rejected(db, request_id, reason)
+    sig_req.status = 'rejected'
+    sig_req.rejection_reason = reason
 
     # Emitir evento
     EventBus.emit('signature.rejected', {
@@ -89,7 +89,12 @@ async def reject_signature(
     return sig_req.to_dict()
 
 @router.get("/requests/by-contract/{contract_id}", response_model=List[dict])
-async def get_contract_signatures(contract_id: int, db: Session = Depends(get_db)):
+async def get_contract_signatures(contract_id: int):
     """Obtener firmas de un contrato"""
-    signatures = SignatureRequestRepository.get_by_contract(db, contract_id)
-    return [s.to_dict() for s in signatures]
+    signatures = [
+        req.to_dict() if hasattr(req, 'to_dict') else req
+        for req in _signature_requests_db.values()
+        if isinstance(req, dict) and req.get('contract_id') == contract_id or
+           (hasattr(req, 'contract_id') and req.contract_id == contract_id)
+    ]
+    return signatures
