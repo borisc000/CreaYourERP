@@ -1,7 +1,7 @@
 import httpx
 import asyncio
 
-async def test():
+async def run_smoke_test():
     async with httpx.AsyncClient() as client:
         # 1. Login
         res = await client.post('http://localhost:8000/auth/login', json={'email': 'admin@test.com', 'password': 'admin'})
@@ -33,4 +33,4 @@ async def test():
         print(f"Mandante created: {m['name']} (ID: {m['id']}) for Customer ID: {m['customer_id']}")
 
 if __name__ == "__main__":
-    asyncio.run(test())
+    asyncio.run(run_smoke_test())

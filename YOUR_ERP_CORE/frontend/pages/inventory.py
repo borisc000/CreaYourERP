@@ -274,6 +274,35 @@ def inventory_page():
                 <label>Destino / area</label>
                 <input id="inventory-movement-destination" placeholder="Bodega, terreno, cuadrilla, cliente...">
             </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Trabajador que entrega</label>
+                    <input id="inventory-movement-delivered-by" placeholder="Nombre de quien entrega">
+                </div>
+                <div class="form-group">
+                    <label>Trabajador que recibe</label>
+                    <input id="inventory-movement-received-by" placeholder="Nombre de quien recibe">
+                </div>
+            </div>
+            <div class="inventory-evidence-grid">
+                <div class="inventory-evidence-card">
+                    <label style="display:block;margin-bottom:0.55rem;color:#94a3b8;font-size:0.8rem;font-weight:600;">Foto de respaldo</label>
+                    <input id="inventory-evidence-photo" type="file" accept="image/*" onchange="handleInventoryEvidencePhoto(event)">
+                    <div id="inventory-evidence-photo-preview" class="inventory-evidence-preview">
+                        <span>Sin foto cargada</span>
+                    </div>
+                </div>
+                <div class="inventory-evidence-card">
+                    <div style="display:flex;justify-content:space-between;gap:0.75rem;align-items:center;margin-bottom:0.55rem;">
+                        <label style="margin:0;color:#94a3b8;font-size:0.8rem;font-weight:600;">Firma de respaldo</label>
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="clearInventorySignaturePad()">Limpiar firma</button>
+                    </div>
+                    <div class="inventory-signature-shell">
+                        <canvas id="inventory-signature-canvas" width="320" height="150"></canvas>
+                    </div>
+                    <span class="field-hint">Para ingresos y salidas puedes dejar foto o firma como respaldo.</span>
+                </div>
+            </div>
             <div class="form-group">
                 <label>Notas</label>
                 <textarea id="inventory-movement-notes" rows="4" placeholder="Comentario operativo del movimiento..."></textarea>
@@ -312,6 +341,16 @@ def inventory_page():
         <pre id="inventory-backup-json" class="inventory-backup-json"></pre>
         <div class="modal-actions">
             <button type="button" class="btn btn-ghost" onclick="closeInventoryModal('inventory-backup-view-modal')">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="inventory-evidence-modal">
+    <div class="modal inventory-modal-xl">
+        <h2>Respaldo de contra entrega</h2>
+        <div id="inventory-evidence-content"></div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" onclick="closeInventoryModal('inventory-evidence-modal')">Cerrar</button>
         </div>
     </div>
 </div>
@@ -830,6 +869,79 @@ def inventory_page():
     flex-wrap:wrap;
     margin-top:0.3rem;
 }
+.inventory-evidence-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:1rem;
+    margin-bottom:1.1rem;
+}
+.inventory-evidence-card {
+    border-radius:18px;
+    border:1px solid rgba(71,85,105,0.74);
+    background:#111827;
+    padding:0.95rem;
+}
+.inventory-evidence-card input[type="file"] {
+    width:100%;
+    color:#cbd5e1;
+    font-size:0.8rem;
+}
+.inventory-evidence-preview {
+    margin-top:0.75rem;
+    min-height:160px;
+    border-radius:16px;
+    border:1px dashed rgba(71,85,105,0.8);
+    background:#0b1120;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+}
+.inventory-evidence-preview img {
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
+.inventory-evidence-preview span {
+    color:#64748b;
+    font-size:0.82rem;
+}
+.inventory-signature-shell {
+    background:#fff;
+    border-radius:16px;
+    overflow:hidden;
+    border:1px solid rgba(71,85,105,0.35);
+}
+.inventory-signature-shell canvas {
+    display:block;
+    width:100%;
+    height:auto;
+    background:#fff;
+    touch-action:none;
+    cursor:crosshair;
+}
+.inventory-evidence-view {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:1rem;
+}
+.inventory-evidence-view-card {
+    border-radius:18px;
+    border:1px solid rgba(71,85,105,0.74);
+    background:#111827;
+    padding:1rem;
+}
+.inventory-evidence-view-card h4 {
+    margin:0 0 0.75rem;
+    color:#f8fafc;
+    font-size:0.95rem;
+}
+.inventory-evidence-view-card img {
+    width:100%;
+    border-radius:14px;
+    border:1px solid rgba(71,85,105,0.6);
+    background:#fff;
+}
 .inventory-modal-large {
     max-width:760px;
 }
@@ -861,7 +973,9 @@ def inventory_page():
         grid-template-columns:1fr;
     }
     .inventory-focus-grid,
-    .inventory-hero__mini-grid {
+    .inventory-hero__mini-grid,
+    .inventory-evidence-grid,
+    .inventory-evidence-view {
         grid-template-columns:1fr;
     }
 }

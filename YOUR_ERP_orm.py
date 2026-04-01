@@ -46,6 +46,7 @@ from sqlalchemy import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 import logging
+from YOUR_ERP_CORE.core.time_utils import utc_now
 
 # ============================================================================
 # 1. TIPOS DE COLUMNAS
@@ -188,15 +189,15 @@ class AuditMixin:
     
     created_at = Column(
         ColumnType.DATETIME,
-        default=datetime.utcnow,
+        default=utc_now,
         readonly=True,
         label="Created At"
     )
     
     updated_at = Column(
         ColumnType.DATETIME,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
         readonly=True,
         label="Updated At"
     )

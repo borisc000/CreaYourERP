@@ -348,15 +348,35 @@ def crm_lead_detail_page(lead_id: str):
                                 </div>
                             </div>
 
-                            <!-- Botón Nuevo Reporte de Terreno → abre modal -->
+                            <!-- Botones y panel de reportes -->
                             <div style="margin-top:1.5rem;">
-                                <button class="btn-reporte-avance" onclick="openNuevoReporteModal()">
+                                <button class="btn-reporte-avance" id="btn-eje-new-report" onclick="openNuevoReporteModal()">
                                     <span style="font-size:1.5rem;">&#128247;</span>
                                     <div>
-                                        <div style="font-size:0.95rem;font-weight:700;">&#10133; Nuevo Reporte de Terreno</div>
-                                        <div style="font-size:0.75rem;opacity:0.75;margin-top:0.15rem;">Fotografías, mediciones y observaciones de terreno</div>
+                                        <div style="font-size:0.95rem;font-weight:700;" id="eje-report-cta-title">&#10133; Nuevo Reporte de Terreno</div>
+                                        <div style="font-size:0.75rem;opacity:0.75;margin-top:0.15rem;" id="eje-report-cta-subtitle">Fotografías, mediciones y observaciones de terreno</div>
                                     </div>
                                 </button>
+                            </div>
+
+                            <div class="eje-report-toolbar">
+                                <button class="btn btn-secondary" id="btn-eje-open-last" onclick="openLatestReportWorkspace()" style="display:none;">
+                                    &#128193; Continuar último reporte
+                                </button>
+                                <div class="eje-report-toolbar-meta" id="eje-report-toolbar-meta">Aún no hay reportes guardados para esta oportunidad.</div>
+                            </div>
+
+                            <div class="eje-report-panel">
+                                <div class="eje-report-panel-head">
+                                    <div>
+                                        <div class="step-label" style="margin-bottom:0.2rem;">Reportes guardados</div>
+                                        <div style="color:#cbd5e1;font-size:0.9rem;">Historial visible del reporte de terreno, con acceso a continuidad y vista espejo.</div>
+                                    </div>
+                                    <div class="eje-report-panel-badge" id="eje-report-count-badge">0</div>
+                                </div>
+                                <div id="eje-reports-list" class="eje-reports-list">
+                                    <div class="eje-report-empty">Aún no se han generado reportes de terreno para esta oportunidad.</div>
+                                </div>
                             </div>
 
                             <!-- Botón Avanzar al Paso 3 -->
@@ -1048,6 +1068,107 @@ def crm_lead_detail_page(lead_id: str):
     background: linear-gradient(135deg, #075985, #0369a1);
     box-shadow: 0 0 24px rgba(14,165,233,0.3);
     transform: translateY(-1px);
+}}
+
+.eje-report-toolbar {{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.85rem;
+    flex-wrap:wrap;
+    margin-top:0.85rem;
+}}
+
+.eje-report-toolbar-meta {{
+    color:#94a3b8;
+    font-size:0.84rem;
+}}
+
+.eje-report-panel {{
+    margin-top:1rem;
+    padding:1rem;
+    border-radius:12px;
+    border:1px solid #334155;
+    background:linear-gradient(180deg, rgba(15,23,42,0.94), rgba(15,23,42,0.82));
+}}
+
+.eje-report-panel-head {{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:0.85rem;
+    margin-bottom:0.9rem;
+}}
+
+.eje-report-panel-badge {{
+    min-width:38px;
+    height:38px;
+    padding:0 0.8rem;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:800;
+    color:#dbeafe;
+    background:rgba(37,99,235,0.16);
+    border:1px solid rgba(96,165,250,0.22);
+}}
+
+.eje-reports-list {{
+    display:grid;
+    gap:0.75rem;
+}}
+
+.eje-report-card {{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:1rem;
+    flex-wrap:wrap;
+    padding:0.9rem 1rem;
+    border-radius:12px;
+    border:1px solid rgba(148,163,184,0.14);
+    background:rgba(2,6,23,0.34);
+}}
+
+.eje-report-card strong {{
+    display:block;
+    color:#f8fafc;
+    font-size:0.96rem;
+}}
+
+.eje-report-card-meta {{
+    color:#94a3b8;
+    font-size:0.82rem;
+    margin-top:0.22rem;
+}}
+
+.eje-report-card-actions {{
+    display:flex;
+    gap:0.55rem;
+    flex-wrap:wrap;
+}}
+
+.eje-report-link {{
+    display:inline-flex;
+    align-items:center;
+    gap:0.35rem;
+    padding:0.55rem 0.85rem;
+    border-radius:999px;
+    border:1px solid rgba(96,165,250,0.22);
+    color:#dbeafe;
+    text-decoration:none;
+    font-size:0.8rem;
+    font-weight:700;
+    background:rgba(37,99,235,0.12);
+}}
+
+.eje-report-empty {{
+    padding:1rem;
+    border-radius:12px;
+    border:1px dashed rgba(148,163,184,0.2);
+    color:#94a3b8;
+    text-align:center;
 }}
 
 /* Botón "Finalizar y Habilitar Cobro" */

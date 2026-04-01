@@ -18,7 +18,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Cargar variables de entorno
-load_dotenv()
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 # Directorio raíz del proyecto
 BASE_DIR = Path(__file__).parent.parent
@@ -126,7 +126,7 @@ class Settings:
     # MÓDULOS A CARGAR
     modules_to_load: List[str] = os.getenv(
         "MODULES_TO_LOAD",
-        "base,signature"
+        "base,signature,mail"
     ).split(",")
     
     # PAGINACIÓN

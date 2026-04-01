@@ -8,9 +8,17 @@ const inventoryState = {
     selectedItemId: null,
 };
 
+let inventorySignatureCanvas = null;
+let inventorySignatureCtx = null;
+let inventorySignatureDrawing = false;
+let inventorySignatureStrokes = [];
+let inventoryCurrentStroke = [];
+let inventoryEvidencePhotoData = '';
+
 document.addEventListener('DOMContentLoaded', async () => {
     if (!API.requireAuth()) return;
     highlightNav('/app/inventory');
+    setupInventorySignaturePad();
     await loadInventoryWorkspace();
 });
 
@@ -72,6 +80,99 @@ function inventoryMovementMeta(type) {
 function inventoryCanAdmin() {
     const user = API.getUser();
     return !!user && user.role !== 'employee';
+}
+
+function setupInventorySignaturePad() {
+    inventorySignatureCanvas = document.getElementById('inventory-signature-canvas');
+    if (!inventorySignatureCanvas) return;
+    inventorySignatureCtx = inventorySignatureCanvas.getContext('2d');
+    inventorySignatureCtx.strokeStyle = '#0f172a';
+    inventorySignatureCtx.lineWidth = 2.4;
+    inventorySignatureCtx.lineCap = 'round';
+    inventorySignatureCtx.lineJoin = 'round';
+
+    inventorySignatureCanvas.addEventListener('mousedown', inventorySignatureStart);
+    inventorySignatureCanvas.addEventListener('mousemove', inventorySignatureMove);
+    inventorySignatureCanvas.addEventListener('mouseup', inventorySignatureEnd);
+    inventorySignatureCanvas.addEventListener('mouseleave', inventorySignatureEnd);
+
+    inventorySignatureCanvas.addEventListener('touchstart', event => {
+        event.preventDefault();
+        inventorySignatureStart(inventorySignatureTouchPoint(event));
+    }, { passive: false });
+    inventorySignatureCanvas.addEventListener('touchmove', event => {
+        event.preventDefault();
+        inventorySignatureMove(inventorySignatureTouchPoint(event));
+    }, { passive: false });
+    inventorySignatureCanvas.addEventListener('touchend', event => {
+        event.preventDefault();
+        inventorySignatureEnd();
+    }, { passive: false });
+}
+
+function inventorySignatureTouchPoint(event) {
+    const rect = inventorySignatureCanvas.getBoundingClientRect();
+    const touch = event.touches[0];
+    return { offsetX: touch.clientX - rect.left, offsetY: touch.clientY - rect.top };
+}
+
+function inventorySignatureStart(event) {
+    if (!inventorySignatureCtx) return;
+    inventorySignatureDrawing = true;
+    inventoryCurrentStroke = [{ x: event.offsetX, y: event.offsetY }];
+    inventorySignatureCtx.beginPath();
+    inventorySignatureCtx.moveTo(event.offsetX, event.offsetY);
+}
+
+function inventorySignatureMove(event) {
+    if (!inventorySignatureDrawing || !inventorySignatureCtx) return;
+    inventorySignatureCtx.lineTo(event.offsetX, event.offsetY);
+    inventorySignatureCtx.stroke();
+    inventoryCurrentStroke.push({ x: event.offsetX, y: event.offsetY });
+}
+
+function inventorySignatureEnd() {
+    if (!inventorySignatureDrawing) return;
+    inventorySignatureDrawing = false;
+    if (inventoryCurrentStroke.length > 1) inventorySignatureStrokes.push([...inventoryCurrentStroke]);
+    inventoryCurrentStroke = [];
+}
+
+function clearInventorySignaturePad() {
+    if (!inventorySignatureCanvas || !inventorySignatureCtx) return;
+    inventorySignatureCtx.clearRect(0, 0, inventorySignatureCanvas.width, inventorySignatureCanvas.height);
+    inventorySignatureStrokes = [];
+    inventoryCurrentStroke = [];
+}
+
+function inventorySignatureData() {
+    if (!inventorySignatureCanvas || inventorySignatureStrokes.length === 0) return '';
+    return inventorySignatureCanvas.toDataURL('image/png');
+}
+
+function handleInventoryEvidencePhoto(event) {
+    const file = event.target.files?.[0];
+    if (!file) {
+        inventoryEvidencePhotoData = '';
+        renderInventoryEvidencePhotoPreview();
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+        inventoryEvidencePhotoData = String(reader.result || '');
+        renderInventoryEvidencePhotoPreview();
+    };
+    reader.readAsDataURL(file);
+}
+
+function renderInventoryEvidencePhotoPreview() {
+    const preview = document.getElementById('inventory-evidence-photo-preview');
+    if (!preview) return;
+    if (!inventoryEvidencePhotoData) {
+        preview.innerHTML = '<span>Sin foto cargada</span>';
+        return;
+    }
+    preview.innerHTML = `<img src="${inventoryEvidencePhotoData}" alt="Respaldo foto">`;
 }
 
 async function loadInventoryWorkspace() {
@@ -354,10 +455,12 @@ function renderInventoryMovements() {
                     <span class="inventory-inline-pill">${invNumber(Math.abs(row.signed_quantity || row.quantity || 0))} ${invEscape(row.item_unit || 'un')}</span>
                     <span class="inventory-inline-pill">Stock: ${invNumber(row.stock_before || 0)} -> ${invNumber(row.stock_after || 0)}</span>
                     <span class="inventory-inline-pill">${invCurrency(row.total_cost || 0)}</span>
+                    ${row.evidence_available ? `<button class="btn btn-ghost btn-sm" onclick="viewInventoryEvidence(${row.id})">Ver respaldo</button>` : ''}
                 </div>
                 <div class="inventory-movement-card__meta">
                     ${invEscape(row.reference || row.reason || 'Sin referencia')}<br>
-                    ${invEscape(row.destination || row.performed_by_name || 'Sin destino')}
+                    ${invEscape(row.destination || row.performed_by_name || 'Sin destino')}<br>
+                    ${row.delivered_by_name || row.received_by_name ? `Entrega: ${invEscape(row.delivered_by_name || '-')} -> Recibe: ${invEscape(row.received_by_name || '-')}` : 'Sin cadena de entrega registrada'}
                 </div>
             </div>
         `;
@@ -449,7 +552,13 @@ function openInventoryMovementModal(itemId = null, movementType = 'in') {
     document.getElementById('inventory-movement-reference').value = '';
     document.getElementById('inventory-movement-reason').value = '';
     document.getElementById('inventory-movement-destination').value = '';
+    document.getElementById('inventory-movement-delivered-by').value = '';
+    document.getElementById('inventory-movement-received-by').value = '';
     document.getElementById('inventory-movement-notes').value = '';
+    document.getElementById('inventory-evidence-photo').value = '';
+    inventoryEvidencePhotoData = '';
+    renderInventoryEvidencePhotoPreview();
+    clearInventorySignaturePad();
     document.getElementById('inventory-movement-modal').classList.add('open');
 }
 
@@ -493,14 +602,34 @@ async function saveInventoryItem(event) {
 
 async function saveInventoryMovement(event) {
     event.preventDefault();
+    const movementType = document.getElementById('inventory-movement-type').value;
+    const deliveredByName = document.getElementById('inventory-movement-delivered-by').value.trim();
+    const receivedByName = document.getElementById('inventory-movement-received-by').value.trim();
+    const signatureData = inventorySignatureData();
+
+    if (['in', 'out'].includes(movementType)) {
+        if (!deliveredByName || !receivedByName) {
+            showToast('Para ingresos y salidas debes registrar quien entrega y quien recibe.', 'error');
+            return;
+        }
+        if (!inventoryEvidencePhotoData && !signatureData) {
+            showToast('Agrega una foto o una firma como respaldo de la entrega.', 'error');
+            return;
+        }
+    }
+
     const payload = {
         item_id: document.getElementById('inventory-movement-item').value,
-        movement_type: document.getElementById('inventory-movement-type').value,
+        movement_type: movementType,
         quantity: document.getElementById('inventory-movement-quantity').value,
         unit_cost: document.getElementById('inventory-movement-unit-cost').value,
         reference: document.getElementById('inventory-movement-reference').value,
         reason: document.getElementById('inventory-movement-reason').value,
         destination: document.getElementById('inventory-movement-destination').value,
+        delivered_by_name: deliveredByName,
+        received_by_name: receivedByName,
+        evidence_photo_data: inventoryEvidencePhotoData,
+        evidence_signature_data: signatureData,
         notes: document.getElementById('inventory-movement-notes').value,
     };
     const res = await API.post('/inventory/movements', payload);
@@ -528,6 +657,45 @@ async function saveInventoryBackup(event) {
     closeInventoryModal('inventory-backup-modal');
     showToast('Respaldo creado.');
     await loadInventoryWorkspace();
+}
+
+async function viewInventoryEvidence(id) {
+    const res = await API.get(`/inventory/movements/${id}`);
+    if (!res?.success) {
+        showToast(res?.errors?.[0] || 'No se pudo abrir el respaldo.', 'error');
+        return;
+    }
+    const row = res.data;
+    document.getElementById('inventory-evidence-content').innerHTML = `
+        <div class="inventory-evidence-view" style="margin-bottom:1rem;">
+            <div class="inventory-evidence-view-card">
+                <h4>Cadena de entrega</h4>
+                <div class="inventory-alert-card__meta">
+                    <strong style="color:#f8fafc;">Entrega:</strong> ${invEscape(row.delivered_by_name || 'Sin dato')}<br>
+                    <strong style="color:#f8fafc;">Recibe:</strong> ${invEscape(row.received_by_name || 'Sin dato')}<br>
+                    <strong style="color:#f8fafc;">Fecha:</strong> ${invEscape(invDate(row.movement_date))}<br>
+                    <strong style="color:#f8fafc;">Referencia:</strong> ${invEscape(row.reference || row.reason || 'Sin referencia')}
+                </div>
+            </div>
+            <div class="inventory-evidence-view-card">
+                <h4>Observacion</h4>
+                <div class="inventory-alert-card__meta">
+                    ${invEscape(row.notes || row.destination || 'Sin observaciones adicionales.')}
+                </div>
+            </div>
+        </div>
+        <div class="inventory-evidence-view">
+            <div class="inventory-evidence-view-card">
+                <h4>Foto</h4>
+                ${row.evidence_photo_data ? `<img src="${row.evidence_photo_data}" alt="Foto evidencia">` : '<div class="empty" style="padding:1rem;">Sin foto adjunta.</div>'}
+            </div>
+            <div class="inventory-evidence-view-card">
+                <h4>Firma</h4>
+                ${row.evidence_signature_data ? `<img src="${row.evidence_signature_data}" alt="Firma evidencia">` : '<div class="empty" style="padding:1rem;">Sin firma adjunta.</div>'}
+            </div>
+        </div>
+    `;
+    document.getElementById('inventory-evidence-modal').classList.add('open');
 }
 
 async function viewInventoryBackup(id) {

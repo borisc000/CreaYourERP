@@ -38,6 +38,7 @@ from enum import Enum
 import uuid
 import hashlib
 import json
+from core.time_utils import utc_now
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Date,
     Text, JSON, ForeignKey, Index, UniqueConstraint,
@@ -188,15 +189,15 @@ class AuditMixin:
     
     created_at = Column(
         ColumnType.DATETIME,
-        default=datetime.utcnow,
+        default=utc_now,
         readonly=True,
         label="Created At"
     )
     
     updated_at = Column(
         ColumnType.DATETIME,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
         readonly=True,
         label="Updated At"
     )

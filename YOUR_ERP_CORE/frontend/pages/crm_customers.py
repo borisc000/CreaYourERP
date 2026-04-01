@@ -93,6 +93,11 @@ def crm_customers_page():
                     <input type="text" id="cust-city" placeholder="Santiago">
                 </div>
             </div>
+            <div class="form-group">
+                <label>Documentos especificos de acreditacion</label>
+                <select id="cust-acc-template-selector" multiple size="6"></select>
+                <span class="text-muted text-sm">Se suman a los documentos estandar para este cliente y luego aplican automaticamente a los trabajadores asignados.</span>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-danger" id="cust-delete-btn"

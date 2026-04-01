@@ -4,12 +4,60 @@ const hrState = {
     employees: [],
     contracts: [],
     leaves: [],
+    jobProfiles: [],
+    customers: [],
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!API.requireAuth()) return;
     await loadHrData();
 });
+
+function hrParseLines(value) {
+    return String(value || '')
+        .split(/\r?\n/)
+        .map(item => item.trim())
+        .filter(Boolean);
+}
+
+function hrJoinLines(items) {
+    return Array.isArray(items) ? items.join('\n') : '';
+}
+
+function deriveHrZodiac(value) {
+    if (!value) return '';
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const ranges = [
+        { start: [1, 20], sign: 'Acuario' },
+        { start: [2, 19], sign: 'Piscis' },
+        { start: [3, 21], sign: 'Aries' },
+        { start: [4, 20], sign: 'Tauro' },
+        { start: [5, 21], sign: 'Geminis' },
+        { start: [6, 21], sign: 'Cancer' },
+        { start: [7, 23], sign: 'Leo' },
+        { start: [8, 23], sign: 'Virgo' },
+        { start: [9, 23], sign: 'Libra' },
+        { start: [10, 23], sign: 'Escorpio' },
+        { start: [11, 22], sign: 'Sagitario' },
+        { start: [12, 22], sign: 'Capricornio' },
+    ];
+    let sign = 'Capricornio';
+    for (const item of ranges) {
+        if (month > item.start[0] || (month === item.start[0] && day >= item.start[1])) {
+            sign = item.sign;
+        }
+    }
+    return sign;
+}
+
+function syncHrEmployeeZodiac() {
+    const birth = document.getElementById('employee-birth-date-hr')?.value || '';
+    const zodiac = document.getElementById('employee-zodiac-hr');
+    if (zodiac) zodiac.value = deriveHrZodiac(birth);
+}
 
 function hrEscape(value) {
     return String(value ?? '')
@@ -43,12 +91,14 @@ function hrStatusBadge(status) {
 }
 
 async function loadHrData() {
-    const [statsRes, departmentsRes, employeesRes, contractsRes, leavesRes] = await Promise.all([
+    const [statsRes, departmentsRes, employeesRes, contractsRes, leavesRes, jobProfilesRes, customersRes] = await Promise.all([
         API.get('/hr/stats'),
         API.get('/hr/departments'),
         API.get('/hr/employees'),
         API.get('/hr/contracts'),
         API.get('/hr/leaves'),
+        API.get('/job-profiles/profiles'),
+        API.get('/hr/accreditation/customers'),
     ]);
 
     hrState.stats = statsRes?.data || {};
@@ -56,6 +106,8 @@ async function loadHrData() {
     hrState.employees = employeesRes?.data?.results || [];
     hrState.contracts = contractsRes?.data?.results || [];
     hrState.leaves = leavesRes?.data?.results || [];
+    hrState.jobProfiles = jobProfilesRes?.data?.results || [];
+    hrState.customers = customersRes?.data?.results || [];
 
     renderHrStats();
     renderDepartments();
@@ -104,7 +156,8 @@ function renderEmployees() {
         const matchesSearch = !search
             || (item.full_name || '').toLowerCase().includes(search)
             || (item.employee_code || '').toLowerCase().includes(search)
-            || (item.work_email || '').toLowerCase().includes(search);
+            || (item.work_email || '').toLowerCase().includes(search)
+            || (item.national_id || '').toLowerCase().includes(search);
         const matchesStatus = !status || item.status === status;
         return matchesSearch && matchesStatus;
     });
@@ -116,9 +169,20 @@ function renderEmployees() {
     body.innerHTML = employees.map(item => `
         <tr>
             <td>${hrEscape(item.employee_code || '-')}</td>
-            <td><strong>${hrEscape(item.full_name)}</strong><div class="text-sm text-muted">${hrEscape(item.work_email || '')}</div></td>
-            <td>${hrEscape(item.department_name || '-')}</td>
-            <td>${hrEscape(item.position_title || '-')}</td>
+            <td>
+                <strong>${hrEscape(item.full_name)}</strong>
+                <div class="text-sm text-muted">${hrEscape(item.position_title || '-')} ${item.department_name ? `· ${hrEscape(item.department_name)}` : ''}</div>
+            </td>
+            <td>
+                <div>${hrEscape(item.work_email || item.personal_email || '-')}</div>
+                <div class="text-sm text-muted">${hrEscape(item.phone || '-')} ${item.city ? `· ${hrEscape(item.city)}` : ''}</div>
+                <div class="text-sm text-muted">${hrEscape(item.national_id || '')}</div>
+            </td>
+            <td>
+                ${item.health_system ? hrBadge(item.health_system, '#172554', '#93c5fd') : ''}
+                ${item.afp_code ? hrBadge((item.afp_code || '').toUpperCase(), '#0f172a') : ''}
+                ${item.criminal_record_status ? hrBadge(item.criminal_record_status, '#422006', '#facc15') : ''}
+            </td>
             <td>${hrStatusBadge(item.status)}</td>
             <td style="white-space:nowrap;display:flex;gap:0.35rem;">
                 <button class="btn btn-ghost btn-sm" onclick="editEmployee(${item.id})">Editar</button>
@@ -140,7 +204,11 @@ function renderContracts() {
             <td>${hrEscape(item.contract_type || '-')}</td>
             <td>${hrStatusBadge(item.status)}</td>
             <td>${hrEscape(item.start_date || '-')}</td>
-            <td>${hrEscape(item.salary_amount || 0)}</td>
+            <td>
+                <div>${hrEscape(item.salary_amount || 0)}</div>
+                <div class="text-sm text-muted">${hrEscape(item.work_schedule || '-')} ${item.shift_pattern ? `· ${hrEscape(item.shift_pattern)}` : ''}</div>
+                <div class="text-sm text-muted">${hrEscape(item.assigned_customer || '')} ${item.work_location ? `· ${hrEscape(item.work_location)}` : ''}</div>
+            </td>
             <td style="white-space:nowrap;display:flex;gap:0.35rem;">
                 <button class="btn btn-ghost btn-sm" onclick="editContract(${item.id})">Editar</button>
                 <button class="btn btn-ghost btn-sm" onclick="deleteContract(${item.id})">Eliminar</button>
@@ -172,8 +240,10 @@ function renderLeaves() {
 
 function fillHrSelects() {
     fillHrSelect('employee-department-hr', hrState.departments, item => item.name, true);
+    fillHrSelect('employee-job-profile-hr', hrState.jobProfiles, item => `${item.code || ''} ${item.name}`.trim(), true);
     fillHrSelect('contract-employee', hrState.employees, item => `${item.employee_code || ''} ${item.full_name}`);
     fillHrSelect('leave-employee', hrState.employees, item => `${item.employee_code || ''} ${item.full_name}`);
+    fillHrMultiSelect('employee-customers-hr', hrState.customers, item => item.name);
 }
 
 function fillHrSelect(id, items, labelFn, includeEmpty = false) {
@@ -182,6 +252,27 @@ function fillHrSelect(id, items, labelFn, includeEmpty = false) {
     const options = [];
     if (includeEmpty) options.push('<option value="">-</option>');
     el.innerHTML = options.concat(items.map(item => `<option value="${item.id}">${hrEscape(labelFn(item))}</option>`)).join('');
+}
+
+function fillHrMultiSelect(id, items, labelFn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = items.map(item => `<option value="${item.id}">${hrEscape(labelFn(item))}</option>`).join('');
+}
+
+function setHrMultiSelectValues(id, values) {
+    const selected = new Set((values || []).map(item => String(item)));
+    const el = document.getElementById(id);
+    if (!el) return;
+    Array.from(el.options).forEach(option => {
+        option.selected = selected.has(option.value);
+    });
+}
+
+function getHrMultiSelectValues(id) {
+    const el = document.getElementById(id);
+    if (!el) return [];
+    return Array.from(el.selectedOptions).map(option => Number(option.value)).filter(Boolean);
 }
 
 function closeHrModal(id) {
@@ -198,19 +289,31 @@ function openDepartmentModal() {
 
 function openEmployeeModal() {
     document.getElementById('employee-modal-title-hr').textContent = 'Nuevo Empleado';
-    ['employee-id-hr','employee-name-hr','employee-email-hr','employee-position-hr','employee-phone-hr','employee-hire-date-hr','employee-base-salary-hr','employee-notes-hr'].forEach(id => {
+    [
+        'employee-id-hr','employee-name-hr','employee-email-hr','employee-personal-email-hr','employee-national-id-hr',
+        'employee-position-hr','employee-phone-hr','employee-alt-phone-hr','employee-hire-date-hr','employee-birth-date-hr',
+        'employee-zodiac-hr','employee-base-salary-hr','employee-nationality-hr','employee-gender-hr',
+        'employee-marital-status-hr','employee-driving-license-hr','employee-city-hr','employee-commune-hr',
+        'employee-region-hr','employee-address-hr','employee-emergency-name-hr','employee-emergency-phone-hr',
+        'employee-courses-hr','employee-certifications-hr','employee-background-notes-hr','employee-notes-hr'
+    ].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
     document.getElementById('employee-department-hr').value = '';
+    document.getElementById('employee-job-profile-hr').value = '';
     document.getElementById('employee-status-hr').value = 'onboarding';
+    document.getElementById('employee-health-system-hr').value = '';
+    document.getElementById('employee-afp-code-hr').value = '';
+    document.getElementById('employee-criminal-record-status-hr').value = '';
+    setHrMultiSelectValues('employee-customers-hr', []);
     document.getElementById('employee-create-user-hr').checked = true;
     document.getElementById('employee-modal-hr').classList.add('open');
 }
 
 function openContractModal() {
     document.getElementById('contract-modal-title').textContent = 'Nuevo Contrato';
-    ['contract-id','contract-start','contract-end','contract-salary','contract-schedule','contract-notes'].forEach(id => {
+    ['contract-id','contract-start','contract-end','contract-salary','contract-schedule','contract-shift-pattern','contract-work-location','contract-assigned-customer','contract-assigned-service','contract-notes'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -250,14 +353,47 @@ function editEmployee(id) {
     document.getElementById('employee-id-hr').value = item.id;
     document.getElementById('employee-name-hr').value = item.full_name || '';
     document.getElementById('employee-email-hr').value = item.work_email || '';
+    document.getElementById('employee-personal-email-hr').value = item.personal_email || '';
     document.getElementById('employee-department-hr').value = item.department_id || '';
+    document.getElementById('employee-job-profile-hr').value = item.job_profile_id || '';
+    document.getElementById('employee-national-id-hr').value = item.national_id || '';
     document.getElementById('employee-position-hr').value = item.position_title || '';
     document.getElementById('employee-phone-hr').value = item.phone || '';
+    document.getElementById('employee-alt-phone-hr').value = item.alternate_phone || '';
     document.getElementById('employee-status-hr').value = item.status || 'onboarding';
     document.getElementById('employee-hire-date-hr').value = item.hire_date || '';
+    document.getElementById('employee-birth-date-hr').value = item.birth_date || '';
+    document.getElementById('employee-zodiac-hr').value = item.zodiac_sign || '';
     document.getElementById('employee-base-salary-hr').value = item.base_salary || '';
+    document.getElementById('employee-nationality-hr').value = item.nationality || '';
+    document.getElementById('employee-gender-hr').value = item.gender || '';
+    document.getElementById('employee-marital-status-hr').value = item.marital_status || '';
+    document.getElementById('employee-health-system-hr').value = item.health_system || '';
+    document.getElementById('employee-afp-code-hr').value = item.afp_code || '';
+    document.getElementById('employee-criminal-record-status-hr').value = item.criminal_record_status || '';
+    document.getElementById('employee-driving-license-hr').value = item.driving_license || '';
+    document.getElementById('employee-city-hr').value = item.city || '';
+    document.getElementById('employee-commune-hr').value = item.commune || '';
+    document.getElementById('employee-region-hr').value = item.region || '';
+    document.getElementById('employee-address-hr').value = item.address || '';
+    document.getElementById('employee-emergency-name-hr').value = item.emergency_contact_name || '';
+    document.getElementById('employee-emergency-phone-hr').value = item.emergency_contact_phone || '';
+    document.getElementById('employee-courses-hr').value = hrJoinLines(item.courses);
+    document.getElementById('employee-certifications-hr').value = hrJoinLines(item.certifications);
+    setHrMultiSelectValues('employee-customers-hr', item.assigned_customer_ids || []);
+    document.getElementById('employee-background-notes-hr').value = item.background_notes || '';
     document.getElementById('employee-notes-hr').value = item.notes || '';
     document.getElementById('employee-create-user-hr').checked = false;
+}
+
+function syncEmployeePositionFromProfile() {
+    const profileId = Number(document.getElementById('employee-job-profile-hr')?.value || 0);
+    if (!profileId) return;
+    const profile = hrState.jobProfiles.find(item => item.id === profileId);
+    const input = document.getElementById('employee-position-hr');
+    if (profile && input && !input.value.trim()) {
+        input.value = profile.name || '';
+    }
 }
 
 function editContract(id) {
@@ -273,6 +409,10 @@ function editContract(id) {
     document.getElementById('contract-end').value = item.end_date || '';
     document.getElementById('contract-salary').value = item.salary_amount || '';
     document.getElementById('contract-schedule').value = item.work_schedule || '';
+    document.getElementById('contract-shift-pattern').value = item.shift_pattern || '';
+    document.getElementById('contract-work-location').value = item.work_location || '';
+    document.getElementById('contract-assigned-customer').value = item.assigned_customer || '';
+    document.getElementById('contract-assigned-service').value = item.assigned_service || '';
     document.getElementById('contract-notes').value = item.notes || '';
 }
 
@@ -314,12 +454,35 @@ async function saveEmployeeHr(event) {
     const payload = {
         full_name: document.getElementById('employee-name-hr').value,
         work_email: document.getElementById('employee-email-hr').value,
+        personal_email: document.getElementById('employee-personal-email-hr').value,
         department_id: document.getElementById('employee-department-hr').value || null,
+        job_profile_id: document.getElementById('employee-job-profile-hr').value || null,
+        national_id: document.getElementById('employee-national-id-hr').value,
         position_title: document.getElementById('employee-position-hr').value,
         phone: document.getElementById('employee-phone-hr').value,
+        alternate_phone: document.getElementById('employee-alt-phone-hr').value,
         status: document.getElementById('employee-status-hr').value,
         hire_date: document.getElementById('employee-hire-date-hr').value,
+        birth_date: document.getElementById('employee-birth-date-hr').value,
+        zodiac_sign: document.getElementById('employee-zodiac-hr').value,
         base_salary: document.getElementById('employee-base-salary-hr').value,
+        nationality: document.getElementById('employee-nationality-hr').value,
+        gender: document.getElementById('employee-gender-hr').value,
+        marital_status: document.getElementById('employee-marital-status-hr').value,
+        health_system: document.getElementById('employee-health-system-hr').value,
+        afp_code: document.getElementById('employee-afp-code-hr').value,
+        criminal_record_status: document.getElementById('employee-criminal-record-status-hr').value,
+        driving_license: document.getElementById('employee-driving-license-hr').value,
+        city: document.getElementById('employee-city-hr').value,
+        commune: document.getElementById('employee-commune-hr').value,
+        region: document.getElementById('employee-region-hr').value,
+        address: document.getElementById('employee-address-hr').value,
+        emergency_contact_name: document.getElementById('employee-emergency-name-hr').value,
+        emergency_contact_phone: document.getElementById('employee-emergency-phone-hr').value,
+        courses: hrParseLines(document.getElementById('employee-courses-hr').value),
+        certifications: hrParseLines(document.getElementById('employee-certifications-hr').value),
+        assigned_customer_ids: getHrMultiSelectValues('employee-customers-hr'),
+        background_notes: document.getElementById('employee-background-notes-hr').value,
         notes: document.getElementById('employee-notes-hr').value,
         create_user_account: document.getElementById('employee-create-user-hr').checked,
     };
@@ -345,6 +508,10 @@ async function saveContract(event) {
         end_date: document.getElementById('contract-end').value,
         salary_amount: document.getElementById('contract-salary').value,
         work_schedule: document.getElementById('contract-schedule').value,
+        shift_pattern: document.getElementById('contract-shift-pattern').value,
+        work_location: document.getElementById('contract-work-location').value,
+        assigned_customer: document.getElementById('contract-assigned-customer').value,
+        assigned_service: document.getElementById('contract-assigned-service').value,
         notes: document.getElementById('contract-notes').value,
     };
     const res = id ? await API.put(`/hr/contracts/${id}`, payload) : await API.post('/hr/contracts', payload);

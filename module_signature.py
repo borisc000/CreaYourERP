@@ -19,6 +19,7 @@ import json
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import base64
+from YOUR_ERP_CORE.core.time_utils import utc_now, ensure_utc_datetime
 from YOUR_ERP_core_framework import (
     BaseModule, Request, Response, ValidationError
 )
@@ -147,7 +148,7 @@ class SignatureRequest(BaseModel, AuditMixin):
         self.access_token = secrets.token_urlsafe(32)
         
         # Establecer expiración (30 días)
-        self.expires_at = datetime.utcnow() + timedelta(days=30)
+        self.expires_at = utc_now() + timedelta(days=30)
         
         # Estado inicial
         self.status = 'draft'
@@ -174,7 +175,8 @@ class SignatureRequest(BaseModel, AuditMixin):
         """Verificar si la solicitud expiró"""
         if not self.expires_at:
             return False
-        return datetime.utcnow() > self.expires_at
+        expires_at = ensure_utc_datetime(self.expires_at)
+        return expires_at is not None and utc_now() > expires_at
     
     def add_signature(self, signature_image_base64: str, signer_email: str, ip_address: str) -> bool:
         """
@@ -200,7 +202,7 @@ class SignatureRequest(BaseModel, AuditMixin):
             # Guardar firma
             self.signature_data = signature_image_base64
             self.signature_hash = signature_hash
-            self.signed_at = datetime.utcnow()
+            self.signed_at = utc_now()
             self.signed_by_email = signer_email
             self.signed_by_ip = ip_address
             self.status = 'signed'

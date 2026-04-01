@@ -4,11 +4,13 @@ Recruitment and selection module.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.YOUR_ERP_core_framework import BaseModule, Request, Response, ValidationError
 from core.YOUR_ERP_orm import BaseModel, Column, ColumnType, AuditMixin
+from core.time_utils import utc_strftime
 from modules.hr.module_hr import (
     Department,
     EmployeeProfile,
@@ -39,6 +41,88 @@ WORK_MODES = ("onsite", "hybrid", "remote")
 APPLICATION_STATUSES = ("active", "hired", "rejected", "withdrawn")
 INTERVIEW_TYPES = ("phone", "video", "panel", "technical")
 INTERVIEW_RESULTS = ("pending", "passed", "failed", "rescheduled")
+CONTRACT_TYPES = ("indefinite", "fixed_term", "internship", "services")
+AFP_CODES = ("capital", "cuprum", "habitat", "modelo", "planvital", "provida", "uno")
+HEALTH_SYSTEMS = ("fonasa", "isapre")
+CRIMINAL_RECORD_STATUSES = ("pending", "clear", "observed", "not_provided")
+INTERVIEW_RECOMMENDATIONS = ("strong_yes", "yes", "reserve", "no")
+
+
+def _normalize_text_list(value: Any) -> List[str]:
+    if value in (None, ""):
+        return []
+    if isinstance(value, list):
+        items = value
+    else:
+        items = str(value).replace("\r", "\n").split("\n")
+    normalized: List[str] = []
+    seen = set()
+    for item in items:
+        cleaned = str(item or "").strip()
+        key = cleaned.lower()
+        if not cleaned or key in seen:
+            continue
+        seen.add(key)
+        normalized.append(cleaned)
+    return normalized
+
+
+def _normalize_national_id(value: Any) -> str:
+    raw = re.sub(r"[^0-9kK]", "", str(value or "")).upper()
+    if len(raw) < 2:
+        return ""
+    return f"{raw[:-1]}-{raw[-1]}"
+
+
+def _is_valid_chilean_rut(value: Any) -> bool:
+    normalized = _normalize_national_id(value)
+    if not normalized:
+        return True
+    body, verifier = normalized.split("-")
+    if not body.isdigit():
+        return False
+    reversed_digits = list(map(int, reversed(body)))
+    factors = [2, 3, 4, 5, 6, 7]
+    total = sum(digit * factors[index % len(factors)] for index, digit in enumerate(reversed_digits))
+    remainder = 11 - (total % 11)
+    expected = "0" if remainder == 11 else "K" if remainder == 10 else str(remainder)
+    return verifier.upper() == expected
+
+
+def _derive_zodiac_sign(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    try:
+        birth_date = datetime.strptime(str(value), "%Y-%m-%d")
+    except Exception:
+        return ""
+    month_day = (birth_date.month, birth_date.day)
+    signs = [
+        ((1, 20), "Acuario"),
+        ((2, 19), "Piscis"),
+        ((3, 21), "Aries"),
+        ((4, 20), "Tauro"),
+        ((5, 21), "Geminis"),
+        ((6, 21), "Cancer"),
+        ((7, 23), "Leo"),
+        ((8, 23), "Virgo"),
+        ((9, 23), "Libra"),
+        ((10, 23), "Escorpio"),
+        ((11, 22), "Sagitario"),
+        ((12, 22), "Capricornio"),
+    ]
+    current_sign = "Capricornio"
+    for start, sign in signs:
+        if month_day >= start:
+            current_sign = sign
+    return current_sign
+
+
+def _labelize_code(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return text.replace("_", " ").replace("-", " ").title()
 
 
 class RecruitmentStage(BaseModel, AuditMixin):
@@ -122,12 +206,32 @@ class Candidate(BaseModel, AuditMixin):
     __displayname__ = "full_name"
 
     full_name = Column(ColumnType.STRING, required=True, label="Full Name")
+    national_id = Column(ColumnType.STRING, label="National ID")
     email = Column(ColumnType.STRING, label="Email")
     phone = Column(ColumnType.STRING, label="Phone")
+    alternate_phone = Column(ColumnType.STRING, label="Alternate Phone")
+    birth_date = Column(ColumnType.STRING, label="Birth Date")
+    zodiac_sign = Column(ColumnType.STRING, label="Zodiac Sign")
+    gender = Column(ColumnType.STRING, label="Gender")
+    marital_status = Column(ColumnType.STRING, label="Marital Status")
+    nationality = Column(ColumnType.STRING, label="Nationality")
+    address = Column(ColumnType.TEXT, label="Address")
+    commune = Column(ColumnType.STRING, label="Commune")
     city = Column(ColumnType.STRING, label="City")
+    region = Column(ColumnType.STRING, label="Region")
+    emergency_contact_name = Column(ColumnType.STRING, label="Emergency Contact")
+    emergency_contact_phone = Column(ColumnType.STRING, label="Emergency Phone")
     source = Column(ColumnType.STRING, label="Source")
     current_position = Column(ColumnType.STRING, label="Current Position")
     expected_salary = Column(ColumnType.FLOAT, default=0.0, label="Expected Salary")
+    health_system = Column(ColumnType.STRING, label="Health System")
+    afp_code = Column(ColumnType.STRING, label="AFP")
+    criminal_record_status = Column(ColumnType.STRING, default="pending", label="Criminal Record")
+    background_notes = Column(ColumnType.TEXT, label="Background Notes")
+    courses = Column(ColumnType.JSON, label="Courses")
+    certifications = Column(ColumnType.JSON, label="Certifications")
+    reference_contacts = Column(ColumnType.TEXT, label="References")
+    driving_license = Column(ColumnType.STRING, label="Driving License")
     resume_url = Column(ColumnType.STRING, label="Resume URL")
     portfolio_url = Column(ColumnType.STRING, label="Portfolio URL")
     summary = Column(ColumnType.TEXT, label="Summary")
@@ -138,6 +242,25 @@ class Candidate(BaseModel, AuditMixin):
         super().validate()
         if not (self.full_name or "").strip():
             raise ValidationError("Candidate full name is required")
+        if self.national_id:
+            self.national_id = _normalize_national_id(self.national_id)
+            if not _is_valid_chilean_rut(self.national_id):
+                raise ValidationError("Candidate national ID is not a valid Chilean RUT")
+        if self.birth_date and not _derive_zodiac_sign(self.birth_date):
+            raise ValidationError("Birth date must use YYYY-MM-DD format")
+        if self.birth_date and not self.zodiac_sign:
+            self.zodiac_sign = _derive_zodiac_sign(self.birth_date)
+        if self.health_system and self.health_system not in HEALTH_SYSTEMS:
+            raise ValidationError(
+                f"Health system must be one of: {', '.join(HEALTH_SYSTEMS)}"
+            )
+        if self.afp_code and self.afp_code not in AFP_CODES:
+            raise ValidationError(f"AFP must be one of: {', '.join(AFP_CODES)}")
+        if self.criminal_record_status and self.criminal_record_status not in CRIMINAL_RECORD_STATUSES:
+            raise ValidationError(
+                "Criminal record status must be one of: "
+                + ", ".join(CRIMINAL_RECORD_STATUSES)
+            )
 
 
 class JobApplication(BaseModel, AuditMixin):
@@ -151,6 +274,17 @@ class JobApplication(BaseModel, AuditMixin):
     owner_user_id = Column(ColumnType.INTEGER, label="Owner")
     score = Column(ColumnType.FLOAT, default=0.0, label="Score")
     available_from = Column(ColumnType.STRING, label="Available From")
+    proposed_salary = Column(ColumnType.FLOAT, default=0.0, label="Proposed Salary")
+    projected_start_date = Column(ColumnType.STRING, label="Projected Start Date")
+    contract_type = Column(ColumnType.STRING, label="Contract Type")
+    work_schedule = Column(ColumnType.STRING, label="Work Schedule")
+    shift_pattern = Column(ColumnType.STRING, label="Shift Pattern")
+    work_location = Column(ColumnType.STRING, label="Work Location")
+    assigned_customer = Column(ColumnType.STRING, label="Assigned Customer")
+    assigned_service = Column(ColumnType.STRING, label="Assigned Service")
+    required_documents = Column(ColumnType.JSON, label="Required Documents")
+    required_courses = Column(ColumnType.JSON, label="Required Courses")
+    hiring_notes = Column(ColumnType.TEXT, label="Hiring Notes")
     notes = Column(ColumnType.TEXT, label="Notes")
     hired_employee_id = Column(ColumnType.INTEGER, label="Hired Employee")
     company_id = Column(ColumnType.INTEGER, required=True, label="Company")
@@ -161,6 +295,10 @@ class JobApplication(BaseModel, AuditMixin):
             raise ValidationError(
                 f"Application status must be one of: {', '.join(APPLICATION_STATUSES)}"
             )
+        if self.contract_type and self.contract_type not in CONTRACT_TYPES:
+            raise ValidationError(
+                f"Application contract type must be one of: {', '.join(CONTRACT_TYPES)}"
+            )
 
 
 class Interview(BaseModel, AuditMixin):
@@ -169,10 +307,22 @@ class Interview(BaseModel, AuditMixin):
 
     application_id = Column(ColumnType.INTEGER, required=True, label="Application")
     interviewer_user_id = Column(ColumnType.INTEGER, label="Interviewer")
+    interviewer_role = Column(ColumnType.STRING, label="Interviewer Role")
     interview_type = Column(ColumnType.STRING, default="video", label="Interview Type")
     scheduled_at = Column(ColumnType.STRING, required=True, label="Scheduled At")
+    duration_minutes = Column(ColumnType.INTEGER, default=60, label="Duration Minutes")
     location = Column(ColumnType.STRING, label="Location")
     result = Column(ColumnType.STRING, default="pending", label="Result")
+    overall_score = Column(ColumnType.FLOAT, default=0.0, label="Overall Score")
+    technical_score = Column(ColumnType.FLOAT, default=0.0, label="Technical Score")
+    communication_score = Column(ColumnType.FLOAT, default=0.0, label="Communication Score")
+    safety_score = Column(ColumnType.FLOAT, default=0.0, label="Safety Score")
+    cultural_score = Column(ColumnType.FLOAT, default=0.0, label="Cultural Score")
+    recommendation = Column(ColumnType.STRING, label="Recommendation")
+    strengths = Column(ColumnType.TEXT, label="Strengths")
+    concerns = Column(ColumnType.TEXT, label="Concerns")
+    next_step = Column(ColumnType.STRING, label="Next Step")
+    pending_documents = Column(ColumnType.JSON, label="Pending Documents")
     feedback = Column(ColumnType.TEXT, label="Feedback")
     company_id = Column(ColumnType.INTEGER, required=True, label="Company")
 
@@ -185,6 +335,11 @@ class Interview(BaseModel, AuditMixin):
         if self.result not in INTERVIEW_RESULTS:
             raise ValidationError(
                 f"Interview result must be one of: {', '.join(INTERVIEW_RESULTS)}"
+            )
+        if self.recommendation and self.recommendation not in INTERVIEW_RECOMMENDATIONS:
+            raise ValidationError(
+                "Interview recommendation must be one of: "
+                + ", ".join(INTERVIEW_RECOMMENDATIONS)
             )
 
 
@@ -317,6 +472,126 @@ class RecruitmentModule(BaseModule):
             return None, Response.not_found("Interview not found")
         return interview, None
 
+    def _candidate_missing_fields(self, candidate: Optional[Candidate]) -> List[str]:
+        if not candidate:
+            return []
+        checks = {
+            "RUT": candidate.national_id,
+            "correo": candidate.email,
+            "telefono": candidate.phone,
+            "fecha_nacimiento": candidate.birth_date,
+            "direccion": candidate.address,
+            "ciudad": candidate.city,
+            "salud": candidate.health_system,
+            "AFP": candidate.afp_code,
+            "contacto_emergencia": candidate.emergency_contact_name,
+            "telefono_emergencia": candidate.emergency_contact_phone,
+            "antecedentes": candidate.criminal_record_status
+            if candidate.criminal_record_status not in ("", "pending", None)
+            else "",
+        }
+        return [label for label, value in checks.items() if not value]
+
+    def _application_missing_fields(
+        self,
+        application: Optional[JobApplication],
+        candidate: Optional[Candidate],
+    ) -> Dict[str, List[str]]:
+        if not application:
+            return {"candidate": [], "contract": [], "training": []}
+        required_training = _normalize_text_list(application.required_courses)
+        candidate_training = {
+            item.strip().lower()
+            for item in (_normalize_text_list(candidate.courses if candidate else []) + _normalize_text_list(candidate.certifications if candidate else []))
+            if item.strip()
+        }
+        return {
+            "candidate": self._candidate_missing_fields(candidate),
+            "contract": [
+                label
+                for label, value in {
+                    "tipo_contrato": application.contract_type,
+                    "renta_propuesta": application.proposed_salary,
+                    "inicio_proyectado": application.projected_start_date,
+                    "jornada": application.work_schedule,
+                    "lugar_trabajo": application.work_location,
+                }.items()
+                if not value
+            ],
+            "training": [
+                item
+                for item in required_training
+                if item.strip().lower() not in candidate_training
+            ],
+        }
+
+    def _candidate_completion(self, candidate: Optional[Candidate]) -> int:
+        total_fields = 11
+        missing = len(self._candidate_missing_fields(candidate))
+        return max(0, round(((total_fields - missing) / total_fields) * 100))
+
+    def _application_readiness(self, application: Optional[JobApplication], candidate: Optional[Candidate]) -> Dict[str, Any]:
+        missing = self._application_missing_fields(application, candidate)
+        total_checks = 15
+        missing_total = len(missing["candidate"]) + len(missing["contract"]) + len(missing["training"])
+        percentage = max(0, round(((total_checks - missing_total) / total_checks) * 100))
+        if missing_total == 0:
+            status = "ready"
+            label = "Lista"
+        elif missing_total <= 3:
+            status = "attention"
+            label = "Con observaciones"
+        else:
+            status = "incomplete"
+            label = "Incompleta"
+        return {
+            "status": status,
+            "label": label,
+            "completion": percentage,
+            "missing_candidate_fields": missing["candidate"],
+            "missing_contract_fields": missing["contract"],
+            "missing_training": missing["training"],
+        }
+
+    def _payload_lines(self, data: Dict[str, Any], key: str) -> List[str]:
+        return _normalize_text_list(data.get(key))
+
+    def _sync_payroll_profile(
+        self,
+        employee: EmployeeProfile,
+        contract: EmployeeContract,
+        candidate: Candidate,
+        department: Optional[Department],
+    ) -> Optional[Dict[str, Any]]:
+        try:
+            from modules.payroll.module_payroll import PayrollProfile
+        except Exception:
+            return None
+
+        afp_code = (candidate.afp_code or "").strip().lower()
+        health_system = (candidate.health_system or "").strip().lower()
+        payload = {
+            "company_id": employee.company_id,
+            "employee_id": employee.id,
+            "contract_id": contract.id,
+            "national_id": candidate.national_id or "",
+            "afp_code": afp_code if afp_code in AFP_CODES else "uno",
+            "health_system": health_system if health_system in HEALTH_SYSTEMS else "fonasa",
+            "cost_center": department.code if department else "",
+            "notes": "Creado desde contratacion en reclutamiento",
+        }
+
+        existing = PayrollProfile.search([("employee_id", "=", employee.id)])
+        if existing:
+            profile = existing[0]
+            for field_name, value in payload.items():
+                setattr(profile, field_name, value)
+            profile.save()
+            return profile.to_dict()
+
+        profile = PayrollProfile.create(payload)
+        return profile.to_dict()
+
     def _job_dict(self, job: JobOpening) -> Dict[str, Any]:
         department = Department.find_by_id(job.department_id) if job.department_id else None
         applications = JobApplication.search([("job_id", "=", job.id)])
@@ -350,21 +625,48 @@ class RecruitmentModule(BaseModule):
 
     def _candidate_dict(self, candidate: Candidate) -> Dict[str, Any]:
         applications = JobApplication.search([("candidate_id", "=", candidate.id)])
+        missing_fields = self._candidate_missing_fields(candidate)
         return {
             "id": candidate.id,
             "full_name": candidate.full_name or "",
+            "national_id": candidate.national_id or "",
             "email": candidate.email or "",
             "phone": candidate.phone or "",
+            "alternate_phone": candidate.alternate_phone or "",
+            "birth_date": candidate.birth_date or "",
+            "zodiac_sign": candidate.zodiac_sign or _derive_zodiac_sign(candidate.birth_date),
+            "gender": candidate.gender or "",
+            "marital_status": candidate.marital_status or "",
+            "nationality": candidate.nationality or "",
+            "address": candidate.address or "",
+            "commune": candidate.commune or "",
             "city": candidate.city or "",
+            "region": candidate.region or "",
+            "emergency_contact_name": candidate.emergency_contact_name or "",
+            "emergency_contact_phone": candidate.emergency_contact_phone or "",
             "source": candidate.source or "",
             "current_position": candidate.current_position or "",
             "expected_salary": candidate.expected_salary or 0.0,
+            "health_system": candidate.health_system or "",
+            "health_system_label": _labelize_code(candidate.health_system),
+            "afp_code": candidate.afp_code or "",
+            "afp_label": (candidate.afp_code or "").upper(),
+            "criminal_record_status": candidate.criminal_record_status or "pending",
+            "criminal_record_label": _labelize_code(candidate.criminal_record_status or "pending"),
+            "background_notes": candidate.background_notes or "",
+            "courses": _normalize_text_list(candidate.courses),
+            "certifications": _normalize_text_list(candidate.certifications),
+            "reference_contacts": candidate.reference_contacts or "",
+            "driving_license": candidate.driving_license or "",
             "resume_url": candidate.resume_url or "",
             "portfolio_url": candidate.portfolio_url or "",
             "summary": candidate.summary or "",
             "rating": candidate.rating or 0.0,
             "company_id": candidate.company_id,
             "applications_count": len(applications),
+            "profile_completion": self._candidate_completion(candidate),
+            "missing_fields": missing_fields,
+            "is_profile_ready": len(missing_fields) == 0,
             "created_at": _fmt_dt(candidate._data.get("created_at")),
         }
 
@@ -373,6 +675,7 @@ class RecruitmentModule(BaseModule):
         candidate = Candidate.find_by_id(application.candidate_id) if application.candidate_id else None
         job = JobOpening.find_by_id(application.job_id) if application.job_id else None
         employee = EmployeeProfile.find_by_id(application.hired_employee_id) if application.hired_employee_id else None
+        readiness = self._application_readiness(application, candidate)
         return {
             "id": application.id,
             "job_id": application.job_id,
@@ -389,10 +692,28 @@ class RecruitmentModule(BaseModule):
             "owner_name": _resolve_user_name(application.owner_user_id),
             "score": application.score or 0.0,
             "available_from": application.available_from or "",
+            "proposed_salary": application.proposed_salary or 0.0,
+            "projected_start_date": application.projected_start_date or "",
+            "contract_type": application.contract_type or "",
+            "contract_type_label": _labelize_code(application.contract_type),
+            "work_schedule": application.work_schedule or "",
+            "shift_pattern": application.shift_pattern or "",
+            "work_location": application.work_location or "",
+            "assigned_customer": application.assigned_customer or "",
+            "assigned_service": application.assigned_service or "",
+            "required_documents": _normalize_text_list(application.required_documents),
+            "required_courses": _normalize_text_list(application.required_courses),
+            "hiring_notes": application.hiring_notes or "",
             "notes": application.notes or "",
             "hired_employee_id": application.hired_employee_id,
             "hired_employee_code": employee.employee_code if employee else None,
             "company_id": application.company_id,
+            "readiness_status": readiness["status"],
+            "readiness_label": readiness["label"],
+            "readiness_completion": readiness["completion"],
+            "missing_candidate_fields": readiness["missing_candidate_fields"],
+            "missing_contract_fields": readiness["missing_contract_fields"],
+            "missing_training": readiness["missing_training"],
             "created_at": _fmt_dt(application._data.get("created_at")),
         }
 
@@ -407,10 +728,23 @@ class RecruitmentModule(BaseModule):
             "job_title": job.title if job else None,
             "interviewer_user_id": interview.interviewer_user_id,
             "interviewer_name": _resolve_user_name(interview.interviewer_user_id),
+            "interviewer_role": interview.interviewer_role or "",
             "interview_type": interview.interview_type or "video",
             "scheduled_at": interview.scheduled_at or "",
+            "duration_minutes": interview.duration_minutes or 60,
             "location": interview.location or "",
             "result": interview.result or "pending",
+            "overall_score": interview.overall_score or 0.0,
+            "technical_score": interview.technical_score or 0.0,
+            "communication_score": interview.communication_score or 0.0,
+            "safety_score": interview.safety_score or 0.0,
+            "cultural_score": interview.cultural_score or 0.0,
+            "recommendation": interview.recommendation or "",
+            "recommendation_label": _labelize_code(interview.recommendation),
+            "strengths": interview.strengths or "",
+            "concerns": interview.concerns or "",
+            "next_step": interview.next_step or "",
+            "pending_documents": _normalize_text_list(interview.pending_documents),
             "feedback": interview.feedback or "",
             "company_id": interview.company_id,
         }
@@ -567,6 +901,8 @@ class RecruitmentModule(BaseModule):
                 for item in candidates
                 if search in (item.full_name or "").lower()
                 or search in (item.email or "").lower()
+                or search in (item.national_id or "").lower()
+                or search in (item.phone or "").lower()
                 or search in (item.current_position or "").lower()
             ]
         candidates.sort(key=lambda item: ((item.full_name or "").lower(), item.id or 0))
@@ -580,25 +916,48 @@ class RecruitmentModule(BaseModule):
             return err
         data = request.data or {}
         duplicates = []
-        if data.get("email"):
-            duplicates = [
-                item
-                for item in Candidate.search(self._tenant_filter())
-                if (item.email or "").strip().lower() == str(data.get("email")).strip().lower()
-            ]
+        normalized_national_id = _normalize_national_id(data.get("national_id"))
+        for item in Candidate.search(self._tenant_filter()):
+            if data.get("email") and (item.email or "").strip().lower() == str(data.get("email")).strip().lower():
+                duplicates.append(item)
+            if normalized_national_id and (item.national_id or "").strip().upper() == normalized_national_id.upper():
+                duplicates.append(item)
         if duplicates:
-            return Response.bad_request("A candidate with that email already exists")
+            return Response.bad_request("A candidate with that email or national ID already exists")
+
+        birth_date = data.get("birth_date")
+        zodiac_sign = data.get("zodiac_sign") or _derive_zodiac_sign(birth_date)
 
         try:
             candidate = Candidate.create(
                 {
                     "full_name": data.get("full_name"),
+                    "national_id": normalized_national_id,
                     "email": data.get("email"),
                     "phone": data.get("phone"),
+                    "alternate_phone": data.get("alternate_phone"),
+                    "birth_date": birth_date,
+                    "zodiac_sign": zodiac_sign,
+                    "gender": data.get("gender"),
+                    "marital_status": data.get("marital_status"),
+                    "nationality": data.get("nationality"),
+                    "address": data.get("address"),
+                    "commune": data.get("commune"),
                     "city": data.get("city"),
+                    "region": data.get("region"),
+                    "emergency_contact_name": data.get("emergency_contact_name"),
+                    "emergency_contact_phone": data.get("emergency_contact_phone"),
                     "source": data.get("source"),
                     "current_position": data.get("current_position"),
                     "expected_salary": _safe_float(data.get("expected_salary"), 0.0),
+                    "health_system": (data.get("health_system") or "").strip().lower() or None,
+                    "afp_code": (data.get("afp_code") or "").strip().lower() or None,
+                    "criminal_record_status": (data.get("criminal_record_status") or "pending").strip().lower(),
+                    "background_notes": data.get("background_notes"),
+                    "courses": self._payload_lines(data, "courses"),
+                    "certifications": self._payload_lines(data, "certifications"),
+                    "reference_contacts": data.get("reference_contacts"),
+                    "driving_license": data.get("driving_license"),
                     "resume_url": data.get("resume_url"),
                     "portfolio_url": data.get("portfolio_url"),
                     "summary": data.get("summary"),
@@ -638,14 +997,43 @@ class RecruitmentModule(BaseModule):
             return error
 
         data = request.data or {}
+        updated_email = str(data.get("email") or candidate.email or "").strip().lower()
+        updated_national_id = _normalize_national_id(data.get("national_id") if "national_id" in data else candidate.national_id)
+        for item in Candidate.search(self._tenant_filter()):
+            if item.id == candidate.id:
+                continue
+            if updated_email and (item.email or "").strip().lower() == updated_email:
+                return Response.bad_request("A candidate with that email already exists")
+            if updated_national_id and (item.national_id or "").strip().upper() == updated_national_id.upper():
+                return Response.bad_request("A candidate with that national ID already exists")
         editable = {
             "full_name": "full_name",
+            "national_id": "national_id",
             "email": "email",
             "phone": "phone",
+            "alternate_phone": "alternate_phone",
+            "birth_date": "birth_date",
+            "zodiac_sign": "zodiac_sign",
+            "gender": "gender",
+            "marital_status": "marital_status",
+            "nationality": "nationality",
+            "address": "address",
+            "commune": "commune",
             "city": "city",
+            "region": "region",
+            "emergency_contact_name": "emergency_contact_name",
+            "emergency_contact_phone": "emergency_contact_phone",
             "source": "source",
             "current_position": "current_position",
             "expected_salary": "expected_salary",
+            "health_system": "health_system",
+            "afp_code": "afp_code",
+            "criminal_record_status": "criminal_record_status",
+            "background_notes": "background_notes",
+            "courses": "courses",
+            "certifications": "certifications",
+            "reference_contacts": "reference_contacts",
+            "driving_license": "driving_license",
             "resume_url": "resume_url",
             "portfolio_url": "portfolio_url",
             "summary": "summary",
@@ -656,7 +1044,17 @@ class RecruitmentModule(BaseModule):
                 value = data[incoming]
                 if incoming in ("expected_salary", "rating"):
                     value = _safe_float(value, 0.0)
+                if incoming == "national_id":
+                    value = _normalize_national_id(value)
+                if incoming == "zodiac_sign":
+                    value = value or _derive_zodiac_sign(data.get("birth_date") or candidate.birth_date)
+                if incoming in ("health_system", "afp_code", "criminal_record_status") and value not in (None, ""):
+                    value = str(value).strip().lower()
+                if incoming in ("courses", "certifications"):
+                    value = _normalize_text_list(value)
                 setattr(candidate, field_name, value)
+        if "birth_date" in data and "zodiac_sign" not in data:
+            candidate.zodiac_sign = _derive_zodiac_sign(candidate.birth_date)
 
         try:
             candidate.save()
@@ -734,6 +1132,17 @@ class RecruitmentModule(BaseModule):
                     "owner_user_id": _safe_int(data.get("owner_user_id"), self.env.user.id),
                     "score": _safe_float(data.get("score"), 0.0),
                     "available_from": data.get("available_from"),
+                    "proposed_salary": _safe_float(data.get("proposed_salary"), 0.0),
+                    "projected_start_date": data.get("projected_start_date"),
+                    "contract_type": data.get("contract_type"),
+                    "work_schedule": data.get("work_schedule"),
+                    "shift_pattern": data.get("shift_pattern"),
+                    "work_location": data.get("work_location"),
+                    "assigned_customer": data.get("assigned_customer"),
+                    "assigned_service": data.get("assigned_service"),
+                    "required_documents": self._payload_lines(data, "required_documents"),
+                    "required_courses": self._payload_lines(data, "required_courses"),
+                    "hiring_notes": data.get("hiring_notes"),
                     "notes": data.get("notes"),
                     "company_id": self._company_id(),
                 }
@@ -772,6 +1181,17 @@ class RecruitmentModule(BaseModule):
             "owner_user_id": "owner_user_id",
             "score": "score",
             "available_from": "available_from",
+            "proposed_salary": "proposed_salary",
+            "projected_start_date": "projected_start_date",
+            "contract_type": "contract_type",
+            "work_schedule": "work_schedule",
+            "shift_pattern": "shift_pattern",
+            "work_location": "work_location",
+            "assigned_customer": "assigned_customer",
+            "assigned_service": "assigned_service",
+            "required_documents": "required_documents",
+            "required_courses": "required_courses",
+            "hiring_notes": "hiring_notes",
             "notes": "notes",
         }
         for incoming, field_name in editable.items():
@@ -779,8 +1199,10 @@ class RecruitmentModule(BaseModule):
                 value = data[incoming]
                 if incoming in ("stage_id", "owner_user_id"):
                     value = _safe_int(value, None)
-                if incoming == "score":
+                if incoming in ("score", "proposed_salary"):
                     value = _safe_float(value, 0.0)
+                if incoming in ("required_documents", "required_courses"):
+                    value = _normalize_text_list(value)
                 setattr(application, field_name, value)
 
         try:
@@ -826,17 +1248,23 @@ class RecruitmentModule(BaseModule):
             if not department or department.company_id != self._company_id():
                 return Response.bad_request("Department not found for this company")
 
-        hire_date = data.get("hire_date") or datetime.utcnow().strftime("%Y-%m-%d")
+        hire_date = data.get("hire_date") or application.projected_start_date or utc_strftime("%Y-%m-%d")
         create_user_account = _normalize_bool(data.get("create_user_account"), True)
+        candidate_email = data.get("work_email") or data.get("personal_email") or candidate.email
         user, temp_password, warning = provision_user_account(
             self._company_id(),
             candidate.full_name,
-            candidate.email,
+            candidate_email,
             create_requested=create_user_account,
             allowed_modules=data.get("allowed_modules") or [],
         )
 
         try:
+            proposed_salary = _safe_float(
+                data.get("salary_amount"),
+                application.proposed_salary or job.salary_max or candidate.expected_salary or 0.0,
+            )
+            department = Department.find_by_id(department_id) if department_id else None
             employee = EmployeeProfile.create(
                 {
                     "full_name": candidate.full_name,
@@ -848,15 +1276,48 @@ class RecruitmentModule(BaseModule):
                     "candidate_id": candidate.id,
                     "position_title": data.get("position_title") or job.title,
                     "work_email": data.get("work_email") or candidate.email,
-                    "personal_email": candidate.email,
-                    "phone": candidate.phone,
+                    "personal_email": candidate_email,
+                    "phone": data.get("phone") or candidate.phone,
+                    "alternate_phone": data.get("alternate_phone") or candidate.alternate_phone,
+                    "national_id": data.get("national_id") or candidate.national_id,
+                    "birth_date": data.get("birth_date") or candidate.birth_date,
+                    "zodiac_sign": data.get("zodiac_sign") or candidate.zodiac_sign or _derive_zodiac_sign(candidate.birth_date),
+                    "gender": data.get("gender") or candidate.gender,
+                    "marital_status": data.get("marital_status") or candidate.marital_status,
+                    "nationality": data.get("nationality") or candidate.nationality,
+                    "address": data.get("address") or candidate.address,
+                    "commune": data.get("commune") or candidate.commune,
+                    "city": data.get("city") or candidate.city,
+                    "region": data.get("region") or candidate.region,
+                    "emergency_contact_name": data.get("emergency_contact_name") or candidate.emergency_contact_name,
+                    "emergency_contact_phone": data.get("emergency_contact_phone") or candidate.emergency_contact_phone,
+                    "health_system": data.get("health_system") or candidate.health_system,
+                    "afp_code": data.get("afp_code") or candidate.afp_code,
+                    "criminal_record_status": data.get("criminal_record_status") or candidate.criminal_record_status,
+                    "background_notes": data.get("background_notes") or candidate.background_notes,
+                    "courses": self._payload_lines(data, "courses") or _normalize_text_list(candidate.courses),
+                    "certifications": self._payload_lines(data, "certifications") or _normalize_text_list(candidate.certifications),
+                    "driving_license": data.get("driving_license") or candidate.driving_license,
                     "status": data.get("employee_status") or "active",
                     "hire_date": hire_date,
-                    "base_salary": _safe_float(
-                        data.get("salary_amount"),
-                        job.salary_max or candidate.expected_salary or 0.0,
+                    "base_salary": proposed_salary,
+                    "notes": data.get("employee_notes")
+                    or "\n".join(
+                        [
+                            item
+                            for item in [
+                                candidate.summary or "",
+                                application.hiring_notes or "",
+                                (
+                                    "Pendientes de acreditacion: "
+                                    + ", ".join(_normalize_text_list(application.required_documents))
+                                )
+                                if _normalize_text_list(application.required_documents)
+                                else "",
+                            ]
+                            if item
+                        ]
                     ),
-                    "notes": data.get("employee_notes") or candidate.summary,
                 }
             )
 
@@ -864,16 +1325,34 @@ class RecruitmentModule(BaseModule):
                 {
                     "employee_id": employee.id,
                     "company_id": self._company_id(),
-                    "contract_type": data.get("contract_type") or "indefinite",
+                    "contract_type": data.get("contract_type") or application.contract_type or "indefinite",
                     "status": data.get("contract_status") or "active",
                     "start_date": hire_date,
                     "end_date": data.get("end_date"),
-                    "salary_amount": _safe_float(
-                        data.get("salary_amount"),
-                        job.salary_max or candidate.expected_salary or 0.0,
-                    ),
-                    "work_schedule": data.get("work_schedule") or "Full time",
-                    "notes": data.get("contract_notes") or f"Hired from application #{application.id}",
+                    "salary_amount": proposed_salary,
+                    "work_schedule": data.get("work_schedule") or application.work_schedule or "Full time",
+                    "shift_pattern": data.get("shift_pattern") or application.shift_pattern,
+                    "work_location": data.get("work_location") or application.work_location or job.location,
+                    "assigned_customer": data.get("assigned_customer") or application.assigned_customer,
+                    "assigned_service": data.get("assigned_service") or application.assigned_service,
+                    "notes": data.get("contract_notes")
+                    or "\n".join(
+                        [
+                            f"Contratada desde postulacion #{application.id}",
+                            (
+                                "Documentos requeridos: "
+                                + ", ".join(_normalize_text_list(application.required_documents))
+                            )
+                            if _normalize_text_list(application.required_documents)
+                            else "",
+                            (
+                                "Cursos requeridos: "
+                                + ", ".join(_normalize_text_list(application.required_courses))
+                            )
+                            if _normalize_text_list(application.required_courses)
+                            else "",
+                        ]
+                    ).strip(),
                 }
             )
 
@@ -903,6 +1382,9 @@ class RecruitmentModule(BaseModule):
                 "employee": employee.to_dict(),
                 "contract": contract.to_dict(),
             }
+            payroll_profile = self._sync_payroll_profile(employee, contract, candidate, department)
+            if payroll_profile:
+                response["payroll_profile"] = payroll_profile
             if temp_password:
                 response["temp_password"] = temp_password
             if warning:
@@ -935,10 +1417,22 @@ class RecruitmentModule(BaseModule):
                 {
                     "application_id": application.id,
                     "interviewer_user_id": _safe_int(data.get("interviewer_user_id"), self.env.user.id),
+                    "interviewer_role": data.get("interviewer_role"),
                     "interview_type": data.get("interview_type") or "video",
                     "scheduled_at": data.get("scheduled_at"),
+                    "duration_minutes": _safe_int(data.get("duration_minutes"), 60),
                     "location": data.get("location"),
                     "result": data.get("result") or "pending",
+                    "overall_score": _safe_float(data.get("overall_score"), 0.0),
+                    "technical_score": _safe_float(data.get("technical_score"), 0.0),
+                    "communication_score": _safe_float(data.get("communication_score"), 0.0),
+                    "safety_score": _safe_float(data.get("safety_score"), 0.0),
+                    "cultural_score": _safe_float(data.get("cultural_score"), 0.0),
+                    "recommendation": data.get("recommendation"),
+                    "strengths": data.get("strengths"),
+                    "concerns": data.get("concerns"),
+                    "next_step": data.get("next_step"),
+                    "pending_documents": self._payload_lines(data, "pending_documents"),
                     "feedback": data.get("feedback"),
                     "company_id": self._company_id(),
                 }
@@ -958,10 +1452,22 @@ class RecruitmentModule(BaseModule):
         data = request.data or {}
         editable = {
             "interviewer_user_id": "interviewer_user_id",
+            "interviewer_role": "interviewer_role",
             "interview_type": "interview_type",
             "scheduled_at": "scheduled_at",
+            "duration_minutes": "duration_minutes",
             "location": "location",
             "result": "result",
+            "overall_score": "overall_score",
+            "technical_score": "technical_score",
+            "communication_score": "communication_score",
+            "safety_score": "safety_score",
+            "cultural_score": "cultural_score",
+            "recommendation": "recommendation",
+            "strengths": "strengths",
+            "concerns": "concerns",
+            "next_step": "next_step",
+            "pending_documents": "pending_documents",
             "feedback": "feedback",
         }
         for incoming, field_name in editable.items():
@@ -969,6 +1475,18 @@ class RecruitmentModule(BaseModule):
                 value = data[incoming]
                 if incoming == "interviewer_user_id":
                     value = _safe_int(value, None)
+                if incoming == "duration_minutes":
+                    value = _safe_int(value, 60)
+                if incoming in (
+                    "overall_score",
+                    "technical_score",
+                    "communication_score",
+                    "safety_score",
+                    "cultural_score",
+                ):
+                    value = _safe_float(value, 0.0)
+                if incoming == "pending_documents":
+                    value = _normalize_text_list(value)
                 setattr(interview, field_name, value)
 
         try:
@@ -1002,8 +1520,20 @@ class RecruitmentModule(BaseModule):
                 "jobs_total": len(jobs),
                 "jobs_open": len([item for item in jobs if item.status in ("draft", "published", "on_hold")]),
                 "candidates_total": len(candidates),
+                "candidates_ready": len([item for item in candidates if not self._candidate_missing_fields(item)]),
                 "applications_active": len([item for item in applications if item.status == "active"]),
                 "applications_hired": len([item for item in applications if item.status == "hired"]),
+                "applications_ready_to_hire": len(
+                    [
+                        item
+                        for item in applications
+                        if self._application_readiness(
+                            item,
+                            Candidate.find_by_id(item.candidate_id) if item.candidate_id else None,
+                        )["status"]
+                        == "ready"
+                    ]
+                ),
                 "interviews_pending": len([item for item in interviews if item.result == "pending"]),
             }
         )

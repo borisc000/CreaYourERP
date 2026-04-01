@@ -1,5 +1,8 @@
 const SAFETY_DETAIL = {
     dossier: null,
+    filteredMatrixRows: [],
+    documentTemplates: [],
+    generatedDocuments: [],
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -11,7 +14,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadSafetyDossier() {
     const folderId = window._SAFETY_FOLDER_ID;
     if (!folderId) return;
-    const res = await API.get('/safety/folders/' + folderId + '/dossier');
+    const [res, templateRes, generatedRes] = await Promise.all([
+        API.get('/safety/folders/' + folderId + '/dossier'),
+        API.get('/document-center/lookups?target_module=safety'),
+        API.get('/document-center/generated?target_module=safety&target_record_id=' + folderId),
+    ]);
     if (!res || res.success === false) {
         const root = document.getElementById('safety-detail-root');
         if (root) {
@@ -20,6 +27,8 @@ async function loadSafetyDossier() {
         return;
     }
     SAFETY_DETAIL.dossier = res.data || {};
+    SAFETY_DETAIL.documentTemplates = templateRes?.success ? (templateRes.data?.templates || []) : [];
+    SAFETY_DETAIL.generatedDocuments = generatedRes?.success ? (generatedRes.data?.results || []) : [];
     renderSafetyDossier();
 }
 
@@ -32,11 +41,13 @@ function renderSafetyDossier() {
     const folder = SAFETY_DETAIL.dossier.folder || {};
     const summary = folder.summary || {};
     const lookups = SAFETY_DETAIL.dossier.lookups || { employees: [], service_profiles: [] };
+    const matrixRows = SAFETY_DETAIL.dossier.risk_matrix?.rows || [];
+    const blockingRows = matrixRows.filter((row) => row.is_blocking || (row.restriction_alerts || []).length || Number(row.vep || 0) >= 16);
 
     setText('folder-breadcrumb', folder.project_code || 'Carpeta');
     setText('folder-project-badge', folder.project_code || 'PRJ');
     setText('folder-title', folder.lead_title || 'Carpeta de seguridad');
-    setText('folder-subtitle', [folder.customer_name, folder.service_profile_name, folder.service_type_name].filter(Boolean).join(' · ') || '-');
+    setText('folder-subtitle', [folder.customer_name, folder.client_site_name, folder.client_area_name, folder.service_profile_name, folder.service_type_name].filter(Boolean).join(' - ') || '-');
 
     const traffic = document.getElementById('folder-traffic-chip');
     if (traffic) {
@@ -44,10 +55,13 @@ function renderSafetyDossier() {
     }
 
     setText('summary-readiness', `${Number(folder.readiness_pct || 0).toFixed(1)}%`);
-    setText('summary-status', `Estado ${folder.status || 'draft'}`);
+    const legalSegment = summary.legal_snapshot?.segment ? ` - Segmento ${summary.legal_snapshot.segment}` : '';
+    setText('summary-status', `Estado ${folder.status || 'draft'}${legalSegment}`);
     setText('summary-docs', `${summary.critical_documents_approved || 0} / ${summary.critical_documents_total || 0}`);
     setText('summary-ppe', `${summary.employees_with_ppe || 0} / ${summary.assigned_employee_count || 0}`);
     setText('summary-checklists', String(summary.checklists_count || 0));
+    setText('summary-matrix-rows', String(matrixRows.length));
+    setText('summary-matrix-blocking', String(blockingRows.length));
 
     const blockers = document.getElementById('folder-blockers');
     if (blockers) {
@@ -57,16 +71,23 @@ function renderSafetyDossier() {
             : 'Sin bloqueos registrados.';
     }
 
+    if (blockers) blockers.innerHTML = blockers.innerHTML.replaceAll('â€¢', '-');
+
     renderConfigSection(folder, lookups);
     renderDocuments();
+    renderIRLRecords();
     renderMatrix();
     renderPPEDeliveries();
+    renderGeneratedSafetyDocuments();
     renderTalks();
     renderChecklists();
     resetDocumentForm();
+    resetIRLForm();
     resetPPEForm();
     resetTalkForm();
     resetChecklistForm();
+    resetMatrixComposer(true);
+    updateMatrixRowPreview();
 }
 
 function renderConfigSection(folder, lookups) {
@@ -82,6 +103,23 @@ function renderConfigSection(folder, lookups) {
     if (statusSel) statusSel.value = folder.status || 'draft';
     const notes = document.getElementById('cfg-notes');
     if (notes) notes.value = folder.notes || '';
+    const miperNotes = document.getElementById('cfg-miper-scope-notes');
+    if (miperNotes) miperNotes.value = folder.miper_scope_notes || '';
+
+    fillSelect(
+        'cfg-client-site',
+        (lookups.client_sites || []).filter((site) => !folder.customer_id || Number(site.customer_id) === Number(folder.customer_id)),
+        folder.client_site_id,
+        (item) => item.id,
+        (item) => item.name,
+        true,
+        'Sin instalacion'
+    );
+    const siteSel = document.getElementById('cfg-client-site');
+    if (siteSel) {
+        siteSel.onchange = () => fillAreaSelect(lookups, Number(siteSel.value || 0), null);
+    }
+    fillAreaSelect(lookups, Number(folder.client_site_id || 0), folder.client_area_id);
 
     const employeeSel = document.getElementById('cfg-assigned-employees');
     if (employeeSel) {
@@ -101,6 +139,21 @@ function renderConfigSection(folder, lookups) {
             .join('');
     }
 
+    const ppeTemplateSel = document.getElementById('ppe-document-template');
+    if (ppeTemplateSel) {
+        ppeTemplateSel.innerHTML = '<option value="">No generar documento</option>' + (SAFETY_DETAIL.documentTemplates || [])
+            .map((template) => `<option value="${template.id}">${esc(template.name || 'Plantilla')} - ${esc(template.document_type || template.category || 'general')}</option>`)
+            .join('');
+    }
+
+    const irlEmployeeSel = document.getElementById('irl-employee');
+    if (irlEmployeeSel) {
+        irlEmployeeSel.innerHTML = '<option value="">Selecciona trabajador</option>' + (lookups.employees || [])
+            .map((employee) => `<option value="${employee.id}">${esc(employee.full_name || employee.name || 'Trabajador')} - ${esc(employee.position_title || 'Sin cargo')}</option>`)
+            .join('');
+        irlEmployeeSel.onchange = () => autofillIRLWorkerContext();
+    }
+
     const talkAttendees = document.getElementById('talk-attendees');
     if (talkAttendees) {
         talkAttendees.innerHTML = (lookups.employees || [])
@@ -109,13 +162,28 @@ function renderConfigSection(folder, lookups) {
     }
 }
 
+function fillAreaSelect(lookups, siteId, selectedAreaId) {
+    fillSelect(
+        'cfg-client-area',
+        (lookups.client_areas || []).filter((area) => !siteId || Number(area.site_id) === Number(siteId)),
+        selectedAreaId,
+        (item) => item.id,
+        (item) => item.name,
+        true,
+        'Sin area'
+    );
+}
+
 async function saveFolderConfig() {
     const folderId = window._SAFETY_FOLDER_ID;
     const payload = {
         service_profile_id: emptyToNull(document.getElementById('cfg-profile')?.value),
+        client_site_id: emptyToNull(document.getElementById('cfg-client-site')?.value),
+        client_area_id: emptyToNull(document.getElementById('cfg-client-area')?.value),
         planned_start_date: document.getElementById('cfg-planned-date')?.value || '',
         status: document.getElementById('cfg-status')?.value || 'draft',
         notes: document.getElementById('cfg-notes')?.value || '',
+        miper_scope_notes: document.getElementById('cfg-miper-scope-notes')?.value || '',
         assigned_employee_ids: selectedValues('cfg-assigned-employees'),
     };
     const res = await API.put('/safety/folders/' + folderId, payload);
@@ -125,6 +193,27 @@ async function saveFolderConfig() {
     }
     showToast('Configuracion guardada.');
     await loadSafetyDossier();
+}
+
+async function generateMIPERMatrix() {
+    const folderId = window._SAFETY_FOLDER_ID;
+    const button = document.getElementById('matrix-generate-btn');
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Regenerando...';
+    }
+    const res = await API.post('/safety/folders/' + folderId + '/generate-matrix', {});
+    if (button) {
+        button.disabled = false;
+        button.textContent = 'Regenerar MIPER';
+    }
+    if (!res || res.success === false) {
+        showToast((res && res.errors && res.errors[0]) || 'No se pudo generar la matriz MIPER.', 'error');
+        return;
+    }
+    await loadSafetyDossier();
+    document.getElementById('section-matrix')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showToast('MIPER regenerada. Usa Vista PDF para revisar la salida final.', 'success');
 }
 
 async function generateFolderDocuments() {
@@ -138,9 +227,30 @@ async function generateFolderDocuments() {
     await loadSafetyDossier();
 }
 
+async function downloadMIPERExcel() {
+    await downloadBinaryFile('/safety/folders/' + window._SAFETY_FOLDER_ID + '/export/miper.xlsx', 'miper.xlsx');
+}
+
+async function downloadMIPERPDF() {
+    await downloadBinaryFile('/safety/folders/' + window._SAFETY_FOLDER_ID + '/export/miper.pdf', 'miper.pdf');
+}
+
+async function previewMIPERPDF() {
+    await downloadBinaryFile(
+        '/safety/folders/' + window._SAFETY_FOLDER_ID + '/export/miper.pdf',
+        'miper.pdf',
+        { openInNewTab: true, successMessage: 'Vista PDF lista.' }
+    );
+}
+
 function renderDocuments() {
     const body = document.getElementById('documents-body');
     const docs = SAFETY_DETAIL.dossier.documents || [];
+    const chip = document.getElementById('documents-count-chip');
+    if (chip) {
+        const approved = docs.filter((doc) => doc.status === 'approved').length;
+        chip.textContent = `${approved}/${docs.length} aprobados`;
+    }
     if (!body) return;
     if (!docs.length) {
         body.innerHTML = '<tr><td colspan="6" class="empty">Sin documentos en la carpeta.</td></tr>';
@@ -232,33 +342,307 @@ async function deleteDocument(id) {
     await loadSafetyDossier();
 }
 
-function renderMatrix() {
-    const matrix = SAFETY_DETAIL.dossier.risk_matrix || { rows: [], status: 'draft', version: 1, title: 'Matriz de riesgo' };
-    setValue('matrix-title', matrix.title || 'Matriz de riesgo');
-    setValue('matrix-status', matrix.status || 'draft');
-    setValue('matrix-version', matrix.version || 1);
-    const body = document.getElementById('matrix-body');
+function renderIRLRecords() {
+    const body = document.getElementById('irl-body');
+    const records = SAFETY_DETAIL.dossier.irl_records || [];
+    const chip = document.getElementById('irl-count-chip');
+    if (chip) chip.textContent = `${records.length} IRL`;
     if (!body) return;
-    const rows = matrix.rows || [];
-    if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="7" class="empty">Sin filas registradas.</td></tr>';
+    if (!records.length) {
+        body.innerHTML = '<tr><td colspan="5" class="empty">Sin IRL registradas.</td></tr>';
         return;
     }
-    body.innerHTML = rows.map((row, index) => `
+    body.innerHTML = records.map((record) => `
         <tr>
-            <td>${esc(row.activity || '')}</td>
-            <td>${esc(row.hazard || '')}</td>
-            <td>${esc(row.risk || '')}</td>
-            <td>${esc(row.controls || '')}</td>
-            <td>${esc((row.required_ppe || []).join(', '))}</td>
-            <td>${esc(row.owner_name || '')}</td>
-            <td><button class="btn btn-danger btn-sm" onclick="removeMatrixRow(${index})">Quitar</button></td>
+            <td>
+                <div style="font-weight:700;color:#f8fafc;">${esc(record.worker_name || record.employee_name || 'Sin trabajador')}</div>
+                <div style="font-size:0.78rem;color:#94a3b8;">${esc(record.position_title || 'Sin cargo')}</div>
+            </td>
+            <td>
+                <div>${esc(record.place_name || '-')}</div>
+                <div style="font-size:0.78rem;color:#94a3b8;">${esc(record.activity_name || '-')}</div>
+            </td>
+            <td>
+                <div>${esc(String((record.risk_items || []).length))} riesgos</div>
+                <div style="font-size:0.78rem;color:#94a3b8;">${esc((record.service_functions || []).slice(0, 2).join(', ') || '-')}</div>
+            </td>
+            <td>
+                ${statusChip(record.status)}
+                <div style="font-size:0.78rem;color:#94a3b8;margin-top:0.25rem;">Version ${esc(String(record.version || 1))}</div>
+            </td>
+            <td>
+                <div style="display:flex;gap:0.45rem;flex-wrap:wrap;">
+                    <button class="btn btn-ghost btn-sm" onclick="editIRLRecord(${record.id})">Editar</button>
+                    <button class="btn btn-secondary btn-sm" onclick="previewIRLPDF(${record.id})">Vista PDF</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteIRLRecord(${record.id})">Eliminar</button>
+                </div>
+            </td>
         </tr>
     `).join('');
 }
 
+function autofillIRLWorkerContext() {
+    const employeeId = Number(document.getElementById('irl-employee')?.value || 0);
+    const employee = (SAFETY_DETAIL.dossier.lookups?.employees || []).find((item) => Number(item.id) === employeeId);
+    if (!employee) return;
+    if (!document.getElementById('irl-worker-identifier')?.value) setValue('irl-worker-identifier', employee.employee_code || '');
+    if (!document.getElementById('irl-position-title')?.value) setValue('irl-position-title', employee.position_title || '');
+    if (!document.getElementById('irl-title')?.value) {
+        const projectCode = SAFETY_DETAIL.dossier.folder?.project_code || 'PRJ';
+        setValue('irl-title', `IRL - ${employee.full_name || 'Trabajador'} - ${projectCode}`);
+    }
+    if (!document.getElementById('irl-place-name')?.value) {
+        setValue('irl-place-name', SAFETY_DETAIL.dossier.folder?.client_area_name || SAFETY_DETAIL.dossier.folder?.client_site_name || '');
+    }
+}
+
+function editIRLRecord(id) {
+    const record = (SAFETY_DETAIL.dossier.irl_records || []).find((item) => item.id === id);
+    if (!record) return;
+    setValue('irl-id', record.id);
+    setValue('irl-employee', record.employee_id || '');
+    setValue('irl-worker-identifier', record.worker_identifier || '');
+    setValue('irl-position-title', record.position_title || '');
+    setValue('irl-place-name', record.place_name || '');
+    setValue('irl-status', record.status || 'draft');
+    setValue('irl-theme-color', record.theme_color || '#0F4C81');
+    setValue('irl-title', record.title || '');
+    setValue('irl-activity-name', record.activity_name || '');
+    setValue('irl-activity-period', record.activity_period || '');
+    setValue('irl-modality', record.modality || 'Presencial');
+    setValue('irl-duration-hours', record.duration_hours || '08:00');
+    setValue('irl-executor-name', record.executor_name || '');
+    setValue('irl-intro-text', record.intro_text || '');
+    setValue('irl-service-functions', (record.service_functions || []).join('\n'));
+    setValue('irl-workspace-features', record.workspace_features || '');
+    setValue('irl-environmental-conditions', record.environmental_conditions || '');
+    setValue('irl-order-cleanliness', record.order_cleanliness || '');
+    setValue('irl-machines-tools', record.machines_tools || '');
+    setValue('irl-complement-materials', materialLinesFromList(record.complement_materials || []));
+    setValue('irl-observations', record.observations || '');
+    document.getElementById('section-irl')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetIRLForm() {
+    [
+        'irl-id',
+        'irl-worker-identifier',
+        'irl-position-title',
+        'irl-place-name',
+        'irl-title',
+        'irl-activity-name',
+        'irl-activity-period',
+        'irl-executor-name',
+        'irl-intro-text',
+        'irl-service-functions',
+        'irl-workspace-features',
+        'irl-environmental-conditions',
+        'irl-order-cleanliness',
+        'irl-machines-tools',
+        'irl-complement-materials',
+        'irl-observations',
+    ].forEach((id) => setValue(id, ''));
+    setValue('irl-employee', '');
+    setValue('irl-status', 'draft');
+    setValue('irl-theme-color', '#0F4C81');
+    setValue('irl-modality', 'Presencial');
+    setValue('irl-duration-hours', '08:00');
+}
+
+function materialLinesFromList(materials) {
+    return (materials || []).map((item) => [item.name || '', item.type || 'otro', item.location || ''].filter(Boolean).join(' | ')).join('\n');
+}
+
+function parseMaterialLines(value) {
+    return parseLines(value).map((line) => {
+        const parts = line.split('|').map((item) => item.trim());
+        return {
+            name: parts[0] || '',
+            type: parts[1] || 'otro',
+            location: parts[2] || '',
+        };
+    }).filter((item) => item.name);
+}
+
+function irlPayloadFromForm() {
+    return {
+        employee_id: emptyToNull(document.getElementById('irl-employee')?.value),
+        worker_identifier: document.getElementById('irl-worker-identifier')?.value || '',
+        position_title: document.getElementById('irl-position-title')?.value || '',
+        place_name: document.getElementById('irl-place-name')?.value || '',
+        status: document.getElementById('irl-status')?.value || 'draft',
+        theme_color: document.getElementById('irl-theme-color')?.value || '#0F4C81',
+        title: document.getElementById('irl-title')?.value || '',
+        activity_name: document.getElementById('irl-activity-name')?.value || '',
+        activity_period: document.getElementById('irl-activity-period')?.value || '',
+        modality: document.getElementById('irl-modality')?.value || 'Presencial',
+        duration_hours: document.getElementById('irl-duration-hours')?.value || '08:00',
+        executor_name: document.getElementById('irl-executor-name')?.value || '',
+        intro_text: document.getElementById('irl-intro-text')?.value || '',
+        service_functions: parseLines(document.getElementById('irl-service-functions')?.value || ''),
+        workspace_features: document.getElementById('irl-workspace-features')?.value || '',
+        environmental_conditions: document.getElementById('irl-environmental-conditions')?.value || '',
+        order_cleanliness: document.getElementById('irl-order-cleanliness')?.value || '',
+        machines_tools: document.getElementById('irl-machines-tools')?.value || '',
+        complement_materials: parseMaterialLines(document.getElementById('irl-complement-materials')?.value || ''),
+        observations: document.getElementById('irl-observations')?.value || '',
+    };
+}
+
+async function generateIRLRecord() {
+    const folderId = window._SAFETY_FOLDER_ID;
+    const payload = irlPayloadFromForm();
+    if (!payload.employee_id && !payload.position_title.trim()) {
+        showToast('Selecciona un trabajador o informa el cargo para generar el IRL.', 'error');
+        return;
+    }
+    const res = await API.post('/safety/folders/' + folderId + '/irl-records/generate', payload);
+    if (!res || res.success === false) {
+        showToast((res && res.errors && res.errors[0]) || 'No se pudo generar el IRL.', 'error');
+        return;
+    }
+    showToast('IRL generada desde la carpeta.');
+    await loadSafetyDossier();
+    const record = res.data?.irl_record;
+    if (record?.id) editIRLRecord(record.id);
+}
+
+async function saveIRLRecord() {
+    const irlId = document.getElementById('irl-id')?.value;
+    if (!irlId) {
+        showToast('Primero genera o selecciona una IRL para guardarla.', 'error');
+        return;
+    }
+    const payload = irlPayloadFromForm();
+    payload.version = Number((SAFETY_DETAIL.dossier.irl_records || []).find((item) => String(item.id) === String(irlId))?.version || 1);
+    const res = await API.put('/safety/irl-records/' + irlId, payload);
+    if (!res || res.success === false) {
+        showToast((res && res.errors && res.errors[0]) || 'No se pudo guardar el IRL.', 'error');
+        return;
+    }
+    showToast('IRL guardada.');
+    await loadSafetyDossier();
+    editIRLRecord(Number(irlId));
+}
+
+async function deleteIRLRecord(id) {
+    if (!confirm('Eliminar esta IRL?')) return;
+    const res = await API.del('/safety/irl-records/' + id);
+    if (!res || res.success === false) {
+        showToast((res && res.errors && res.errors[0]) || 'No se pudo eliminar el IRL.', 'error');
+        return;
+    }
+    showToast('IRL eliminada.');
+    await loadSafetyDossier();
+}
+
+async function previewIRLPDF(id) {
+    await downloadBinaryFile(
+        '/safety/irl-records/' + id + '/export/pdf',
+        'irl.pdf',
+        { openInNewTab: true, successMessage: 'Vista PDF IRL lista.' }
+    );
+}
+
+async function previewCurrentIRL() {
+    const irlId = document.getElementById('irl-id')?.value;
+    if (!irlId) {
+        showToast('Selecciona o genera una IRL primero.', 'error');
+        return;
+    }
+    await previewIRLPDF(irlId);
+}
+
+function renderMatrix() {
+    const matrix = SAFETY_DETAIL.dossier.risk_matrix || { rows: [], status: 'draft', version: 1, title: 'Matriz de riesgo', generation_summary: {} };
+    setValue('matrix-title', matrix.title || 'Matriz de riesgo');
+    setValue('matrix-status', matrix.status || 'draft');
+    setValue('matrix-version', matrix.version || 1);
+    const generationSummary = document.getElementById('matrix-generation-summary');
+    if (generationSummary) {
+        const meta = matrix.generation_summary || {};
+        const blockMeta = meta.matched_by_block || {};
+        const blockText = Object.entries(blockMeta)
+            .filter(([, value]) => Number(value) > 0)
+            .map(([key, value]) => `${humanizeScope(key)}: ${value}`)
+            .join(' - ');
+        generationSummary.textContent = meta.row_count
+            ? `${meta.row_count} filas - ${meta.matched_rule_count || 0} reglas - ${blockText || 'sin bloques heredados'}`
+            : 'El generador MIPER combina bloques transversales, servicio y entorno del cliente.';
+    }
+    const finalNote = document.getElementById('matrix-final-note');
+    if (finalNote) {
+        finalNote.textContent = (matrix.rows || []).length
+            ? 'La matriz ya esta visible abajo. Usa Vista PDF para revisar la presentacion final y Descargar Excel/PDF para entrega.'
+            : 'Aun no hay filas visibles. Regenera la MIPER y luego usa Vista PDF para revisar la salida final.';
+    }
+    const generatedInfo = document.getElementById('matrix-last-generated');
+    if (generatedInfo) {
+        const generatedAt = matrix.generation_summary?.generated_at ? formatDateTime(matrix.generation_summary.generated_at) : 'sin timestamp';
+        generatedInfo.textContent = `Version ${matrix.version || 1} · Estado ${matrix.status || 'draft'} · Ultima generacion ${generatedAt}`;
+    }
+    renderMatrixBlockChips(matrix.generation_summary || {});
+    updateMatrixSourceFilter(matrix.rows || []);
+    const body = document.getElementById('matrix-body');
+    if (!body) return;
+    const rows = matrix.rows || [];
+    SAFETY_DETAIL.filteredMatrixRows = getFilteredMatrixRows(rows);
+    renderMatrixMetrics(rows, SAFETY_DETAIL.filteredMatrixRows);
+    if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="7" class="empty">Sin filas registradas.</td></tr>';
+        return;
+    }
+    if (!SAFETY_DETAIL.filteredMatrixRows.length) {
+        body.innerHTML = '<tr><td colspan="7" class="empty">No hay filas que coincidan con los filtros activos.</td></tr>';
+        return;
+    }
+    body.innerHTML = SAFETY_DETAIL.filteredMatrixRows.map((entry) => {
+        const row = entry.row;
+        const index = entry.index;
+        return `
+        <tr>
+            <td>
+                <div style="font-weight:700;color:#f8fafc;">${esc(row.process_name || '-')}</div>
+                <div style="font-size:0.78rem;color:#94a3b8;">${esc(row.task_name || row.activity || '-')}</div>
+                <div style="font-size:0.74rem;color:#64748b;margin-top:0.25rem;">${esc([row.position_name, row.place_name].filter(Boolean).join(' - ') || '-')}</div>
+            </td>
+            <td>
+                <div style="font-weight:600;color:#f8fafc;">${esc(row.hazard_factor || row.hazard || '')}</div>
+                <div style="font-size:0.78rem;color:#94a3b8;">${esc([row.master_risk_code, row.risk_name || row.risk].filter(Boolean).join(' - '))}</div>
+            </td>
+            <td>
+                ${matrixLevelChip(row.risk_level, row.vep)}
+                <div style="font-size:0.76rem;color:#94a3b8;margin-top:0.35rem;">${esc(String(row.vep || 0))} VEP</div>
+            </td>
+            <td>
+                <div>${esc(row.controls || '')}</div>
+                <div style="font-size:0.78rem;color:#94a3b8;margin-top:0.25rem;">EPP: ${esc((row.required_ppe || []).join(', ') || '-')}</div>
+            </td>
+            <td>
+                <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">${renderTagPills(row.protocol_codes || [], 'protocol')}</div>
+                <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.35rem;">${renderTagPills(row.origin_blocks || row.source_labels || [], 'origin')}</div>
+            </td>
+            <td>
+                <div>${esc((row.restriction_alerts || []).join(' | ') || '-')}</div>
+                <div style="font-size:0.78rem;color:#94a3b8;margin-top:0.25rem;">${esc(row.owner_name || '')}</div>
+            </td>
+            <td>
+                <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+                    <button class="btn btn-ghost btn-sm" onclick="editMatrixRow(${index})">Editar</button>
+                    <button class="btn btn-secondary btn-sm" onclick="cloneMatrixRow(${index})">Clonar</button>
+                    <button class="btn btn-danger btn-sm" onclick="removeMatrixRow(${index})">Quitar</button>
+                </div>
+            </td>
+        </tr>
+    `;
+    }).join('');
+}
+
 function addMatrixRow() {
+    const processName = document.getElementById('matrix-row-process')?.value || '';
     const activity = document.getElementById('matrix-row-activity')?.value || '';
+    const positionName = document.getElementById('matrix-row-position')?.value || '';
+    const placeName = document.getElementById('matrix-row-place')?.value || '';
     const hazard = document.getElementById('matrix-row-hazard')?.value || '';
     const risk = document.getElementById('matrix-row-risk')?.value || '';
     if (!activity.trim() && !hazard.trim() && !risk.trim()) {
@@ -267,27 +651,276 @@ function addMatrixRow() {
     }
     const controls = document.getElementById('matrix-row-controls')?.value || '';
     const ppe = parseLines(document.getElementById('matrix-row-ppe')?.value || '');
+    const protocols = parseLines(document.getElementById('matrix-row-protocols')?.value || '');
     const owner = document.getElementById('matrix-row-owner')?.value || '';
+    const legalReference = document.getElementById('matrix-row-legal')?.value || '';
+    const probability = Number(document.getElementById('matrix-row-probability')?.value || 2);
+    const consequence = Number(document.getElementById('matrix-row-consequence')?.value || 2);
+    const vep = probability * consequence;
+    const riskLevel = riskLevelFromVep(vep);
+    const editIndex = Number(document.getElementById('matrix-edit-index')?.value || -1);
     if (!SAFETY_DETAIL.dossier.risk_matrix) {
-        SAFETY_DETAIL.dossier.risk_matrix = { title: 'Matriz de riesgo', status: 'draft', version: 1, rows: [] };
+        SAFETY_DETAIL.dossier.risk_matrix = { title: 'Matriz de riesgo', status: 'draft', version: 1, rows: [], generation_summary: {} };
     }
     SAFETY_DETAIL.dossier.risk_matrix.rows = SAFETY_DETAIL.dossier.risk_matrix.rows || [];
-    SAFETY_DETAIL.dossier.risk_matrix.rows.push({
+    const draftRow = {
+        process_name: processName,
+        task_name: activity,
         activity,
+        position_name: positionName,
+        place_name: placeName,
         hazard,
+        hazard_factor: hazard,
         risk,
+        risk_name: risk,
         controls,
+        control_hierarchy: { elimination: [], engineering: [], administrative: parseLines(controls), ppe: ppe },
         required_ppe: ppe,
+        protocol_codes: protocols,
         owner_name: owner,
-    });
-    ['matrix-row-activity', 'matrix-row-hazard', 'matrix-row-risk', 'matrix-row-controls', 'matrix-row-ppe', 'matrix-row-owner'].forEach((id) => setValue(id, ''));
+        probability,
+        consequence,
+        vep,
+        risk_level: riskLevel,
+        action_required: actionRequiredFromVep(vep),
+        origin_blocks: ['manual'],
+        source_labels: ['Fila manual'],
+        restriction_alerts: [],
+        is_blocking: vep >= 16,
+        legal_reference: legalReference,
+    };
+    if (editIndex >= 0 && editIndex < SAFETY_DETAIL.dossier.risk_matrix.rows.length) {
+        SAFETY_DETAIL.dossier.risk_matrix.rows[editIndex] = draftRow;
+        showToast('Fila de matriz actualizada.');
+    } else {
+        SAFETY_DETAIL.dossier.risk_matrix.rows.push(draftRow);
+        showToast('Fila agregada a la matriz.');
+    }
+    resetMatrixComposer();
     renderMatrix();
 }
 
 function removeMatrixRow(index) {
     if (!SAFETY_DETAIL.dossier.risk_matrix?.rows) return;
     SAFETY_DETAIL.dossier.risk_matrix.rows.splice(index, 1);
+    if (String(document.getElementById('matrix-edit-index')?.value || '') === String(index)) {
+        resetMatrixComposer();
+    }
     renderMatrix();
+}
+
+function applyMatrixFilters() {
+    renderMatrix();
+}
+
+function getFilteredMatrixRows(rows) {
+    const search = (document.getElementById('matrix-search')?.value || '').trim().toLowerCase();
+    const level = document.getElementById('matrix-risk-filter')?.value || '';
+    const source = document.getElementById('matrix-source-filter')?.value || '';
+    const sort = document.getElementById('matrix-sort')?.value || 'risk_desc';
+    const alertsOnly = !!document.getElementById('matrix-alert-filter')?.checked;
+    const filtered = (rows || []).map((row, index) => ({ row, index })).filter((entry) => {
+        const row = entry.row;
+        if (level && String(row.risk_level || '') !== level) return false;
+        if (source) {
+            const sources = [...(row.origin_blocks || []), ...(row.source_labels || [])].map((item) => String(item || '').toLowerCase());
+            if (!sources.includes(source.toLowerCase())) return false;
+        }
+        if (alertsOnly && !(row.restriction_alerts || []).length) return false;
+        if (!search) return true;
+        const haystack = [
+            row.process_name,
+            row.task_name,
+            row.activity,
+            row.position_name,
+            row.place_name,
+            row.hazard_factor,
+            row.hazard,
+            row.risk_name,
+            row.risk,
+            row.master_risk_code,
+            (row.protocol_codes || []).join(' '),
+            (row.origin_blocks || []).join(' '),
+            row.owner_name,
+        ].join(' ').toLowerCase();
+        return haystack.includes(search);
+    });
+    const severityWeight = (row) => {
+        const normalized = String(row.risk_level || riskLevelFromVep(Number(row.vep || 0))).toLowerCase();
+        if (normalized === 'intolerable') return 4;
+        if (normalized === 'importante') return 3;
+        if (normalized === 'moderado') return 2;
+        return 1;
+    };
+    return filtered.sort((left, right) => {
+        const a = left.row;
+        const b = right.row;
+        if (sort === 'process_asc') {
+            return String(a.process_name || a.task_name || '').localeCompare(String(b.process_name || b.task_name || ''), 'es');
+        }
+        if (sort === 'manual_first') {
+            const aManual = (a.origin_blocks || []).includes('manual') ? 1 : 0;
+            const bManual = (b.origin_blocks || []).includes('manual') ? 1 : 0;
+            if (aManual !== bManual) return bManual - aManual;
+        }
+        if (sort === 'alerts_first') {
+            const aAlert = (a.restriction_alerts || []).length || Number(a.vep || 0) >= 16 ? 1 : 0;
+            const bAlert = (b.restriction_alerts || []).length || Number(b.vep || 0) >= 16 ? 1 : 0;
+            if (aAlert !== bAlert) return bAlert - aAlert;
+        }
+        const severityCompare = severityWeight(b) - severityWeight(a);
+        if (severityCompare !== 0) return severityCompare;
+        const vepCompare = Number(b.vep || 0) - Number(a.vep || 0);
+        if (vepCompare !== 0) return vepCompare;
+        return String(a.process_name || a.task_name || '').localeCompare(String(b.process_name || b.task_name || ''), 'es');
+    });
+}
+
+function renderMatrixMetrics(rows, filteredRows) {
+    const visibleRows = (filteredRows || []).map((entry) => entry.row);
+    const protocols = new Set();
+    const sources = new Set();
+    let blocking = 0;
+    visibleRows.forEach((row) => {
+        (row.protocol_codes || []).forEach((code) => protocols.add(code));
+        (row.origin_blocks || []).forEach((origin) => sources.add(origin));
+        if (row.is_blocking || (row.restriction_alerts || []).length || Number(row.vep || 0) >= 16) blocking += 1;
+    });
+    setText('matrix-metric-rows', String(filteredRows.length));
+    setText('matrix-metric-blocking', String(blocking));
+    setText('matrix-metric-protocols', String(protocols.size));
+    setText('matrix-metric-sources', String(sources.size));
+}
+
+function renderMatrixBlockChips(summary) {
+    const root = document.getElementById('matrix-block-chips');
+    if (!root) return;
+    const blockMeta = summary.matched_by_block || {};
+    const chips = Object.entries(blockMeta)
+        .filter(([, value]) => Number(value) > 0)
+        .map(([key, value]) => `<span class="mini-chip draft">${esc(humanizeScope(key))}: ${esc(String(value))}</span>`);
+    root.innerHTML = chips.length ? chips.join('') : '<span class="mini-chip draft">Sin bloques heredados activos</span>';
+}
+
+function updateMatrixSourceFilter(rows) {
+    const select = document.getElementById('matrix-source-filter');
+    if (!select) return;
+    const currentValue = select.value || '';
+    const sources = new Set();
+    (rows || []).forEach((row) => {
+        [...(row.origin_blocks || []), ...(row.source_labels || [])].forEach((item) => {
+            const normalized = String(item || '').trim();
+            if (normalized) sources.add(normalized);
+        });
+    });
+    const options = ['<option value="">Todos</option>']
+        .concat(Array.from(sources).sort().map((source) => `<option value="${esc(source)}">${esc(source)}</option>`));
+    select.innerHTML = options.join('');
+    if (currentValue && Array.from(sources).includes(currentValue)) {
+        select.value = currentValue;
+    }
+}
+
+function matrixLevelChip(level, vep) {
+    const normalized = (level || riskLevelFromVep(Number(vep || 0))).toLowerCase();
+    const chipClass = normalized === 'intolerable'
+        ? 'red'
+        : (normalized === 'importante' ? 'yellow' : 'green');
+    return `<span class="traffic-chip ${chipClass}">${esc(level || riskLevelFromVep(Number(vep || 0)))}</span>`;
+}
+
+function renderTagPills(items, type) {
+    if (!(items || []).length) return '<span class="mini-chip draft">-</span>';
+    const chipClass = type === 'protocol' ? 'pending_review' : 'draft';
+    return items.map((item) => `<span class="mini-chip ${chipClass}">${esc(item)}</span>`).join('');
+}
+
+function editMatrixRow(index) {
+    const row = SAFETY_DETAIL.dossier.risk_matrix?.rows?.[index];
+    if (!row) return;
+    setValue('matrix-edit-index', index);
+    setValue('matrix-row-process', row.process_name || '');
+    setValue('matrix-row-activity', row.task_name || row.activity || '');
+    setValue('matrix-row-position', row.position_name || '');
+    setValue('matrix-row-place', row.place_name || '');
+    setValue('matrix-row-hazard', row.hazard_factor || row.hazard || '');
+    setValue('matrix-row-risk', row.risk_name || row.risk || '');
+    setValue('matrix-row-controls', row.controls || '');
+    setValue('matrix-row-ppe', (row.required_ppe || []).join('\n'));
+    setValue('matrix-row-protocols', (row.protocol_codes || []).join('\n'));
+    setValue('matrix-row-owner', row.owner_name || '');
+    setValue('matrix-row-legal', row.legal_reference || '');
+    setValue('matrix-row-probability', String(row.probability || 2));
+    setValue('matrix-row-consequence', String(row.consequence || 2));
+    const action = document.getElementById('matrix-composer-action-label');
+    if (action) action.textContent = 'Actualizar fila';
+    updateMatrixRowPreview();
+    window.scrollTo({ top: document.getElementById('section-matrix')?.offsetTop - 24 || 0, behavior: 'smooth' });
+}
+
+function cloneMatrixRow(index) {
+    editMatrixRow(index);
+    setValue('matrix-edit-index', '');
+    const action = document.getElementById('matrix-composer-action-label');
+    if (action) action.textContent = 'Agregar fila a la matriz';
+}
+
+function cloneFirstFilteredMatrixRow() {
+    if (!SAFETY_DETAIL.filteredMatrixRows.length) {
+        showToast('No hay filas visibles para clonar.', 'error');
+        return;
+    }
+    cloneMatrixRow(SAFETY_DETAIL.filteredMatrixRows[0].index);
+}
+
+function resetMatrixComposer(keepPreview) {
+    [
+        'matrix-edit-index',
+        'matrix-row-process',
+        'matrix-row-activity',
+        'matrix-row-position',
+        'matrix-row-place',
+        'matrix-row-hazard',
+        'matrix-row-risk',
+        'matrix-row-controls',
+        'matrix-row-ppe',
+        'matrix-row-protocols',
+        'matrix-row-owner',
+        'matrix-row-legal',
+    ].forEach((id) => setValue(id, ''));
+    setValue('matrix-row-probability', '2');
+    setValue('matrix-row-consequence', '2');
+    const action = document.getElementById('matrix-composer-action-label');
+    if (action) action.textContent = 'Agregar fila a la matriz';
+    if (!keepPreview) updateMatrixRowPreview();
+}
+
+function updateMatrixRowPreview() {
+    const probability = Number(document.getElementById('matrix-row-probability')?.value || 2);
+    const consequence = Number(document.getElementById('matrix-row-consequence')?.value || 2);
+    const vep = probability * consequence;
+    const level = riskLevelFromVep(vep);
+    const preview = document.getElementById('matrix-row-vep-preview');
+    if (!preview) return;
+    const chipClass = level === 'Intolerable' ? 'red' : (level === 'Importante' ? 'yellow' : 'green');
+    preview.className = `traffic-chip ${chipClass}`;
+    preview.textContent = `VEP ${vep} - ${level}`;
+}
+
+function riskLevelFromVep(vep) {
+    const value = Number(vep || 0);
+    if (value >= 16) return 'Intolerable';
+    if (value >= 8) return 'Importante';
+    if (value >= 4) return 'Moderado';
+    return 'Tolerable';
+}
+
+function actionRequiredFromVep(vep) {
+    const value = Number(vep || 0);
+    if (value >= 16) return 'Detener y redisenar control';
+    if (value >= 8) return 'Intervenir antes de ejecutar';
+    if (value >= 4) return 'Controlar y supervisar';
+    return 'Mantener control';
 }
 
 async function saveMatrix() {
@@ -297,6 +930,7 @@ async function saveMatrix() {
         status: document.getElementById('matrix-status')?.value || 'draft',
         version: Number(document.getElementById('matrix-version')?.value || 1),
         rows: SAFETY_DETAIL.dossier.risk_matrix?.rows || [],
+        generation_summary: SAFETY_DETAIL.dossier.risk_matrix?.generation_summary || {},
     };
     const res = await API.put('/safety/folders/' + folderId + '/risk-matrix', payload);
     if (!res || res.success === false) {
@@ -310,6 +944,11 @@ async function saveMatrix() {
 function renderPPEDeliveries() {
     const body = document.getElementById('ppe-body');
     const deliveries = SAFETY_DETAIL.dossier.ppe_deliveries || [];
+    const chip = document.getElementById('ppe-count-chip');
+    if (chip) {
+        const covered = new Set(deliveries.filter((delivery) => delivery.status === 'delivered').map((delivery) => delivery.employee_id));
+        chip.textContent = `${covered.size} personas cubiertas`;
+    }
     if (!body) return;
     if (!deliveries.length) {
         body.innerHTML = '<tr><td colspan="5" class="empty">Sin entregas registradas.</td></tr>';
@@ -331,6 +970,44 @@ function renderPPEDeliveries() {
     `).join('');
 }
 
+function renderGeneratedSafetyDocuments() {
+    const body = document.getElementById('ppe-generated-docs-body');
+    const chip = document.getElementById('ppe-generated-count-chip');
+    const docs = SAFETY_DETAIL.generatedDocuments || [];
+    if (chip) {
+        chip.textContent = `${docs.length} documentos`;
+    }
+    if (!body) return;
+    if (!docs.length) {
+        body.innerHTML = '<tr><td colspan="5" class="empty">Sin documentos generados aun.</td></tr>';
+        return;
+    }
+    body.innerHTML = docs.map((doc) => `
+        <tr>
+            <td>
+                <div style="font-weight:700;color:#f8fafc;">${esc(doc.name || 'Documento')}</div>
+                <div style="font-size:0.78rem;color:#94a3b8;">${esc(doc.template_name || '-')}</div>
+            </td>
+            <td>
+                <div>${esc(doc.source_label || doc.recipient_name || '-')}</div>
+                <div style="font-size:0.78rem;color:#94a3b8;">${esc(doc.target_module || 'safety')}${doc.target_record_id ? ` #${esc(doc.target_record_id)}` : ''}</div>
+            </td>
+            <td>${statusChip(doc.status || 'draft')}</td>
+            <td>${doc.requires_signature ? '<span class="mini-chip pending_review">Firma</span>' : '<span class="mini-chip draft">Sin firma</span>'}</td>
+            <td>
+                <div style="display:flex;gap:0.45rem;flex-wrap:wrap;">
+                    <a class="btn btn-ghost btn-sm" href="${esc(doc.workspace_url || ('/app/cross-correspondence?generated_document_id=' + doc.id))}">Abrir</a>
+                    <button class="btn btn-secondary btn-sm" onclick="openGeneratedSafetyDocument(${doc.id})">DOC</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openGeneratedSafetyDocument(documentId) {
+    window.location.href = `/app/cross-correspondence?generated_document_id=${encodeURIComponent(documentId)}`;
+}
+
 function editPPEDelivery(id) {
     const delivery = (SAFETY_DETAIL.dossier.ppe_deliveries || []).find((item) => item.id === id);
     if (!delivery) return;
@@ -349,6 +1026,7 @@ function resetPPEForm() {
     setValue('ppe-status', 'delivered');
     setValue('ppe-items', '');
     setValue('ppe-notes', '');
+    setValue('ppe-document-template', '');
 }
 
 async function savePPEDelivery() {
@@ -360,6 +1038,7 @@ async function savePPEDelivery() {
         status: document.getElementById('ppe-status')?.value || 'delivered',
         items: parseLines(document.getElementById('ppe-items')?.value || ''),
         notes: document.getElementById('ppe-notes')?.value || '',
+        document_template_id: document.getElementById('ppe-document-template')?.value || '',
     };
     if (!payload.employee_id) {
         showToast('Selecciona un trabajador.', 'error');
@@ -372,7 +1051,13 @@ async function savePPEDelivery() {
         showToast((res && res.errors && res.errors[0]) || 'No se pudo guardar la entrega.', 'error');
         return;
     }
-    showToast('Entrega de EPP guardada.');
+    if (res.data?.document_generation_error) {
+        showToast(`Entrega guardada, pero el documento no se genero: ${res.data.document_generation_error}`, 'error');
+    } else if ((res.data?.generated_documents || []).length) {
+        showToast(`Entrega de EPP guardada y ${(res.data.generated_documents || []).length} documento(s) generado(s).`);
+    } else {
+        showToast('Entrega de EPP guardada.');
+    }
     resetPPEForm();
     await loadSafetyDossier();
 }
@@ -391,6 +1076,11 @@ async function deletePPEDelivery(id) {
 function renderTalks() {
     const body = document.getElementById('talks-body');
     const talks = SAFETY_DETAIL.dossier.talks || [];
+    const chip = document.getElementById('talks-count-chip');
+    if (chip) {
+        const attendance = talks.reduce((total, talk) => total + Number(talk.attendance_count || 0), 0);
+        chip.textContent = `${talks.length} charlas / ${attendance} asistencias`;
+    }
     if (!body) return;
     if (!talks.length) {
         body.innerHTML = '<tr><td colspan="5" class="empty">Sin charlas registradas.</td></tr>';
@@ -476,6 +1166,11 @@ async function deleteTalk(id) {
 function renderChecklists() {
     const body = document.getElementById('checklists-body');
     const checklists = SAFETY_DETAIL.dossier.checklists || [];
+    const chip = document.getElementById('checklists-count-chip');
+    if (chip) {
+        const critical = checklists.filter((item) => item.result === 'critical').length;
+        chip.textContent = critical ? `${critical} criticos` : `${checklists.length} checklists`;
+    }
     if (!body) return;
     if (!checklists.length) {
         body.innerHTML = '<tr><td colspan="6" class="empty">Sin checklists registrados.</td></tr>';
@@ -588,6 +1283,16 @@ function trafficLabel(color) {
     return ({ green: 'Verde', yellow: 'Amarillo', red: 'Rojo' })[color || 'red'] || (color || 'Rojo');
 }
 
+function humanizeScope(scope) {
+    return ({
+        transversal: 'Transversal',
+        service_profile: 'Servicio',
+        customer: 'Cliente',
+        client_site: 'Instalacion',
+        client_area: 'Area',
+    })[scope] || scope;
+}
+
 function selectedValues(selectId) {
     const select = document.getElementById(selectId);
     if (!select) return [];
@@ -600,6 +1305,46 @@ function parseLines(value) {
         .split('\n')
         .map((item) => item.trim())
         .filter(Boolean);
+}
+
+async function downloadBinaryFile(path, fallbackName, options = {}) {
+    try {
+        const token = API.getToken();
+        const res = await fetch(path, {
+            method: 'GET',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) {
+            let message = 'No se pudo descargar el archivo.';
+            try {
+                const payload = await res.json();
+                if (payload?.errors?.length) message = payload.errors[0];
+            } catch {
+                message = `No se pudo descargar el archivo (${res.status}).`;
+            }
+            showToast(message, 'error');
+            return;
+        }
+        const blob = await res.blob();
+        const disposition = res.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const filename = (match && match[1]) || fallbackName;
+        const url = window.URL.createObjectURL(blob);
+        if (options.openInNewTab) {
+            window.open(url, '_blank', 'noopener');
+        } else {
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+        }
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+        showToast(options.successMessage || `Descarga lista: ${filename}`);
+    } catch (error) {
+        showToast(error.message || 'No se pudo descargar el archivo.', 'error');
+    }
 }
 
 function setText(id, value) {
@@ -618,6 +1363,18 @@ function emptyToNull(value) {
 
 function todayIso() {
     return new Date().toISOString().slice(0, 10);
+}
+
+function formatDateTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value || '-');
+    return date.toLocaleString('es-CL', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
 function esc(value) {

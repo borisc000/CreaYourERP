@@ -20,6 +20,7 @@ from core.YOUR_ERP_core_framework import (
     BaseModule, Request, Response, ValidationError
 )
 from core.YOUR_ERP_orm import BaseModel, Column, ColumnType, EmailValidator, LengthValidator, AuditMixin
+from core.time_utils import ensure_utc_datetime, utc_now
 
 
 # ============================================================================
@@ -535,6 +536,12 @@ class BaseModule(BaseModule):
                 self.logger.warning(f"HR department seeding skipped: {_seed_err}")
 
             try:
+                from modules.hr.module_hr import seed_default_accreditation_requirements
+                seed_default_accreditation_requirements(company.id)
+            except Exception as _seed_err:
+                self.logger.warning(f"HR accreditation seeding skipped: {_seed_err}")
+
+            try:
                 from modules.recruitment.module_recruitment import seed_default_recruitment_stages
                 seed_default_recruitment_stages(company.id)
             except Exception as _seed_err:
@@ -553,7 +560,24 @@ class BaseModule(BaseModule):
                 'password_hash': temp_user.password_hash,
                 'role': 'company_admin',
                 'is_admin': True,
-                'allowed_modules': ["crm", "operations", "finance", "settings", "users", "recruitment", "hr", "inventory"]
+                'allowed_modules': [
+                    "crm",
+                    "operations",
+                    "finance",
+                    "settings",
+                    "users",
+                    "recruitment",
+                    "hr",
+                    "payroll",
+                    "inventory",
+                    "rentals",
+                    "safety",
+                    "document_center",
+                    "signature",
+                    "mail",
+                    "google_workspace",
+                    "ai",
+                ]
             })
 
             # 4. Auto-login: generar token directamente
@@ -955,7 +979,7 @@ class BaseModule(BaseModule):
 
         user    = users[0]
         token   = secrets.token_urlsafe(32)
-        expires = datetime.utcnow() + timedelta(hours=1)
+        expires = utc_now() + timedelta(hours=1)
 
         user.reset_token         = token
         user.reset_token_expires = expires
@@ -996,7 +1020,8 @@ class BaseModule(BaseModule):
             return Response.bad_request("Invalid or expired reset token")
 
         user = users[0]
-        if not user.reset_token_expires or datetime.utcnow() > user.reset_token_expires:
+        expires_at = ensure_utc_datetime(user.reset_token_expires)
+        if not expires_at or utc_now() > expires_at:
             user.reset_token = None
             user.reset_token_expires = None
             user.save()

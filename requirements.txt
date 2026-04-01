@@ -40,6 +40,12 @@ pillow
 aiosmtplib
 email-validator
 
+# Google Workspace
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
+
 # Logging & Monitoring
 python-json-logger
 sentry-sdk

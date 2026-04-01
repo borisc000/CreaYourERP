@@ -11,6 +11,7 @@ sys.path.insert(0, '/'.join(__file__.split('/')[:-1]))
 
 from datetime import datetime, timedelta
 from core.YOUR_ERP_orm import BaseModel
+from core.time_utils import utc_now, utc_now_iso
 from modules.base.module_base import User, Company
 from modules.crm.module_crm import Customer, Mandante, Lead, ServiceType, Stage
 from modules.quotes.module_quotes import ServiceCatalog, WorkerCatalog, ItemCatalog
@@ -51,7 +52,7 @@ def seed_demo():
     user.set_password('demo123')
     user.save()
     # Generar token
-    user.auth_token = f"demo_token_{user.id}_{datetime.utcnow().timestamp()}"
+    user.auth_token = f"demo_token_{user.id}_{utc_now().timestamp()}"
     user.save()
     print(f"[+] Usuario: demo@pedroconstruction.cl")
     print(f"  Contraseña: demo123")
@@ -249,7 +250,7 @@ def seed_demo():
             'supervisor': 'Supervisor Demo',
             'adm': 'Administrador Demo',
             'mandante': 'Encargado Proyecto',
-            'emision': datetime.utcnow().isoformat(),
+        'emision': utc_now_iso(),
             'active': True,
         })
         report.save()
@@ -262,7 +263,7 @@ def seed_demo():
                 'report_id': report.id,
                 'tipo': ctype,
                 'descripcion': f'Checkpoint {ctype} - Verificación de estándares',
-                'emision': (datetime.utcnow() + timedelta(days=checkpoint_types.index(ctype))).isoformat(),
+        'emision': (utc_now() + timedelta(days=checkpoint_types.index(ctype))).isoformat(),
                 'active': True,
             })
             cp.save()

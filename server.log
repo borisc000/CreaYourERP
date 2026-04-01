@@ -1,0 +1,1208 @@
+2026-04-01 02:43:50,329 - your_erp_core_app - WARNING - Database settings are configured, but the current ORM and adapter still persist data in memory only.
+2026-04-01 02:43:50,330 - your_erp_core_app - INFO - Initializing ERP Framework...
+2026-04-01 02:43:50,330 - CoreFramework - INFO - CoreFramework logging configured
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: Base
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: Signature
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: document_center
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: CRM
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: Quotes
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: Billing
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: Reports
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: HR
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: Attendance
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: payroll
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: Recruitment
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: Safety
+2026-04-01 02:43:50,330 - ModuleRegistry - DEBUG - Registered module class: job_profiles
+2026-04-01 02:43:50,331 - ModuleRegistry - DEBUG - Registered module class: Inventory
+2026-04-01 02:43:50,331 - ModuleRegistry - DEBUG - Registered module class: Rentals
+2026-04-01 02:43:50,331 - ModuleRegistry - DEBUG - Registered module class: RIOHS
+2026-04-01 02:43:50,331 - ModuleRegistry - DEBUG - Registered module class: Mail
+2026-04-01 02:43:50,331 - ModuleRegistry - DEBUG - Registered module class: google_workspace
+2026-04-01 02:43:50,331 - ModuleRegistry - DEBUG - Registered module class: AI
+2026-04-01 02:43:50,331 - CoreFramework - INFO - Initializing CoreFramework...
+2026-04-01 02:43:50,331 - DatabaseAdapter - INFO - Connecting to database: postgresql://postgres:postgres@localhost:5432/your_erp_dev
+2026-04-01 02:43:50,331 - BaseModule - INFO - Initializing module: Base
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: company
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: group
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: user
+2026-04-01 02:43:50,331 - BaseModule - INFO - Base module initialized
+2026-04-01 02:43:50,331 - ModuleRegistry - INFO - Loaded module: base
+2026-04-01 02:43:50,331 - SignatureModule - INFO - Initializing module: Signature
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: signature.request
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: signature.log
+2026-04-01 02:43:50,331 - SignatureModule - INFO - Signature module initialized
+2026-04-01 02:43:50,331 - ModuleRegistry - INFO - Loaded module: signature
+2026-04-01 02:43:50,331 - DocumentCenterModule - INFO - Initializing module: document_center
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: document_center.template
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: document_center.batch
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: document_center.generated_document
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: document_center.event
+2026-04-01 02:43:50,331 - DocumentCenterModule - INFO - Document center module initialized
+2026-04-01 02:43:50,331 - ModuleRegistry - INFO - Loaded module: document_center
+2026-04-01 02:43:50,331 - CRMModule - INFO - Initializing module: CRM
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: crm.stage
+2026-04-01 02:43:50,331 - ModelRegistry - DEBUG - Registered model: crm.customer
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: crm.mandante
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: crm.lead
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: crm.lead_note
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: crm.activity_log
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: crm.document
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: crm.service_type
+2026-04-01 02:43:50,332 - CRMModule - INFO - CRM module initialized
+2026-04-01 02:43:50,332 - ModuleRegistry - INFO - Loaded module: crm
+2026-04-01 02:43:50,332 - QuotesModule - INFO - Initializing module: Quotes
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: quotes.service_catalog
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: quotes.worker_catalog
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: quotes.item_catalog
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: quotes.quote
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: quotes.quote_line
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: quotes.quote_template
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: quotes.quote_template_line
+2026-04-01 02:43:50,332 - QuotesModule - INFO - Quotes module v2 initialized (3 catalogs)
+2026-04-01 02:43:50,332 - ModuleRegistry - INFO - Loaded module: quotes
+2026-04-01 02:43:50,332 - BillingModule - INFO - Initializing module: Billing
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: billing.document
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: billing.line
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: billing.event
+2026-04-01 02:43:50,332 - BillingModule - INFO - Billing simulation module initialized
+2026-04-01 02:43:50,332 - ModuleRegistry - INFO - Loaded module: billing
+2026-04-01 02:43:50,332 - ReportsModule - INFO - Initializing module: Reports
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: reports.report
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: reports.checkpoint
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: reports.photo
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: reports.area_faena
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: reports.sector_faena
+2026-04-01 02:43:50,332 - ModelRegistry - DEBUG - Registered model: reports.customer_risk_assignment
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: reports.area_risk_assignment
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: reports.sector_risk_assignment
+2026-04-01 02:43:50,333 - ModuleRegistry - INFO - Loaded module: reports
+2026-04-01 02:43:50,333 - HRModule - INFO - Initializing module: HR
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: hr.department
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: hr.employee
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: hr.contract
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: hr.time_off_request
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: hr.accreditation_requirement
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: hr.accreditation_document
+2026-04-01 02:43:50,333 - HRModule - INFO - HR module initialized
+2026-04-01 02:43:50,333 - ModuleRegistry - INFO - Loaded module: hr
+2026-04-01 02:43:50,333 - AttendanceModule - INFO - Initializing module: Attendance
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: attendance.policy
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: attendance.record
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: attendance.event
+2026-04-01 02:43:50,333 - AttendanceModule - INFO - Attendance module initialized
+2026-04-01 02:43:50,333 - ModuleRegistry - INFO - Loaded module: attendance
+2026-04-01 02:43:50,333 - PayrollModule - INFO - Initializing module: payroll
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: payroll.legal_parameter
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: payroll.tax_bracket
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: payroll.profile
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: payroll.period
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: payroll.settlement
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: payroll.event
+2026-04-01 02:43:50,333 - PayrollModule - INFO - Payroll module initialized
+2026-04-01 02:43:50,333 - ModuleRegistry - INFO - Loaded module: payroll
+2026-04-01 02:43:50,333 - RecruitmentModule - INFO - Initializing module: Recruitment
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: recruitment.stage
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: recruitment.job
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: recruitment.candidate
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: recruitment.application
+2026-04-01 02:43:50,333 - ModelRegistry - DEBUG - Registered model: recruitment.interview
+2026-04-01 02:43:50,334 - RecruitmentModule - INFO - Recruitment module initialized
+2026-04-01 02:43:50,334 - ModuleRegistry - INFO - Loaded module: recruitment
+2026-04-01 02:43:50,334 - SafetyModule - INFO - Initializing module: Safety
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.service_profile
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.folder
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.document
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.risk_matrix
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.ppe_delivery
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.talk
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.checklist
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.irl_record
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.master_risk
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.protocol
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.client_site
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.client_area
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.worker_restriction
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: safety.generator_rule
+2026-04-01 02:43:50,334 - SafetyModule - INFO - Safety module initialized
+2026-04-01 02:43:50,334 - ModuleRegistry - INFO - Loaded module: safety
+2026-04-01 02:43:50,334 - InventoryModule - INFO - Initializing module: Inventory
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: inventory.item
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: inventory.movement
+2026-04-01 02:43:50,334 - ModelRegistry - DEBUG - Registered model: inventory.backup
+2026-04-01 02:43:50,334 - InventoryModule - INFO - Inventory module initialized
+2026-04-01 02:43:50,334 - ModuleRegistry - INFO - Loaded module: inventory
+2026-04-01 02:43:50,334 - RiohsModule - INFO - Initializing module: RIOHS
+2026-04-01 02:43:50,334 - RiohsModule - INFO - Módulo RIOHS inicializado
+2026-04-01 02:43:50,334 - ModuleRegistry - INFO - Loaded module: riohs
+2026-04-01 02:43:50,334 - CoreFramework - INFO - CoreFramework initialized successfully
+2026-04-01 02:43:50,334 - your_erp_core_app - WARNING - Framework storage mode: in_memory_demo (configured database type: postgresql)
+2026-04-01 02:43:50,334 - your_erp_core_app - INFO - Framework initialized successfully
+2026-04-01 02:43:50,440 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-04-01 02:43:50,473 - main - WARNING - Database settings are configured, but the current ORM and adapter still persist data in memory only.
+2026-04-01 02:43:50,473 - main - INFO - Initializing ERP Framework...
+2026-04-01 02:43:50,473 - CoreFramework - INFO - CoreFramework logging configured
+2026-04-01 02:43:50,473 - ModuleRegistry - DEBUG - Registered module class: Base
+2026-04-01 02:43:50,473 - ModuleRegistry - DEBUG - Registered module class: Signature
+2026-04-01 02:43:50,473 - ModuleRegistry - DEBUG - Registered module class: document_center
+2026-04-01 02:43:50,473 - ModuleRegistry - DEBUG - Registered module class: CRM
+2026-04-01 02:43:50,473 - ModuleRegistry - DEBUG - Registered module class: Quotes
+2026-04-01 02:43:50,473 - ModuleRegistry - DEBUG - Registered module class: Billing
+2026-04-01 02:43:50,473 - ModuleRegistry - DEBUG - Registered module class: Reports
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: HR
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: Attendance
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: payroll
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: Recruitment
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: Safety
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: job_profiles
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: Inventory
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: Rentals
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: RIOHS
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: Mail
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: google_workspace
+2026-04-01 02:43:50,474 - ModuleRegistry - DEBUG - Registered module class: AI
+2026-04-01 02:43:50,474 - CoreFramework - INFO - Initializing CoreFramework...
+2026-04-01 02:43:50,474 - DatabaseAdapter - INFO - Connecting to database: postgresql://postgres:postgres@localhost:5432/your_erp_dev
+2026-04-01 02:43:50,474 - BaseModule - INFO - Initializing module: Base
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: company
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: group
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: user
+2026-04-01 02:43:50,474 - BaseModule - INFO - Base module initialized
+2026-04-01 02:43:50,474 - ModuleRegistry - INFO - Loaded module: base
+2026-04-01 02:43:50,474 - SignatureModule - INFO - Initializing module: Signature
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: signature.request
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: signature.log
+2026-04-01 02:43:50,474 - SignatureModule - INFO - Signature module initialized
+2026-04-01 02:43:50,474 - ModuleRegistry - INFO - Loaded module: signature
+2026-04-01 02:43:50,474 - DocumentCenterModule - INFO - Initializing module: document_center
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: document_center.template
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: document_center.batch
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: document_center.generated_document
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: document_center.event
+2026-04-01 02:43:50,474 - DocumentCenterModule - INFO - Document center module initialized
+2026-04-01 02:43:50,474 - ModuleRegistry - INFO - Loaded module: document_center
+2026-04-01 02:43:50,474 - CRMModule - INFO - Initializing module: CRM
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: crm.stage
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: crm.customer
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: crm.mandante
+2026-04-01 02:43:50,474 - ModelRegistry - DEBUG - Registered model: crm.lead
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: crm.lead_note
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: crm.activity_log
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: crm.document
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: crm.service_type
+2026-04-01 02:43:50,475 - CRMModule - INFO - CRM module initialized
+2026-04-01 02:43:50,475 - ModuleRegistry - INFO - Loaded module: crm
+2026-04-01 02:43:50,475 - QuotesModule - INFO - Initializing module: Quotes
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: quotes.service_catalog
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: quotes.worker_catalog
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: quotes.item_catalog
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: quotes.quote
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: quotes.quote_line
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: quotes.quote_template
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: quotes.quote_template_line
+2026-04-01 02:43:50,475 - QuotesModule - INFO - Quotes module v2 initialized (3 catalogs)
+2026-04-01 02:43:50,475 - ModuleRegistry - INFO - Loaded module: quotes
+2026-04-01 02:43:50,475 - BillingModule - INFO - Initializing module: Billing
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: billing.document
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: billing.line
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: billing.event
+2026-04-01 02:43:50,475 - BillingModule - INFO - Billing simulation module initialized
+2026-04-01 02:43:50,475 - ModuleRegistry - INFO - Loaded module: billing
+2026-04-01 02:43:50,475 - ReportsModule - INFO - Initializing module: Reports
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: reports.report
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: reports.checkpoint
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: reports.photo
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: reports.area_faena
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: reports.sector_faena
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: reports.customer_risk_assignment
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: reports.area_risk_assignment
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: reports.sector_risk_assignment
+2026-04-01 02:43:50,475 - ModuleRegistry - INFO - Loaded module: reports
+2026-04-01 02:43:50,475 - HRModule - INFO - Initializing module: HR
+2026-04-01 02:43:50,475 - ModelRegistry - DEBUG - Registered model: hr.department
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: hr.employee
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: hr.contract
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: hr.time_off_request
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: hr.accreditation_requirement
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: hr.accreditation_document
+2026-04-01 02:43:50,476 - HRModule - INFO - HR module initialized
+2026-04-01 02:43:50,476 - ModuleRegistry - INFO - Loaded module: hr
+2026-04-01 02:43:50,476 - AttendanceModule - INFO - Initializing module: Attendance
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: attendance.policy
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: attendance.record
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: attendance.event
+2026-04-01 02:43:50,476 - AttendanceModule - INFO - Attendance module initialized
+2026-04-01 02:43:50,476 - ModuleRegistry - INFO - Loaded module: attendance
+2026-04-01 02:43:50,476 - PayrollModule - INFO - Initializing module: payroll
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: payroll.legal_parameter
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: payroll.tax_bracket
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: payroll.profile
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: payroll.period
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: payroll.settlement
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: payroll.event
+2026-04-01 02:43:50,476 - PayrollModule - INFO - Payroll module initialized
+2026-04-01 02:43:50,476 - ModuleRegistry - INFO - Loaded module: payroll
+2026-04-01 02:43:50,476 - RecruitmentModule - INFO - Initializing module: Recruitment
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: recruitment.stage
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: recruitment.job
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: recruitment.candidate
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: recruitment.application
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: recruitment.interview
+2026-04-01 02:43:50,476 - RecruitmentModule - INFO - Recruitment module initialized
+2026-04-01 02:43:50,476 - ModuleRegistry - INFO - Loaded module: recruitment
+2026-04-01 02:43:50,476 - SafetyModule - INFO - Initializing module: Safety
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: safety.service_profile
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: safety.folder
+2026-04-01 02:43:50,476 - ModelRegistry - DEBUG - Registered model: safety.document
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.risk_matrix
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.ppe_delivery
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.talk
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.checklist
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.irl_record
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.master_risk
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.protocol
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.client_site
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.client_area
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.worker_restriction
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: safety.generator_rule
+2026-04-01 02:43:50,477 - SafetyModule - INFO - Safety module initialized
+2026-04-01 02:43:50,477 - ModuleRegistry - INFO - Loaded module: safety
+2026-04-01 02:43:50,477 - InventoryModule - INFO - Initializing module: Inventory
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: inventory.item
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: inventory.movement
+2026-04-01 02:43:50,477 - ModelRegistry - DEBUG - Registered model: inventory.backup
+2026-04-01 02:43:50,477 - InventoryModule - INFO - Inventory module initialized
+2026-04-01 02:43:50,477 - ModuleRegistry - INFO - Loaded module: inventory
+2026-04-01 02:43:50,477 - RiohsModule - INFO - Initializing module: RIOHS
+2026-04-01 02:43:50,477 - RiohsModule - INFO - Módulo RIOHS inicializado
+2026-04-01 02:43:50,477 - ModuleRegistry - INFO - Loaded module: riohs
+2026-04-01 02:43:50,477 - CoreFramework - INFO - CoreFramework initialized successfully
+2026-04-01 02:43:50,477 - main - WARNING - Framework storage mode: in_memory_demo (configured database type: postgresql)
+2026-04-01 02:43:50,477 - main - INFO - Framework initialized successfully
+INFO:     Started server process [31076]
+INFO:     Waiting for application startup.
+2026-04-01 02:43:50,486 - Company - DEBUG - Inserted Company #1
+2026-04-01 02:43:50,486 - Company - DEBUG - Updated Company #1
+2026-04-01 02:43:50,530 - User - DEBUG - Inserted User #1
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+
+    +-------------------------------------------+
+    |       YOUR ERP - Unified Bootstrap        |
+    |      Loading app from YOUR_ERP_CORE       |
+    +-------------------------------------------+
+
+  Core app: C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE\main.py
+  Server running at: http://localhost:8000
+  Frontend: /app/login
+  Acreditaciones: /app/accreditation
+  Correspondencia: /app/cross-correspondence
+  Firmas: /app/signature-center
+  [*] Seeding demo data...
+  [+] Demo data seeded - Email: demo@pedroconstruction.cl / Password: demo123
+INFO:     127.0.0.1:51584 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51596 - "GET /app/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51597 - "GET /static/js/api.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51596 - "GET /static/css/theme.css?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51597 - "GET /static/js/auth.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51596 - "GET /app/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51596 - "GET /static/js/dashboard.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51596 - "GET /safety/folders HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51597 - "GET /hr/stats HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51596 - "GET /recruitment/stats HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51597 - "GET /inventory/dashboard HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51596 - "GET /crm/stats HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51597 - "GET /document-center/stats HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51596 - "GET /signature/requests HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51596 - "GET /app/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51679 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-04-01 02:48:26,569 - Company - DEBUG - Inserted Company #2
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #1
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #2
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #3
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #4
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #5
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #6
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #7
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #8
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #9
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #10
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #11
+2026-04-01 02:48:26,569 - Stage - DEBUG - Inserted Stage #12
+2026-04-01 02:48:26,570 - Department - DEBUG - Inserted Department #1
+2026-04-01 02:48:26,570 - Department - DEBUG - Inserted Department #2
+2026-04-01 02:48:26,570 - Department - DEBUG - Inserted Department #3
+2026-04-01 02:48:26,570 - Department - DEBUG - Inserted Department #4
+2026-04-01 02:48:26,570 - Department - DEBUG - Inserted Department #5
+2026-04-01 02:48:26,570 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #1
+2026-04-01 02:48:26,570 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #2
+2026-04-01 02:48:26,570 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #3
+2026-04-01 02:48:26,570 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #4
+2026-04-01 02:48:26,570 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #5
+2026-04-01 02:48:26,570 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #1
+2026-04-01 02:48:26,570 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #2
+2026-04-01 02:48:26,570 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #3
+2026-04-01 02:48:26,570 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #4
+2026-04-01 02:48:26,570 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #5
+2026-04-01 02:48:26,570 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #6
+2026-04-01 02:48:26,570 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #7
+2026-04-01 02:48:26,614 - User - DEBUG - Inserted User #2
+2026-04-01 02:48:26,614 - User - DEBUG - Updated User #2
+INFO:     127.0.0.1:51680 - "POST /auth/register HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51680 - "GET /app/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51680 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51680 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51680 - "GET /hr/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51680 - "GET /inventory/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51680 - "GET /safety/folders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51680 - "GET /document-center/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51680 - "GET /signature/requests HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /static/js/crm.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /users HTTP/1.1" 200 OK
+2026-04-01 02:51:53,010 - ServiceType - DEBUG - Inserted ServiceType #1
+2026-04-01 02:51:53,010 - ServiceType - DEBUG - Inserted ServiceType #2
+2026-04-01 02:51:53,010 - ServiceType - DEBUG - Inserted ServiceType #3
+2026-04-01 02:51:53,010 - ServiceType - DEBUG - Inserted ServiceType #4
+INFO:     127.0.0.1:51767 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51771 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51772 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51773 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51774 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51775 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51775 - "GET /app/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51775 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51774 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51773 - "GET /hr/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51772 - "GET /inventory/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51771 - "GET /safety/folders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /document-center/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51775 - "GET /signature/requests HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51775 - "GET /app/cross-correspondence HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51775 - "GET /static/js/pdf_signature_workspace.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /static/js/document_center.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51767 - "GET /document-center/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51775 - "GET /document-center/templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51771 - "GET /document-center/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51772 - "GET /document-center/generated HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51773 - "GET /document-center/lookups HTTP/1.1" 200 OK
+2026-04-01 02:52:34,531 - DocumentTemplate - DEBUG - Inserted DocumentTemplate #1
+INFO:     127.0.0.1:51794 - "POST /document-center/templates HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51794 - "GET /document-center/templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51794 - "GET /document-center/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51794 - "GET /document-center/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51794 - "GET /document-center/generated HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51794 - "GET /document-center/lookups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51799 - "GET /app/crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51799 - "GET /static/js/crm_customers.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51799 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51800 - "GET /hr/accreditation/templates HTTP/1.1" 200 OK
+2026-04-01 02:53:06,454 - Customer - DEBUG - Inserted Customer #1
+INFO:     127.0.0.1:51801 - "POST /crm/customers HTTP/1.1" 201 Created
+2026-04-01 02:53:06,459 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #6
+2026-04-01 02:53:06,459 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #7
+2026-04-01 02:53:06,459 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #8
+2026-04-01 02:53:06,459 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #9
+INFO:     127.0.0.1:51801 - "PUT /hr/accreditation/customers/1/requirements HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51801 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51801 - "GET /app/crm/customers/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51801 - "GET /static/js/crm_customer_detail.js?v=4.4 HTTP/1.1" 200 OK
+2026-04-01 02:53:09,067 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #1
+2026-04-01 02:53:09,067 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #2
+2026-04-01 02:53:09,067 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #3
+2026-04-01 02:53:09,067 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #4
+2026-04-01 02:53:09,067 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #5
+2026-04-01 02:53:09,067 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #6
+2026-04-01 02:53:09,067 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #1
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #2
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #3
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #4
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #5
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #6
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #7
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #8
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #9
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #10
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #11
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #12
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #13
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #14
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #15
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #16
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #17
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #18
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #19
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #20
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #21
+2026-04-01 02:53:09,068 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #22
+2026-04-01 02:53:09,069 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #23
+2026-04-01 02:53:09,069 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #24
+2026-04-01 02:53:09,069 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #25
+2026-04-01 02:53:09,069 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #26
+2026-04-01 02:53:09,069 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #27
+2026-04-01 02:53:09,069 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #28
+2026-04-01 02:53:09,069 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #29
+2026-04-01 02:53:09,069 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #30
+2026-04-01 02:53:09,069 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #31
+2026-04-01 02:53:09,069 - SafetyServiceProfile - DEBUG - Inserted SafetyServiceProfile #1
+2026-04-01 02:53:09,069 - SafetyServiceProfile - DEBUG - Inserted SafetyServiceProfile #2
+2026-04-01 02:53:09,069 - SafetyServiceProfile - DEBUG - Inserted SafetyServiceProfile #3
+2026-04-01 02:53:09,069 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #1
+2026-04-01 02:53:09,069 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #2
+2026-04-01 02:53:09,069 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #3
+2026-04-01 02:53:09,069 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #4
+2026-04-01 02:53:09,070 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #5
+2026-04-01 02:53:09,070 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #6
+2026-04-01 02:53:09,070 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #7
+2026-04-01 02:53:09,070 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #8
+2026-04-01 02:53:09,070 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #9
+2026-04-01 02:53:09,070 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #10
+INFO:     127.0.0.1:51801 - "GET /safety/master-risks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51802 - "GET /crm/customers/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51803 - "GET /crm/customers/1/mandantes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51801 - "GET /crm/customers/1/risks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51801 - "GET /areas?customer_id=1 HTTP/1.1" 200 OK
+2026-04-01 02:53:21,186 - Mandante - DEBUG - Inserted Mandante #1
+INFO:     127.0.0.1:51822 - "POST /crm/customers/1/mandantes HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51822 - "GET /crm/customers/1/mandantes HTTP/1.1" 200 OK
+2026-04-01 02:53:24,377 - AreaFaena - DEBUG - Inserted AreaFaena #1
+INFO:     127.0.0.1:51822 - "POST /areas HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51822 - "GET /areas?customer_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51822 - "GET /crm/customers/1/risks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51822 - "GET /areas/1/sectors HTTP/1.1" 200 OK
+2026-04-01 02:53:44,989 - SectorFaena - DEBUG - Inserted SectorFaena #1
+2026-04-01 02:53:44,989 - SectorRiskAssignment - DEBUG - Inserted SectorRiskAssignment #1
+2026-04-01 02:53:44,990 - SectorRiskAssignment - DEBUG - Inserted SectorRiskAssignment #2
+2026-04-01 02:53:44,990 - SectorRiskAssignment - DEBUG - Inserted SectorRiskAssignment #3
+2026-04-01 02:53:44,990 - SectorRiskAssignment - DEBUG - Inserted SectorRiskAssignment #4
+2026-04-01 02:53:44,990 - SectorRiskAssignment - DEBUG - Inserted SectorRiskAssignment #5
+INFO:     127.0.0.1:51832 - "POST /areas/1/sectors HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51832 - "GET /areas/1/sectors HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51832 - "GET /areas?customer_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51832 - "GET /crm/customers/1/risks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51890 - "GET /app/crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51890 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51890 - "GET /hr/accreditation/templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51891 - "GET /hr/accreditation/customers/1/requirements HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51911 - "GET /hr/accreditation/customers/1/requirements HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51911 - "GET /app/crm/customers/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51911 - "GET /safety/master-risks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /crm/customers/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51911 - "GET /crm/customers/1/mandantes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /crm/customers/1/risks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /areas?customer_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /app/crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51911 - "GET /hr/accreditation/templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51922 - "GET /app/catalogs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51922 - "GET /static/js/catalogs.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51922 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51922 - "GET /app/crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51922 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51923 - "GET /hr/accreditation/templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51923 - "GET /app/catalogs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51923 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+2026-04-01 02:58:15,265 - ServiceCatalog - DEBUG - Inserted ServiceCatalog #1
+INFO:     127.0.0.1:51938 - "POST /quotes/catalog/services HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51938 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51938 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+2026-04-01 02:58:30,487 - WorkerCatalog - DEBUG - Inserted WorkerCatalog #1
+INFO:     127.0.0.1:51939 - "POST /quotes/catalog/workers HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51939 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /app/billing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /static/js/billing.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /billing/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /billing/documents?limit=120 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /billing/reference-data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /app/hr HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /static/js/hr.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51953 - "GET /hr/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51954 - "GET /hr/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /hr/employees HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51953 - "GET /hr/contracts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51954 - "GET /hr/leaves HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /hr/accreditation/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /app/recruitment HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /static/js/recruitment.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51954 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51953 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51958 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51959 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51960 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51939 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+2026-04-01 03:00:29,604 - JobOpening - DEBUG - Inserted JobOpening #1
+INFO:     127.0.0.1:52029 - "POST /recruitment/jobs HTTP/1.1" 201 Created
+INFO:     127.0.0.1:52029 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52029 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52029 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52029 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52029 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52029 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52029 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+2026-04-01 03:02:13,899 - Candidate - DEBUG - Inserted Candidate #1
+INFO:     127.0.0.1:52081 - "POST /recruitment/candidates HTTP/1.1" 201 Created
+INFO:     127.0.0.1:52081 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52081 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52081 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52081 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52081 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52081 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52081 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+2026-04-01 03:07:54,743 - JobApplication - DEBUG - Inserted JobApplication #1
+INFO:     127.0.0.1:52345 - "POST /recruitment/applications HTTP/1.1" 201 Created
+INFO:     127.0.0.1:52345 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52345 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52345 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52345 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52345 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52345 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52345 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+2026-04-01 03:08:38,928 - Interview - DEBUG - Inserted Interview #1
+INFO:     127.0.0.1:52350 - "POST /recruitment/interviews HTTP/1.1" 201 Created
+INFO:     127.0.0.1:52350 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52351 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52352 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52353 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52354 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52350 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52351 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+2026-04-01 03:13:51,448 - Interview - DEBUG - Updated Interview #1
+INFO:     127.0.0.1:52449 - "PUT /recruitment/interviews/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52449 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52449 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52449 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52449 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52449 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52449 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52449 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+2026-04-01 03:16:34,191 - EmployeeProfile - DEBUG - Inserted EmployeeProfile #1
+2026-04-01 03:16:34,191 - EmployeeContract - DEBUG - Inserted EmployeeContract #1
+2026-04-01 03:16:34,191 - JobApplication - DEBUG - Updated JobApplication #1
+2026-04-01 03:16:34,191 - JobOpening - DEBUG - Updated JobOpening #1
+2026-04-01 03:16:34,191 - PayrollProfile - DEBUG - Inserted PayrollProfile #1
+INFO:     127.0.0.1:52508 - "POST /recruitment/applications/1/hire HTTP/1.1" 201 Created
+INFO:     127.0.0.1:52508 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52508 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52508 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52508 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52508 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52508 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52508 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52513 - "GET /app/hr HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52513 - "GET /hr/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52514 - "GET /hr/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52515 - "GET /hr/employees HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52516 - "GET /hr/contracts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52517 - "GET /hr/leaves HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52513 - "GET /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52514 - "GET /hr/accreditation/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52526 - "GET /app/recruitment HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52526 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52526 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52526 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52526 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52526 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52526 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52526 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52569 - "GET /app/job-profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52569 - "GET /static/js/job_profiles.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52569 - "GET /job-profiles/stats HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52570 - "GET /job-profiles/lookups HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52571 - "GET /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52572 - "POST /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52609 - "GET /app/recruitment HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52609 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52609 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52609 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52609 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52609 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52609 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52609 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52615 - "GET /app/job-profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52615 - "GET /job-profiles/stats HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52616 - "GET /job-profiles/lookups HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52617 - "GET /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52618 - "GET /app/recruitment HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52618 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52619 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52618 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52619 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52618 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52619 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52618 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52618 - "GET /app/job-profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52618 - "GET /job-profiles/stats HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52619 - "GET /job-profiles/lookups HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52631 - "GET /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52631 - "GET /app/recruitment HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52631 - "GET /recruitment/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52619 - "GET /recruitment/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52618 - "GET /recruitment/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52632 - "GET /recruitment/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52633 - "GET /recruitment/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52634 - "GET /recruitment/applications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52631 - "GET /recruitment/interviews HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52649 - "GET /app/job-profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52649 - "GET /job-profiles/stats HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52649 - "GET /job-profiles/lookups HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52649 - "GET /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52649 - "GET /app/hr HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52649 - "GET /static/js/hr.js?v=4.4 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:52649 - "GET /hr/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52651 - "GET /hr/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52652 - "GET /hr/employees HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52653 - "GET /hr/contracts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52649 - "GET /hr/leaves HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52651 - "GET /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52652 - "GET /hr/accreditation/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52722 - "GET /app/job-profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52722 - "GET /job-profiles/stats HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52722 - "GET /job-profiles/lookups HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52722 - "GET /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52722 - "GET /app/hr HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52722 - "GET /hr/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52728 - "GET /hr/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52730 - "GET /hr/employees HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52731 - "GET /hr/contracts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52722 - "GET /hr/leaves HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52728 - "GET /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52730 - "GET /hr/accreditation/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52730 - "GET /app/attendance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52730 - "GET /static/js/attendance.js?v=4.4 HTTP/1.1" 200 OK
+2026-04-01 03:23:55,924 - AttendancePolicy - DEBUG - Inserted AttendancePolicy #1
+INFO:     127.0.0.1:52730 - "GET /attendance/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52728 - "GET /attendance/policy HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52722 - "GET /attendance/employees HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52731 - "GET /attendance/records HTTP/1.1" 200 OK
+2026-04-01 03:24:27,922 - AttendanceRecord - DEBUG - Inserted AttendanceRecord #1
+2026-04-01 03:24:27,923 - CoreFramework - ERROR - Error dispatching request: 'Request' object has no attribute 'ip_address'
+Traceback (most recent call last):
+  File "C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE\core\YOUR_ERP_core_framework.py", line 673, in dispatch_request
+    response = await handler(request)
+               ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE\modules\attendance\module_attendance.py", line 758, in register_punch
+    evidence = self._build_evidence_payload(request, data, event_at, employee, policy)
+  File "C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE\modules\attendance\module_attendance.py", line 448, in _build_evidence_payload
+    "ip_address": str(headers.get("x-forwarded-for") or headers.get("x-real-ip") or request.ip_address or ""),
+                                                                                    ^^^^^^^^^^^^^^^^^^
+AttributeError: 'Request' object has no attribute 'ip_address'
+INFO:     127.0.0.1:52734 - "POST /attendance/records/punch HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:52735 - "POST /attendance/records/punch HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:52771 - "POST /attendance/records/punch HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:52772 - "POST /attendance/records/punch HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:52781 - "GET /attendance/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52782 - "GET /attendance/policy HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52783 - "GET /attendance/employees HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52784 - "GET /attendance/records HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52785 - "POST /attendance/records/punch HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:52793 - "GET /attendance/records/1 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52794 - "GET /app/payroll HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52794 - "GET /static/js/payroll.js?v=4.4 HTTP/1.1" 200 OK
+2026-04-01 03:25:20,064 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #1
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #2
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #3
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #4
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #5
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #6
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #7
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #8
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #9
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #10
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #11
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #12
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #13
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #14
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #15
+2026-04-01 03:25:20,065 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #16
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #17
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #18
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #19
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #20
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #21
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #22
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #23
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #24
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #25
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #26
+2026-04-01 03:25:20,066 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #27
+2026-04-01 03:25:20,067 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #28
+2026-04-01 03:25:20,067 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #29
+2026-04-01 03:25:20,067 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #30
+2026-04-01 03:25:20,067 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #31
+2026-04-01 03:25:20,067 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #1
+2026-04-01 03:25:20,067 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #2
+2026-04-01 03:25:20,067 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #3
+2026-04-01 03:25:20,067 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #4
+2026-04-01 03:25:20,067 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #5
+2026-04-01 03:25:20,067 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #6
+2026-04-01 03:25:20,067 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #7
+2026-04-01 03:25:20,067 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #8
+2026-04-01 03:25:20,069 - DocumentTemplate - DEBUG - Inserted DocumentTemplate #2
+INFO:     127.0.0.1:52794 - "GET /payroll/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52794 - "GET /payroll/lookups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52794 - "GET /payroll/legal-parameters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52794 - "GET /payroll/profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52794 - "GET /payroll/periods HTTP/1.1" 200 OK
+2026-04-01 03:25:51,823 - PayrollPeriod - DEBUG - Inserted PayrollPeriod #1
+INFO:     127.0.0.1:52802 - "POST /payroll/periods HTTP/1.1" 201 Created
+INFO:     127.0.0.1:52802 - "GET /payroll/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52803 - "GET /payroll/lookups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52804 - "GET /payroll/periods HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52805 - "GET /payroll/legal-parameters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/periods/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/periods/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/periods/1 HTTP/1.1" 200 OK
+2026-04-01 03:25:59,713 - PayrollPeriod - DEBUG - Updated PayrollPeriod #1
+INFO:     127.0.0.1:52802 - "PUT /payroll/periods/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52822 - "GET /payroll/lookups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/legal-parameters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52822 - "GET /payroll/periods HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/periods/1 HTTP/1.1" 200 OK
+2026-04-01 03:26:02,803 - PayrollPeriod - DEBUG - Updated PayrollPeriod #1
+INFO:     127.0.0.1:52802 - "POST /payroll/periods/1/calculate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52822 - "GET /payroll/lookups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52828 - "GET /payroll/legal-parameters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52829 - "GET /payroll/periods HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52830 - "GET /payroll/profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52830 - "GET /payroll/periods/1 HTTP/1.1" 200 OK
+2026-04-01 03:26:05,408 - PayrollPeriod - DEBUG - Updated PayrollPeriod #1
+INFO:     127.0.0.1:52830 - "POST /payroll/periods/1/calculate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52830 - "GET /payroll/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52829 - "GET /payroll/lookups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52828 - "GET /payroll/legal-parameters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52822 - "GET /payroll/periods HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52802 - "GET /payroll/periods/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55397 - "GET /app/accreditation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55397 - "GET /static/js/accreditation.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55397 - "GET /hr/accreditation/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55397 - "GET /hr/accreditation/matrix HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55400 - "GET /app/crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55400 - "GET /static/js/crm_customers.js?v=4.4 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55400 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55401 - "GET /hr/accreditation/templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55401 - "GET /hr/accreditation/customers/1/requirements HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55401 - "GET /hr/accreditation/customers/1/requirements HTTP/1.1" 200 OK
+2026-04-01 03:56:31,267 - Customer - DEBUG - Updated Customer #1
+INFO:     127.0.0.1:55416 - "PUT /crm/customers/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55416 - "PUT /hr/accreditation/customers/1/requirements HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55416 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55416 - "GET /app/accreditation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55416 - "GET /hr/accreditation/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55416 - "GET /hr/accreditation/matrix HTTP/1.1" 200 OK
+2026-04-01 03:57:03,763 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #10
+INFO:     127.0.0.1:55419 - "POST /hr/accreditation/requirements HTTP/1.1" 201 Created
+INFO:     127.0.0.1:55419 - "GET /hr/accreditation/matrix HTTP/1.1" 200 OK
+2026-04-01 03:57:43,201 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #11
+INFO:     127.0.0.1:55442 - "POST /hr/accreditation/requirements HTTP/1.1" 201 Created
+INFO:     127.0.0.1:55442 - "GET /hr/accreditation/matrix HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55443 - "GET /hr/accreditation/employees/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55443 - "GET /document-center/generated?employee_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55445 - "GET /app/hr HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55445 - "GET /static/js/hr.js?v=4.4 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55445 - "GET /hr/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55445 - "GET /hr/departments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55445 - "GET /hr/employees HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55445 - "GET /hr/contracts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55445 - "GET /hr/leaves HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55445 - "GET /hr/accreditation/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55445 - "GET /job-profiles/profiles HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55445 - "GET /app/accreditation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55445 - "GET /hr/accreditation/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55445 - "GET /hr/accreditation/matrix HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55457 - "GET /app/cross-correspondence HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55457 - "GET /static/js/document_center.js?v=4.4 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55457 - "GET /document-center/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55458 - "GET /document-center/templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55459 - "GET /document-center/batches HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55460 - "GET /document-center/lookups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55461 - "GET /document-center/generated HTTP/1.1" 200 OK
+2026-04-01 03:59:19,834 - DocumentBatch - DEBUG - Inserted DocumentBatch #1
+2026-04-01 03:59:19,865 - GeneratedDocument - DEBUG - Inserted GeneratedDocument #1
+2026-04-01 03:59:19,865 - DocumentEventLog - DEBUG - Inserted DocumentEventLog #1
+2026-04-01 03:59:19,866 - DocumentBatch - DEBUG - Updated DocumentBatch #1
+2026-04-01 03:59:19,866 - DocumentBatch - DEBUG - Inserted DocumentBatch #2
+2026-04-01 03:59:20,055 - GeneratedDocument - DEBUG - Inserted GeneratedDocument #2
+2026-04-01 03:59:20,055 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #12
+2026-04-01 03:59:20,055 - EmployeeAccreditationDocument - DEBUG - Inserted EmployeeAccreditationDocument #1
+2026-04-01 03:59:20,055 - GeneratedDocument - DEBUG - Updated GeneratedDocument #2
+2026-04-01 03:59:20,055 - DocumentEventLog - DEBUG - Inserted DocumentEventLog #2
+2026-04-01 03:59:20,055 - DocumentBatch - DEBUG - Updated DocumentBatch #2
+2026-04-01 03:59:20,056 - main - ERROR - Unexpected error: Object of type Column is not JSON serializable
+Traceback (most recent call last):
+  File "C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE\main.py", line 816, in catch_all
+    return JSONResponse(
+        status_code=response.status,
+        content=response.to_dict(),
+        headers=response.headers
+    )
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 192, in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 45, in __init__
+    self.body = self.render(content)
+                ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 195, in render
+    return json.dumps(
+           ~~~~~~~~~~^
+        content,
+        ^^^^^^^^
+    ...<3 lines>...
+        separators=(",", ":"),
+        ^^^^^^^^^^^^^^^^^^^^^^
+    ).encode("utf-8")
+    ^
+  File "C:\Python314\Lib\json\__init__.py", line 242, in dumps
+    **kw).encode(obj)
+          ~~~~~~^^^^^
+  File "C:\Python314\Lib\json\encoder.py", line 202, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "C:\Python314\Lib\json\encoder.py", line 263, in iterencode
+    return _iterencode(o, 0)
+  File "C:\Python314\Lib\json\encoder.py", line 182, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+                    f'is not JSON serializable')
+TypeError: Object of type Column is not JSON serializable
+when serializing dict item 'created_by'
+when serializing dict item 'batch'
+when serializing list item 0
+when serializing dict item 'results'
+when serializing dict item 'data'
+INFO:     127.0.0.1:55482 - "POST /document-center/worker-generate HTTP/1.1" 500 Internal Server Error
+2026-04-01 03:59:21,986 - DocumentBatch - DEBUG - Inserted DocumentBatch #3
+2026-04-01 03:59:22,003 - GeneratedDocument - DEBUG - Inserted GeneratedDocument #3
+2026-04-01 03:59:22,003 - DocumentEventLog - DEBUG - Inserted DocumentEventLog #3
+2026-04-01 03:59:22,003 - DocumentBatch - DEBUG - Updated DocumentBatch #3
+2026-04-01 03:59:22,003 - main - ERROR - Unexpected error: Object of type Column is not JSON serializable
+Traceback (most recent call last):
+  File "C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE\main.py", line 816, in catch_all
+    return JSONResponse(
+        status_code=response.status,
+        content=response.to_dict(),
+        headers=response.headers
+    )
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 192, in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 45, in __init__
+    self.body = self.render(content)
+                ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 195, in render
+    return json.dumps(
+           ~~~~~~~~~~^
+        content,
+        ^^^^^^^^
+    ...<3 lines>...
+        separators=(",", ":"),
+        ^^^^^^^^^^^^^^^^^^^^^^
+    ).encode("utf-8")
+    ^
+  File "C:\Python314\Lib\json\__init__.py", line 242, in dumps
+    **kw).encode(obj)
+          ~~~~~~^^^^^
+  File "C:\Python314\Lib\json\encoder.py", line 202, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "C:\Python314\Lib\json\encoder.py", line 263, in iterencode
+    return _iterencode(o, 0)
+  File "C:\Python314\Lib\json\encoder.py", line 182, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+                    f'is not JSON serializable')
+TypeError: Object of type Column is not JSON serializable
+when serializing dict item 'created_by'
+when serializing dict item 'batch'
+when serializing list item 0
+when serializing dict item 'results'
+when serializing dict item 'data'
+INFO:     127.0.0.1:55482 - "POST /document-center/worker-generate HTTP/1.1" 500 Internal Server Error
+2026-04-01 03:59:49,074 - DocumentTemplate - DEBUG - Inserted DocumentTemplate #3
+INFO:     127.0.0.1:55483 - "POST /document-center/templates HTTP/1.1" 201 Created
+INFO:     127.0.0.1:55483 - "GET /document-center/templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55483 - "GET /document-center/stats HTTP/1.1" 200 OK
+2026-04-01 03:59:49,085 - main - ERROR - Unexpected error: Object of type Column is not JSON serializable
+Traceback (most recent call last):
+  File "C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE\main.py", line 816, in catch_all
+    return JSONResponse(
+        status_code=response.status,
+        content=response.to_dict(),
+        headers=response.headers
+    )
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 192, in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 45, in __init__
+    self.body = self.render(content)
+                ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 195, in render
+    return json.dumps(
+           ~~~~~~~~~~^
+        content,
+        ^^^^^^^^
+    ...<3 lines>...
+        separators=(",", ":"),
+        ^^^^^^^^^^^^^^^^^^^^^^
+    ).encode("utf-8")
+    ^
+  File "C:\Python314\Lib\json\__init__.py", line 242, in dumps
+    **kw).encode(obj)
+          ~~~~~~^^^^^
+  File "C:\Python314\Lib\json\encoder.py", line 202, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "C:\Python314\Lib\json\encoder.py", line 263, in iterencode
+    return _iterencode(o, 0)
+  File "C:\Python314\Lib\json\encoder.py", line 182, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+                    f'is not JSON serializable')
+TypeError: Object of type Column is not JSON serializable
+when serializing dict item 'created_by'
+when serializing list item 0
+when serializing dict item 'results'
+when serializing dict item 'data'
+INFO:     127.0.0.1:55483 - "GET /document-center/batches HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:55483 - "GET /document-center/generated HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55483 - "GET /document-center/lookups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55497 - "GET /app/signature-center HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55497 - "GET /static/js/signatures_center.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55497 - "GET /signature/requests HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55498 - "GET /app/cross-correspondence HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55498 - "GET /document-center/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55499 - "GET /document-center/templates HTTP/1.1" 200 OK
+2026-04-01 04:00:04,321 - main - ERROR - Unexpected error: Object of type Column is not JSON serializable
+Traceback (most recent call last):
+  File "C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE\main.py", line 816, in catch_all
+    return JSONResponse(
+        status_code=response.status,
+        content=response.to_dict(),
+        headers=response.headers
+    )
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 192, in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 45, in __init__
+    self.body = self.render(content)
+                ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\PC\Desktop\nuevo erp\venv\Lib\site-packages\starlette\responses.py", line 195, in render
+    return json.dumps(
+           ~~~~~~~~~~^
+        content,
+        ^^^^^^^^
+    ...<3 lines>...
+        separators=(",", ":"),
+        ^^^^^^^^^^^^^^^^^^^^^^
+    ).encode("utf-8")
+    ^
+  File "C:\Python314\Lib\json\__init__.py", line 242, in dumps
+    **kw).encode(obj)
+          ~~~~~~^^^^^
+  File "C:\Python314\Lib\json\encoder.py", line 202, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "C:\Python314\Lib\json\encoder.py", line 263, in iterencode
+    return _iterencode(o, 0)
+  File "C:\Python314\Lib\json\encoder.py", line 182, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+                    f'is not JSON serializable')
+TypeError: Object of type Column is not JSON serializable
+when serializing dict item 'created_by'
+when serializing list item 0
+when serializing dict item 'results'
+when serializing dict item 'data'
+INFO:     127.0.0.1:55500 - "GET /document-center/batches HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:55498 - "GET /document-center/generated HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55499 - "GET /document-center/lookups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55506 - "GET /app/signature-center HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55506 - "GET /signature/requests HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55532 - "GET /static/vendor/pdfjs/pdf.mjs HTTP/1.1" 200 OK
+2026-04-01 04:02:09,716 - SignatureRequest - DEBUG - Inserted SignatureRequest #1
+2026-04-01 04:02:09,716 - SignatureLog - DEBUG - Inserted SignatureLog #1
+2026-04-01 04:02:09,717 - SignatureRequest - DEBUG - Updated SignatureRequest #1
+2026-04-01 04:02:09,717 - SignatureModule - INFO - Email skipped for ['srwpedro@gmail.com']: SMTP not configured
+2026-04-01 04:02:09,717 - SignatureRequest - DEBUG - Updated SignatureRequest #1
+2026-04-01 04:02:09,717 - SignatureLog - DEBUG - Inserted SignatureLog #2
+INFO:     127.0.0.1:55562 - "POST /signature/requests HTTP/1.1" 201 Created
+INFO:     127.0.0.1:55562 - "GET /signature/requests HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55562 - "GET /app/sign/sZ4gOBV90MW_edkzX5Mi5WmXbabbhhrhjp0-_pZpOWA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55562 - "GET /static/js/signing_workspace.js?v=4.4 HTTP/1.1" 200 OK
+2026-04-01 04:02:13,843 - SignatureRequest - DEBUG - Updated SignatureRequest #1
+2026-04-01 04:02:13,843 - SignatureLog - DEBUG - Inserted SignatureLog #3
+INFO:     127.0.0.1:55562 - "GET /signature/sZ4gOBV90MW_edkzX5Mi5WmXbabbhhrhjp0-_pZpOWA HTTP/1.1" 200 OK
+2026-04-01 04:02:20,277 - SignatureRequest - WARNING - Falling back to original PDF bytes during signature merge: pypdf is required
+2026-04-01 04:02:20,279 - SignatureRequest - DEBUG - Updated SignatureRequest #1
+2026-04-01 04:02:20,279 - SignatureModule - INFO - Email skipped for ['srwpedro@gmail.com']: SMTP not configured
+2026-04-01 04:02:20,279 - SignatureRequest - DEBUG - Updated SignatureRequest #1
+2026-04-01 04:02:20,279 - SignatureLog - DEBUG - Inserted SignatureLog #4
+INFO:     127.0.0.1:55563 - "POST /signature/sZ4gOBV90MW_edkzX5Mi5WmXbabbhhrhjp0-_pZpOWA/sign HTTP/1.1" 200 OK
+2026-04-01 04:02:20,285 - SignatureLog - DEBUG - Inserted SignatureLog #5
+INFO:     127.0.0.1:55563 - "GET /signature/sZ4gOBV90MW_edkzX5Mi5WmXbabbhhrhjp0-_pZpOWA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55593 - "GET /signature/requests HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55593 - "GET /signature/requests/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55594 - "GET /signature/requests/1/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55599 - "GET /signature/requests/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55600 - "GET /signature/requests/1/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55601 - "GET /app/accreditation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55601 - "GET /hr/accreditation/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55601 - "GET /hr/accreditation/matrix HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55656 - "GET /app/rentals HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55656 - "GET /static/js/rentals.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55656 - "GET /rentals/dashboard HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55656 - "GET /rentals/assets HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55656 - "GET /rentals/contracts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55656 - "GET /crm/leads?limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55656 - "GET /crm/customers?limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55664 - "POST /rentals/assets HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55665 - "POST /rentals/assets HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55666 - "POST /rentals/contracts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55667 - "GET /app/inventory HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55667 - "GET /static/js/inventory.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55667 - "GET /inventory/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /inventory/backups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55667 - "GET /inventory/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55668 - "GET /inventory/movements?limit=80 HTTP/1.1" 200 OK
+2026-04-01 04:06:47,442 - InventoryItem - DEBUG - Inserted InventoryItem #1
+INFO:     127.0.0.1:55725 - "POST /inventory/items HTTP/1.1" 201 Created
+INFO:     127.0.0.1:55725 - "GET /inventory/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55726 - "GET /inventory/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55725 - "GET /inventory/movements?limit=80 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55726 - "GET /inventory/backups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55739 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55739 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55740 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55739 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55740 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55739 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55740 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55750 - "GET /crm/customers/1/mandantes HTTP/1.1" 200 OK
+2026-04-01 04:07:15,700 - Company - DEBUG - Updated Company #2
+2026-04-01 04:07:15,700 - Lead - DEBUG - Inserted Lead #1
+2026-04-01 04:07:15,700 - ActivityLog - DEBUG - Inserted ActivityLog #1
+INFO:     127.0.0.1:55751 - "POST /crm/leads HTTP/1.1" 201 Created
+INFO:     127.0.0.1:55751 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55752 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55753 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55751 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55752 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55752 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55752 - "GET /app/crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55752 - "GET /static/js/crm_lead_detail.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55752 - "GET /crm/leads/1/dossier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55751 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55757 - "GET /app/quotes/new?lead_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55757 - "GET /static/js/quote_form.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55757 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55758 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55757 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55757 - "GET /company/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55757 - "GET /crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55758 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55758 - "GET /crm/documents/Lead/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55757 - "GET /quotes/templates HTTP/1.1" 200 OK
+2026-04-01 04:07:32,490 - Quote - DEBUG - Inserted Quote #1
+2026-04-01 04:07:32,490 - QuoteLine - DEBUG - Inserted QuoteLine #1
+2026-04-01 04:07:32,490 - QuoteLine - DEBUG - Inserted QuoteLine #2
+2026-04-01 04:07:32,490 - QuoteLine - DEBUG - Inserted QuoteLine #3
+2026-04-01 04:07:32,491 - Lead - DEBUG - Updated Lead #1
+2026-04-01 04:07:32,491 - ActivityLog - DEBUG - Inserted ActivityLog #2
+2026-04-01 04:07:32,491 - ActivityLog - DEBUG - Inserted ActivityLog #3
+INFO:     127.0.0.1:55765 - "POST /quotes HTTP/1.1" 201 Created
+2026-04-01 04:07:32,496 - Quote - DEBUG - Updated Quote #1
+2026-04-01 04:07:32,496 - ActivityLog - DEBUG - Inserted ActivityLog #4
+2026-04-01 04:07:32,496 - Lead - DEBUG - Updated Lead #1
+2026-04-01 04:07:32,496 - ActivityLog - DEBUG - Inserted ActivityLog #5
+INFO:     127.0.0.1:55765 - "POST /quotes/1/send HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /app/quotes/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /quotes/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /crm/documents/Lead/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /app/quotes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /static/js/quotes.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /quotes?limit=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /app/quotes/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55765 - "GET /quotes/catalog/services HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55769 - "GET /quotes/catalog/workers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /quotes/catalog/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /quotes/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /crm/documents/Lead/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /app/quotes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /quotes?limit=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /app/crm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /crm/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /crm/leads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /crm/customers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /app/crm/leads/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55771 - "GET /crm/leads/1/dossier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55783 - "GET /crm/stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55784 - "GET /areas?customer_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55785 - "GET /reports/personnel HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55786 - "GET /crm/customers/1/mandantes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55787 - "GET /crm/service-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55808 - "GET /areas/1/sectors HTTP/1.1" 200 OK
+2026-04-01 04:08:37,938 - Report - DEBUG - Inserted Report #1
+2026-04-01 04:08:37,938 - Lead - DEBUG - Updated Lead #1
+2026-04-01 04:08:37,939 - ActivityLog - DEBUG - Inserted ActivityLog #6
+INFO:     127.0.0.1:55808 - "POST /reports HTTP/1.1" 201 Created
+INFO:     127.0.0.1:55808 - "GET /app/reports/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55808 - "GET /static/js/report_pdf_generator.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55809 - "GET /static/js/report_workspace.js?v=4.4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55808 - "GET /reports/1 HTTP/1.1" 200 OK
+2026-04-01 04:09:13,632 - ReportCheckpoint - DEBUG - Inserted ReportCheckpoint #1
+INFO:     127.0.0.1:55819 - "POST /reports/1/checkpoints HTTP/1.1" 201 Created
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_part_begin with no data
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_header_field with data[42:61]
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_header_value with data[63:142]
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_header_end with no data
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_header_field with data[144:156]
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_header_value with data[158:168]
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_header_end with no data
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_headers_finished with no data
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_part_data with data[172:58446]
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_part_end with no data
+2026-04-01 04:09:13,639 - python_multipart.multipart - DEBUG - Calling on_end with no data
+2026-04-01 04:09:13,641 - ReportPhoto - DEBUG - Inserted ReportPhoto #1
+2026-04-01 04:09:13,641 - main - INFO - Photo uploaded: report_photos\1\foto_20260401070913640546.jpg for checkpoint 1
+INFO:     127.0.0.1:55819 - "POST /reports/checkpoints/1/photo HTTP/1.1" 201 Created
+INFO:     127.0.0.1:55819 - "GET /reports/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55819 - "GET /uploads/report_photos/1/foto_20260401070913640546.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55827 - "GET /api/base/config/requirements HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55834 - "GET /api/base/config/requirements HTTP/1.1" 404 Not Found
+2026-04-01 04:09:43,773 - ReportCheckpoint - DEBUG - Inserted ReportCheckpoint #2
+INFO:     127.0.0.1:55820 - "POST /reports/1/checkpoints HTTP/1.1" 201 Created
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_part_begin with no data
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_header_field with data[42:61]
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_header_value with data[63:109]
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_header_end with no data
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_header_field with data[111:123]
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_header_value with data[125:134]
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_header_end with no data
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_headers_finished with no data
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_part_data with data[138:46861]
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_part_end with no data
+2026-04-01 04:09:43,776 - python_multipart.multipart - DEBUG - Calling on_end with no data
+2026-04-01 04:09:43,777 - ReportPhoto - DEBUG - Inserted ReportPhoto #2
+2026-04-01 04:09:43,777 - main - INFO - Photo uploaded: report_photos\2\foto_20260401070943777170.png for checkpoint 2
+INFO:     127.0.0.1:55820 - "POST /reports/checkpoints/2/photo HTTP/1.1" 201 Created
+INFO:     127.0.0.1:55820 - "GET /reports/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55820 - "GET /uploads/report_photos/2/foto_20260401070943777170.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55820 - "GET /reports/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55820 - "GET /company/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55820 - "GET /crm/leads/1/dossier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55820 - "GET /reports/photos/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55820 - "GET /uploads/report_photos/1/foto_20260401070913640546.jpg HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55820 - "GET /reports/photos/2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55820 - "GET /uploads/report_photos/2/foto_20260401070943777170.png HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55849 - "GET /api/base/config/requirements HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55869 - "GET /docs HTTP/1.1" 200 OK

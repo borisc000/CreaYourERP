@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.YOUR_ERP_core_framework import BaseModule, Request, Response, ValidationError
 from core.YOUR_ERP_orm import BaseModel, Column, ColumnType, AuditMixin
+from core.time_utils import utc_now, utc_now_iso, utc_strftime, utc_today_iso
 
 
 ITEM_STATUSES = ("active", "inactive")
@@ -186,9 +187,13 @@ class InventoryMovement(BaseModel, AuditMixin):
     reference = Column(ColumnType.STRING, label="Reference")
     reason = Column(ColumnType.STRING, label="Reason")
     destination = Column(ColumnType.STRING, label="Destination")
+    delivered_by_name = Column(ColumnType.STRING, label="Delivered By")
+    received_by_name = Column(ColumnType.STRING, label="Received By")
+    evidence_photo_data = Column(ColumnType.TEXT, label="Evidence Photo")
+    evidence_signature_data = Column(ColumnType.TEXT, label="Evidence Signature")
     notes = Column(ColumnType.TEXT, label="Notes")
     performed_by = Column(ColumnType.INTEGER, label="Performed By")
-    movement_date = Column(ColumnType.DATETIME, default=datetime.utcnow, label="Movement Date")
+    movement_date = Column(ColumnType.DATETIME, default=utc_now, label="Movement Date")
 
     def validate(self):
         super().validate()
@@ -199,6 +204,8 @@ class InventoryMovement(BaseModel, AuditMixin):
         self.reference = _clean_str(self.reference)
         self.reason = _clean_str(self.reason)
         self.destination = _clean_str(self.destination)
+        self.delivered_by_name = _clean_str(self.delivered_by_name)
+        self.received_by_name = _clean_str(self.received_by_name)
 
         if self.movement_type not in MOVEMENT_TYPES:
             raise ValidationError(
@@ -206,6 +213,11 @@ class InventoryMovement(BaseModel, AuditMixin):
             )
         if self.quantity <= 0:
             raise ValidationError("Movement quantity must be greater than zero")
+        if self.movement_type in ("in", "out"):
+            if not self.delivered_by_name or not self.received_by_name:
+                raise ValidationError("Delivered by and received by are required for entries and exits")
+            if not _clean_str(self.evidence_photo_data) and not _clean_str(self.evidence_signature_data):
+                raise ValidationError("Entries and exits require a photo or signature evidence")
 
     def signed_quantity(self) -> float:
         sign = -1 if self.movement_type in ("out", "adjustment_out") else 1
@@ -223,10 +235,10 @@ class InventoryMovement(BaseModel, AuditMixin):
         }
         return labels.get(self.movement_type, self.movement_type or "-")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, include_evidence: bool = False) -> Dict[str, Any]:
         item = InventoryItem.find_by_id(self.item_id) if self.item_id else None
         total_cost = round(_safe_float(self.quantity) * max(_safe_float(self.unit_cost), 0.0), 2)
-        return {
+        payload = {
             "id": self.id,
             "item_id": self.item_id,
             "item_name": item.name if item else None,
@@ -245,12 +257,21 @@ class InventoryMovement(BaseModel, AuditMixin):
             "reference": self.reference or "",
             "reason": self.reason or "",
             "destination": self.destination or "",
+            "delivered_by_name": self.delivered_by_name or "",
+            "received_by_name": self.received_by_name or "",
+            "has_photo_evidence": bool(_clean_str(self.evidence_photo_data)),
+            "has_signature_evidence": bool(_clean_str(self.evidence_signature_data)),
+            "evidence_available": bool(_clean_str(self.evidence_photo_data) or _clean_str(self.evidence_signature_data)),
             "notes": self.notes or "",
             "performed_by": self.performed_by,
             "performed_by_name": _resolve_user_name(self.performed_by),
             "movement_date": _fmt_dt(self.movement_date),
             "created_at": _fmt_dt(self._data.get("created_at")),
         }
+        if include_evidence:
+            payload["evidence_photo_data"] = self.evidence_photo_data or ""
+            payload["evidence_signature_data"] = self.evidence_signature_data or ""
+        return payload
 
 
 class InventoryBackup(BaseModel, AuditMixin):
@@ -269,7 +290,7 @@ class InventoryBackup(BaseModel, AuditMixin):
 
     def before_create(self):
         if not _clean_str(self.backup_name):
-            self.backup_name = datetime.utcnow().strftime("INV-%Y%m%d-%H%M%S")
+            self.backup_name = utc_strftime("INV-%Y%m%d-%H%M%S")
 
     def validate(self):
         super().validate()
@@ -324,6 +345,7 @@ class InventoryModule(BaseModule):
 
         self.register_route("/inventory/movements", self.list_movements, methods=["GET"], auth_required=True)
         self.register_route("/inventory/movements", self.create_movement, methods=["POST"], auth_required=True)
+        self.register_route("/inventory/movements/{id}", self.get_movement, methods=["GET"], auth_required=True)
 
         self.register_route("/inventory/backups", self.list_backups, methods=["GET"], auth_required=True)
         self.register_route("/inventory/backups", self.create_backup, methods=["POST"], auth_required=True)
@@ -413,6 +435,16 @@ class InventoryModule(BaseModule):
             return None, Response.not_found("Backup not found")
         return backup, None
 
+    def _movement_or_404(self, movement_id: Any) -> Tuple[Optional[InventoryMovement], Optional[Response]]:
+        movement = InventoryMovement.find_by_id(_safe_int(movement_id))
+        if not movement:
+            return None, Response.not_found("Movement not found")
+
+        user = self.env.user
+        if user.role != "superadmin" and movement.company_id != self._company_id():
+            return None, Response.not_found("Movement not found")
+        return movement, None
+
     def _save_record(self, record: BaseModel) -> None:
         record.validate()
         if not record.save():
@@ -442,7 +474,7 @@ class InventoryModule(BaseModule):
             if item_data["stock_status"] == "out":
                 out_of_stock_items += 1
 
-        today_key = datetime.utcnow().date().isoformat()
+        today_key = utc_today_iso()
         inbound_today = 0.0
         outbound_today = 0.0
         for movement in movements:
@@ -539,12 +571,12 @@ class InventoryModule(BaseModule):
             company_name = None
 
         return {
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": utc_now_iso(),
             "company_id": company_id,
             "company_name": company_name,
             "summary": self._build_stats(items, movements, backups),
             "items": [item.to_dict() for item in items],
-            "movements": [movement.to_dict() for movement in movements],
+            "movements": [movement.to_dict(include_evidence=True) for movement in movements],
         }
 
     def _apply_stock_movement(
@@ -556,6 +588,10 @@ class InventoryModule(BaseModule):
         reference: Any,
         reason: Any,
         destination: Any,
+        delivered_by_name: Any,
+        received_by_name: Any,
+        evidence_photo_data: Any,
+        evidence_signature_data: Any,
         notes: Any,
         request: Request,
     ) -> Tuple[Optional[InventoryMovement], Optional[Response]]:
@@ -587,7 +623,7 @@ class InventoryModule(BaseModule):
             item.average_cost = incoming_cost
 
         item.current_stock = after
-        item.last_movement_at = datetime.utcnow()
+        item.last_movement_at = utc_now()
         if after > 0 and item.status == "inactive":
             item.status = "active"
 
@@ -605,6 +641,10 @@ class InventoryModule(BaseModule):
                     "reference": _clean_str(reference),
                     "reason": _clean_str(reason),
                     "destination": _clean_str(destination),
+                    "delivered_by_name": _clean_str(delivered_by_name),
+                    "received_by_name": _clean_str(received_by_name),
+                    "evidence_photo_data": _clean_str(evidence_photo_data),
+                    "evidence_signature_data": _clean_str(evidence_signature_data),
                     "notes": _clean_str(notes),
                     "performed_by": request.user_id,
                 }
@@ -692,12 +732,16 @@ class InventoryModule(BaseModule):
         if initial_stock > 0:
             created_movement, movement_error = self._apply_stock_movement(
                 item=item,
-                movement_type="in",
+                movement_type="adjustment_in",
                 quantity=initial_stock,
                 unit_cost=average_cost,
                 reference=data.get("initial_reference") or "Stock inicial",
                 reason="Carga inicial",
                 destination=data.get("location"),
+                delivered_by_name="Sistema",
+                received_by_name=_resolve_user_name(request.user_id) or "Sistema",
+                evidence_photo_data="",
+                evidence_signature_data="",
                 notes=data.get("notes"),
                 request=request,
             )
@@ -790,6 +834,17 @@ class InventoryModule(BaseModule):
             }
         )
 
+    async def get_movement(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        movement, error = self._movement_or_404(request.params.get("id"))
+        if error:
+            return error
+
+        return Response.ok(movement.to_dict(include_evidence=True))
+
     async def create_movement(self, request: Request) -> Response:
         err = self._require_access()
         if err:
@@ -807,6 +862,10 @@ class InventoryModule(BaseModule):
             reference=request.get_data("reference"),
             reason=request.get_data("reason"),
             destination=request.get_data("destination"),
+            delivered_by_name=request.get_data("delivered_by_name"),
+            received_by_name=request.get_data("received_by_name"),
+            evidence_photo_data=request.get_data("evidence_photo_data"),
+            evidence_signature_data=request.get_data("evidence_signature_data"),
             notes=request.get_data("notes"),
             request=request,
         )

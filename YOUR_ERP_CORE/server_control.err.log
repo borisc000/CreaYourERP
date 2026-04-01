@@ -1,0 +1,434 @@
+2026-03-31 17:43:46,761 - __main__ - WARNING - Database settings are configured, but the current ORM and adapter still persist data in memory only.
+2026-03-31 17:43:46,762 - __main__ - INFO - Initializing ERP Framework...
+2026-03-31 17:43:46,762 - CoreFramework - INFO - CoreFramework logging configured
+2026-03-31 17:43:46,762 - ModuleRegistry - DEBUG - Registered module class: Base
+2026-03-31 17:43:46,762 - ModuleRegistry - DEBUG - Registered module class: Signature
+2026-03-31 17:43:46,762 - ModuleRegistry - DEBUG - Registered module class: document_center
+2026-03-31 17:43:46,762 - ModuleRegistry - DEBUG - Registered module class: CRM
+2026-03-31 17:43:46,762 - ModuleRegistry - DEBUG - Registered module class: Quotes
+2026-03-31 17:43:46,763 - ModuleRegistry - DEBUG - Registered module class: Billing
+2026-03-31 17:43:46,763 - ModuleRegistry - DEBUG - Registered module class: Reports
+2026-03-31 17:43:46,763 - ModuleRegistry - DEBUG - Registered module class: HR
+2026-03-31 17:43:46,763 - ModuleRegistry - DEBUG - Registered module class: Attendance
+2026-03-31 17:43:46,763 - ModuleRegistry - DEBUG - Registered module class: payroll
+2026-03-31 17:43:46,763 - ModuleRegistry - DEBUG - Registered module class: Recruitment
+2026-03-31 17:43:46,763 - ModuleRegistry - DEBUG - Registered module class: Safety
+2026-03-31 17:43:46,763 - ModuleRegistry - DEBUG - Registered module class: job_profiles
+2026-03-31 17:43:46,764 - ModuleRegistry - DEBUG - Registered module class: Inventory
+2026-03-31 17:43:46,764 - ModuleRegistry - DEBUG - Registered module class: Rentals
+2026-03-31 17:43:46,764 - ModuleRegistry - DEBUG - Registered module class: RIOHS
+2026-03-31 17:43:46,764 - ModuleRegistry - DEBUG - Registered module class: Mail
+2026-03-31 17:43:46,764 - ModuleRegistry - DEBUG - Registered module class: google_workspace
+2026-03-31 17:43:46,764 - ModuleRegistry - DEBUG - Registered module class: AI
+2026-03-31 17:43:46,764 - CoreFramework - INFO - Initializing CoreFramework...
+2026-03-31 17:43:46,765 - DatabaseAdapter - INFO - Connecting to database: postgresql://postgres:postgres@localhost:5432/your_erp_dev
+2026-03-31 17:43:46,765 - BaseModule - INFO - Initializing module: Base
+2026-03-31 17:43:46,765 - ModelRegistry - DEBUG - Registered model: company
+2026-03-31 17:43:46,765 - ModelRegistry - DEBUG - Registered model: group
+2026-03-31 17:43:46,765 - ModelRegistry - DEBUG - Registered model: user
+2026-03-31 17:43:46,765 - BaseModule - INFO - Base module initialized
+2026-03-31 17:43:46,765 - ModuleRegistry - INFO - Loaded module: base
+2026-03-31 17:43:46,766 - SignatureModule - INFO - Initializing module: Signature
+2026-03-31 17:43:46,766 - ModelRegistry - DEBUG - Registered model: signature.request
+2026-03-31 17:43:46,766 - ModelRegistry - DEBUG - Registered model: signature.log
+2026-03-31 17:43:46,766 - SignatureModule - INFO - Signature module initialized
+2026-03-31 17:43:46,766 - ModuleRegistry - INFO - Loaded module: signature
+2026-03-31 17:43:46,766 - DocumentCenterModule - INFO - Initializing module: document_center
+2026-03-31 17:43:46,766 - ModelRegistry - DEBUG - Registered model: document_center.template
+2026-03-31 17:43:46,767 - ModelRegistry - DEBUG - Registered model: document_center.batch
+2026-03-31 17:43:46,767 - ModelRegistry - DEBUG - Registered model: document_center.generated_document
+2026-03-31 17:43:46,767 - ModelRegistry - DEBUG - Registered model: document_center.event
+2026-03-31 17:43:46,767 - DocumentCenterModule - INFO - Document center module initialized
+2026-03-31 17:43:46,767 - ModuleRegistry - INFO - Loaded module: document_center
+2026-03-31 17:43:46,767 - CRMModule - INFO - Initializing module: CRM
+2026-03-31 17:43:46,767 - ModelRegistry - DEBUG - Registered model: crm.stage
+2026-03-31 17:43:46,767 - ModelRegistry - DEBUG - Registered model: crm.customer
+2026-03-31 17:43:46,768 - ModelRegistry - DEBUG - Registered model: crm.mandante
+2026-03-31 17:43:46,768 - ModelRegistry - DEBUG - Registered model: crm.lead
+2026-03-31 17:43:46,768 - ModelRegistry - DEBUG - Registered model: crm.lead_note
+2026-03-31 17:43:46,768 - ModelRegistry - DEBUG - Registered model: crm.activity_log
+2026-03-31 17:43:46,768 - ModelRegistry - DEBUG - Registered model: crm.document
+2026-03-31 17:43:46,768 - ModelRegistry - DEBUG - Registered model: crm.service_type
+2026-03-31 17:43:46,769 - CRMModule - INFO - CRM module initialized
+2026-03-31 17:43:46,769 - ModuleRegistry - INFO - Loaded module: crm
+2026-03-31 17:43:46,769 - QuotesModule - INFO - Initializing module: Quotes
+2026-03-31 17:43:46,769 - ModelRegistry - DEBUG - Registered model: quotes.service_catalog
+2026-03-31 17:43:46,769 - ModelRegistry - DEBUG - Registered model: quotes.worker_catalog
+2026-03-31 17:43:46,769 - ModelRegistry - DEBUG - Registered model: quotes.item_catalog
+2026-03-31 17:43:46,770 - ModelRegistry - DEBUG - Registered model: quotes.quote
+2026-03-31 17:43:46,770 - ModelRegistry - DEBUG - Registered model: quotes.quote_line
+2026-03-31 17:43:46,770 - ModelRegistry - DEBUG - Registered model: quotes.quote_template
+2026-03-31 17:43:46,770 - ModelRegistry - DEBUG - Registered model: quotes.quote_template_line
+2026-03-31 17:43:46,770 - QuotesModule - INFO - Quotes module v2 initialized (3 catalogs)
+2026-03-31 17:43:46,770 - ModuleRegistry - INFO - Loaded module: quotes
+2026-03-31 17:43:46,770 - BillingModule - INFO - Initializing module: Billing
+2026-03-31 17:43:46,771 - ModelRegistry - DEBUG - Registered model: billing.document
+2026-03-31 17:43:46,771 - ModelRegistry - DEBUG - Registered model: billing.line
+2026-03-31 17:43:46,771 - ModelRegistry - DEBUG - Registered model: billing.event
+2026-03-31 17:43:46,771 - BillingModule - INFO - Billing simulation module initialized
+2026-03-31 17:43:46,771 - ModuleRegistry - INFO - Loaded module: billing
+2026-03-31 17:43:46,771 - ReportsModule - INFO - Initializing module: Reports
+2026-03-31 17:43:46,771 - ModelRegistry - DEBUG - Registered model: reports.report
+2026-03-31 17:43:46,772 - ModelRegistry - DEBUG - Registered model: reports.checkpoint
+2026-03-31 17:43:46,772 - ModelRegistry - DEBUG - Registered model: reports.photo
+2026-03-31 17:43:46,772 - ModelRegistry - DEBUG - Registered model: reports.area_faena
+2026-03-31 17:43:46,772 - ModelRegistry - DEBUG - Registered model: reports.sector_faena
+2026-03-31 17:43:46,772 - ModelRegistry - DEBUG - Registered model: reports.customer_risk_assignment
+2026-03-31 17:43:46,772 - ModelRegistry - DEBUG - Registered model: reports.area_risk_assignment
+2026-03-31 17:43:46,772 - ModelRegistry - DEBUG - Registered model: reports.sector_risk_assignment
+2026-03-31 17:43:46,772 - ModuleRegistry - INFO - Loaded module: reports
+2026-03-31 17:43:46,773 - HRModule - INFO - Initializing module: HR
+2026-03-31 17:43:46,773 - ModelRegistry - DEBUG - Registered model: hr.department
+2026-03-31 17:43:46,773 - ModelRegistry - DEBUG - Registered model: hr.employee
+2026-03-31 17:43:46,773 - ModelRegistry - DEBUG - Registered model: hr.contract
+2026-03-31 17:43:46,773 - ModelRegistry - DEBUG - Registered model: hr.time_off_request
+2026-03-31 17:43:46,773 - ModelRegistry - DEBUG - Registered model: hr.accreditation_requirement
+2026-03-31 17:43:46,773 - ModelRegistry - DEBUG - Registered model: hr.accreditation_document
+2026-03-31 17:43:46,774 - HRModule - INFO - HR module initialized
+2026-03-31 17:43:46,774 - ModuleRegistry - INFO - Loaded module: hr
+2026-03-31 17:43:46,774 - AttendanceModule - INFO - Initializing module: Attendance
+2026-03-31 17:43:46,774 - ModelRegistry - DEBUG - Registered model: attendance.policy
+2026-03-31 17:43:46,774 - ModelRegistry - DEBUG - Registered model: attendance.record
+2026-03-31 17:43:46,774 - ModelRegistry - DEBUG - Registered model: attendance.event
+2026-03-31 17:43:46,774 - AttendanceModule - INFO - Attendance module initialized
+2026-03-31 17:43:46,775 - ModuleRegistry - INFO - Loaded module: attendance
+2026-03-31 17:43:46,775 - PayrollModule - INFO - Initializing module: payroll
+2026-03-31 17:43:46,775 - ModelRegistry - DEBUG - Registered model: payroll.legal_parameter
+2026-03-31 17:43:46,775 - ModelRegistry - DEBUG - Registered model: payroll.tax_bracket
+2026-03-31 17:43:46,775 - ModelRegistry - DEBUG - Registered model: payroll.profile
+2026-03-31 17:43:46,775 - ModelRegistry - DEBUG - Registered model: payroll.period
+2026-03-31 17:43:46,775 - ModelRegistry - DEBUG - Registered model: payroll.settlement
+2026-03-31 17:43:46,776 - ModelRegistry - DEBUG - Registered model: payroll.event
+2026-03-31 17:43:46,776 - PayrollModule - INFO - Payroll module initialized
+2026-03-31 17:43:46,776 - ModuleRegistry - INFO - Loaded module: payroll
+2026-03-31 17:43:46,776 - RecruitmentModule - INFO - Initializing module: Recruitment
+2026-03-31 17:43:46,776 - ModelRegistry - DEBUG - Registered model: recruitment.stage
+2026-03-31 17:43:46,776 - ModelRegistry - DEBUG - Registered model: recruitment.job
+2026-03-31 17:43:46,776 - ModelRegistry - DEBUG - Registered model: recruitment.candidate
+2026-03-31 17:43:46,776 - ModelRegistry - DEBUG - Registered model: recruitment.application
+2026-03-31 17:43:46,777 - ModelRegistry - DEBUG - Registered model: recruitment.interview
+2026-03-31 17:43:46,777 - RecruitmentModule - INFO - Recruitment module initialized
+2026-03-31 17:43:46,777 - ModuleRegistry - INFO - Loaded module: recruitment
+2026-03-31 17:43:46,777 - SafetyModule - INFO - Initializing module: Safety
+2026-03-31 17:43:46,777 - ModelRegistry - DEBUG - Registered model: safety.service_profile
+2026-03-31 17:43:46,777 - ModelRegistry - DEBUG - Registered model: safety.folder
+2026-03-31 17:43:46,777 - ModelRegistry - DEBUG - Registered model: safety.document
+2026-03-31 17:43:46,778 - ModelRegistry - DEBUG - Registered model: safety.risk_matrix
+2026-03-31 17:43:46,778 - ModelRegistry - DEBUG - Registered model: safety.ppe_delivery
+2026-03-31 17:43:46,778 - ModelRegistry - DEBUG - Registered model: safety.talk
+2026-03-31 17:43:46,778 - ModelRegistry - DEBUG - Registered model: safety.checklist
+2026-03-31 17:43:46,778 - ModelRegistry - DEBUG - Registered model: safety.irl_record
+2026-03-31 17:43:46,778 - ModelRegistry - DEBUG - Registered model: safety.master_risk
+2026-03-31 17:43:46,778 - ModelRegistry - DEBUG - Registered model: safety.protocol
+2026-03-31 17:43:46,779 - ModelRegistry - DEBUG - Registered model: safety.client_site
+2026-03-31 17:43:46,779 - ModelRegistry - DEBUG - Registered model: safety.client_area
+2026-03-31 17:43:46,779 - ModelRegistry - DEBUG - Registered model: safety.worker_restriction
+2026-03-31 17:43:46,779 - ModelRegistry - DEBUG - Registered model: safety.generator_rule
+2026-03-31 17:43:46,779 - SafetyModule - INFO - Safety module initialized
+2026-03-31 17:43:46,779 - ModuleRegistry - INFO - Loaded module: safety
+2026-03-31 17:43:46,779 - InventoryModule - INFO - Initializing module: Inventory
+2026-03-31 17:43:46,780 - ModelRegistry - DEBUG - Registered model: inventory.item
+2026-03-31 17:43:46,780 - ModelRegistry - DEBUG - Registered model: inventory.movement
+2026-03-31 17:43:46,780 - ModelRegistry - DEBUG - Registered model: inventory.backup
+2026-03-31 17:43:46,780 - InventoryModule - INFO - Inventory module initialized
+2026-03-31 17:43:46,780 - ModuleRegistry - INFO - Loaded module: inventory
+2026-03-31 17:43:46,780 - RiohsModule - INFO - Initializing module: RIOHS
+2026-03-31 17:43:46,780 - RiohsModule - INFO - Módulo RIOHS inicializado
+2026-03-31 17:43:46,781 - ModuleRegistry - INFO - Loaded module: riohs
+2026-03-31 17:43:46,781 - CoreFramework - INFO - CoreFramework initialized successfully
+2026-03-31 17:43:46,781 - __main__ - WARNING - Framework storage mode: in_memory_demo (configured database type: postgresql)
+2026-03-31 17:43:46,781 - __main__ - INFO - Framework initialized successfully
+2026-03-31 17:43:46,987 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-03-31 17:43:47,055 - main - WARNING - Database settings are configured, but the current ORM and adapter still persist data in memory only.
+2026-03-31 17:43:47,055 - main - INFO - Initializing ERP Framework...
+2026-03-31 17:43:47,055 - CoreFramework - INFO - CoreFramework logging configured
+2026-03-31 17:43:47,055 - ModuleRegistry - DEBUG - Registered module class: Base
+2026-03-31 17:43:47,055 - ModuleRegistry - DEBUG - Registered module class: Signature
+2026-03-31 17:43:47,056 - ModuleRegistry - DEBUG - Registered module class: document_center
+2026-03-31 17:43:47,056 - ModuleRegistry - DEBUG - Registered module class: CRM
+2026-03-31 17:43:47,056 - ModuleRegistry - DEBUG - Registered module class: Quotes
+2026-03-31 17:43:47,056 - ModuleRegistry - DEBUG - Registered module class: Billing
+2026-03-31 17:43:47,056 - ModuleRegistry - DEBUG - Registered module class: Reports
+2026-03-31 17:43:47,056 - ModuleRegistry - DEBUG - Registered module class: HR
+2026-03-31 17:43:47,056 - ModuleRegistry - DEBUG - Registered module class: Attendance
+2026-03-31 17:43:47,056 - ModuleRegistry - DEBUG - Registered module class: payroll
+2026-03-31 17:43:47,057 - ModuleRegistry - DEBUG - Registered module class: Recruitment
+2026-03-31 17:43:47,057 - ModuleRegistry - DEBUG - Registered module class: Safety
+2026-03-31 17:43:47,057 - ModuleRegistry - DEBUG - Registered module class: job_profiles
+2026-03-31 17:43:47,057 - ModuleRegistry - DEBUG - Registered module class: Inventory
+2026-03-31 17:43:47,057 - ModuleRegistry - DEBUG - Registered module class: Rentals
+2026-03-31 17:43:47,057 - ModuleRegistry - DEBUG - Registered module class: RIOHS
+2026-03-31 17:43:47,057 - ModuleRegistry - DEBUG - Registered module class: Mail
+2026-03-31 17:43:47,058 - ModuleRegistry - DEBUG - Registered module class: google_workspace
+2026-03-31 17:43:47,058 - ModuleRegistry - DEBUG - Registered module class: AI
+2026-03-31 17:43:47,058 - CoreFramework - INFO - Initializing CoreFramework...
+2026-03-31 17:43:47,058 - DatabaseAdapter - INFO - Connecting to database: postgresql://postgres:postgres@localhost:5432/your_erp_dev
+2026-03-31 17:43:47,058 - BaseModule - INFO - Initializing module: Base
+2026-03-31 17:43:47,058 - ModelRegistry - DEBUG - Registered model: company
+2026-03-31 17:43:47,058 - ModelRegistry - DEBUG - Registered model: group
+2026-03-31 17:43:47,059 - ModelRegistry - DEBUG - Registered model: user
+2026-03-31 17:43:47,059 - BaseModule - INFO - Base module initialized
+2026-03-31 17:43:47,059 - ModuleRegistry - INFO - Loaded module: base
+2026-03-31 17:43:47,059 - SignatureModule - INFO - Initializing module: Signature
+2026-03-31 17:43:47,059 - ModelRegistry - DEBUG - Registered model: signature.request
+2026-03-31 17:43:47,059 - ModelRegistry - DEBUG - Registered model: signature.log
+2026-03-31 17:43:47,059 - SignatureModule - INFO - Signature module initialized
+2026-03-31 17:43:47,060 - ModuleRegistry - INFO - Loaded module: signature
+2026-03-31 17:43:47,060 - DocumentCenterModule - INFO - Initializing module: document_center
+2026-03-31 17:43:47,060 - ModelRegistry - DEBUG - Registered model: document_center.template
+2026-03-31 17:43:47,060 - ModelRegistry - DEBUG - Registered model: document_center.batch
+2026-03-31 17:43:47,060 - ModelRegistry - DEBUG - Registered model: document_center.generated_document
+2026-03-31 17:43:47,060 - ModelRegistry - DEBUG - Registered model: document_center.event
+2026-03-31 17:43:47,061 - DocumentCenterModule - INFO - Document center module initialized
+2026-03-31 17:43:47,061 - ModuleRegistry - INFO - Loaded module: document_center
+2026-03-31 17:43:47,061 - CRMModule - INFO - Initializing module: CRM
+2026-03-31 17:43:47,061 - ModelRegistry - DEBUG - Registered model: crm.stage
+2026-03-31 17:43:47,061 - ModelRegistry - DEBUG - Registered model: crm.customer
+2026-03-31 17:43:47,061 - ModelRegistry - DEBUG - Registered model: crm.mandante
+2026-03-31 17:43:47,061 - ModelRegistry - DEBUG - Registered model: crm.lead
+2026-03-31 17:43:47,062 - ModelRegistry - DEBUG - Registered model: crm.lead_note
+2026-03-31 17:43:47,062 - ModelRegistry - DEBUG - Registered model: crm.activity_log
+2026-03-31 17:43:47,062 - ModelRegistry - DEBUG - Registered model: crm.document
+2026-03-31 17:43:47,062 - ModelRegistry - DEBUG - Registered model: crm.service_type
+2026-03-31 17:43:47,062 - CRMModule - INFO - CRM module initialized
+2026-03-31 17:43:47,062 - ModuleRegistry - INFO - Loaded module: crm
+2026-03-31 17:43:47,062 - QuotesModule - INFO - Initializing module: Quotes
+2026-03-31 17:43:47,063 - ModelRegistry - DEBUG - Registered model: quotes.service_catalog
+2026-03-31 17:43:47,063 - ModelRegistry - DEBUG - Registered model: quotes.worker_catalog
+2026-03-31 17:43:47,063 - ModelRegistry - DEBUG - Registered model: quotes.item_catalog
+2026-03-31 17:43:47,063 - ModelRegistry - DEBUG - Registered model: quotes.quote
+2026-03-31 17:43:47,063 - ModelRegistry - DEBUG - Registered model: quotes.quote_line
+2026-03-31 17:43:47,063 - ModelRegistry - DEBUG - Registered model: quotes.quote_template
+2026-03-31 17:43:47,063 - ModelRegistry - DEBUG - Registered model: quotes.quote_template_line
+2026-03-31 17:43:47,064 - QuotesModule - INFO - Quotes module v2 initialized (3 catalogs)
+2026-03-31 17:43:47,064 - ModuleRegistry - INFO - Loaded module: quotes
+2026-03-31 17:43:47,064 - BillingModule - INFO - Initializing module: Billing
+2026-03-31 17:43:47,064 - ModelRegistry - DEBUG - Registered model: billing.document
+2026-03-31 17:43:47,064 - ModelRegistry - DEBUG - Registered model: billing.line
+2026-03-31 17:43:47,064 - ModelRegistry - DEBUG - Registered model: billing.event
+2026-03-31 17:43:47,065 - BillingModule - INFO - Billing simulation module initialized
+2026-03-31 17:43:47,065 - ModuleRegistry - INFO - Loaded module: billing
+2026-03-31 17:43:47,065 - ReportsModule - INFO - Initializing module: Reports
+2026-03-31 17:43:47,065 - ModelRegistry - DEBUG - Registered model: reports.report
+2026-03-31 17:43:47,065 - ModelRegistry - DEBUG - Registered model: reports.checkpoint
+2026-03-31 17:43:47,065 - ModelRegistry - DEBUG - Registered model: reports.photo
+2026-03-31 17:43:47,065 - ModelRegistry - DEBUG - Registered model: reports.area_faena
+2026-03-31 17:43:47,066 - ModelRegistry - DEBUG - Registered model: reports.sector_faena
+2026-03-31 17:43:47,066 - ModelRegistry - DEBUG - Registered model: reports.customer_risk_assignment
+2026-03-31 17:43:47,066 - ModelRegistry - DEBUG - Registered model: reports.area_risk_assignment
+2026-03-31 17:43:47,066 - ModelRegistry - DEBUG - Registered model: reports.sector_risk_assignment
+2026-03-31 17:43:47,066 - ModuleRegistry - INFO - Loaded module: reports
+2026-03-31 17:43:47,066 - HRModule - INFO - Initializing module: HR
+2026-03-31 17:43:47,066 - ModelRegistry - DEBUG - Registered model: hr.department
+2026-03-31 17:43:47,066 - ModelRegistry - DEBUG - Registered model: hr.employee
+2026-03-31 17:43:47,067 - ModelRegistry - DEBUG - Registered model: hr.contract
+2026-03-31 17:43:47,067 - ModelRegistry - DEBUG - Registered model: hr.time_off_request
+2026-03-31 17:43:47,067 - ModelRegistry - DEBUG - Registered model: hr.accreditation_requirement
+2026-03-31 17:43:47,067 - ModelRegistry - DEBUG - Registered model: hr.accreditation_document
+2026-03-31 17:43:47,067 - HRModule - INFO - HR module initialized
+2026-03-31 17:43:47,067 - ModuleRegistry - INFO - Loaded module: hr
+2026-03-31 17:43:47,067 - AttendanceModule - INFO - Initializing module: Attendance
+2026-03-31 17:43:47,068 - ModelRegistry - DEBUG - Registered model: attendance.policy
+2026-03-31 17:43:47,068 - ModelRegistry - DEBUG - Registered model: attendance.record
+2026-03-31 17:43:47,068 - ModelRegistry - DEBUG - Registered model: attendance.event
+2026-03-31 17:43:47,068 - AttendanceModule - INFO - Attendance module initialized
+2026-03-31 17:43:47,068 - ModuleRegistry - INFO - Loaded module: attendance
+2026-03-31 17:43:47,068 - PayrollModule - INFO - Initializing module: payroll
+2026-03-31 17:43:47,068 - ModelRegistry - DEBUG - Registered model: payroll.legal_parameter
+2026-03-31 17:43:47,068 - ModelRegistry - DEBUG - Registered model: payroll.tax_bracket
+2026-03-31 17:43:47,069 - ModelRegistry - DEBUG - Registered model: payroll.profile
+2026-03-31 17:43:47,069 - ModelRegistry - DEBUG - Registered model: payroll.period
+2026-03-31 17:43:47,069 - ModelRegistry - DEBUG - Registered model: payroll.settlement
+2026-03-31 17:43:47,069 - ModelRegistry - DEBUG - Registered model: payroll.event
+2026-03-31 17:43:47,069 - PayrollModule - INFO - Payroll module initialized
+2026-03-31 17:43:47,069 - ModuleRegistry - INFO - Loaded module: payroll
+2026-03-31 17:43:47,069 - RecruitmentModule - INFO - Initializing module: Recruitment
+2026-03-31 17:43:47,070 - ModelRegistry - DEBUG - Registered model: recruitment.stage
+2026-03-31 17:43:47,070 - ModelRegistry - DEBUG - Registered model: recruitment.job
+2026-03-31 17:43:47,070 - ModelRegistry - DEBUG - Registered model: recruitment.candidate
+2026-03-31 17:43:47,070 - ModelRegistry - DEBUG - Registered model: recruitment.application
+2026-03-31 17:43:47,070 - ModelRegistry - DEBUG - Registered model: recruitment.interview
+2026-03-31 17:43:47,070 - RecruitmentModule - INFO - Recruitment module initialized
+2026-03-31 17:43:47,070 - ModuleRegistry - INFO - Loaded module: recruitment
+2026-03-31 17:43:47,071 - SafetyModule - INFO - Initializing module: Safety
+2026-03-31 17:43:47,071 - ModelRegistry - DEBUG - Registered model: safety.service_profile
+2026-03-31 17:43:47,071 - ModelRegistry - DEBUG - Registered model: safety.folder
+2026-03-31 17:43:47,071 - ModelRegistry - DEBUG - Registered model: safety.document
+2026-03-31 17:43:47,071 - ModelRegistry - DEBUG - Registered model: safety.risk_matrix
+2026-03-31 17:43:47,071 - ModelRegistry - DEBUG - Registered model: safety.ppe_delivery
+2026-03-31 17:43:47,071 - ModelRegistry - DEBUG - Registered model: safety.talk
+2026-03-31 17:43:47,071 - ModelRegistry - DEBUG - Registered model: safety.checklist
+2026-03-31 17:43:47,072 - ModelRegistry - DEBUG - Registered model: safety.irl_record
+2026-03-31 17:43:47,072 - ModelRegistry - DEBUG - Registered model: safety.master_risk
+2026-03-31 17:43:47,072 - ModelRegistry - DEBUG - Registered model: safety.protocol
+2026-03-31 17:43:47,072 - ModelRegistry - DEBUG - Registered model: safety.client_site
+2026-03-31 17:43:47,072 - ModelRegistry - DEBUG - Registered model: safety.client_area
+2026-03-31 17:43:47,072 - ModelRegistry - DEBUG - Registered model: safety.worker_restriction
+2026-03-31 17:43:47,072 - ModelRegistry - DEBUG - Registered model: safety.generator_rule
+2026-03-31 17:43:47,073 - SafetyModule - INFO - Safety module initialized
+2026-03-31 17:43:47,073 - ModuleRegistry - INFO - Loaded module: safety
+2026-03-31 17:43:47,073 - InventoryModule - INFO - Initializing module: Inventory
+2026-03-31 17:43:47,073 - ModelRegistry - DEBUG - Registered model: inventory.item
+2026-03-31 17:43:47,073 - ModelRegistry - DEBUG - Registered model: inventory.movement
+2026-03-31 17:43:47,073 - ModelRegistry - DEBUG - Registered model: inventory.backup
+2026-03-31 17:43:47,073 - InventoryModule - INFO - Inventory module initialized
+2026-03-31 17:43:47,074 - ModuleRegistry - INFO - Loaded module: inventory
+2026-03-31 17:43:47,074 - RiohsModule - INFO - Initializing module: RIOHS
+2026-03-31 17:43:47,074 - RiohsModule - INFO - Módulo RIOHS inicializado
+2026-03-31 17:43:47,074 - ModuleRegistry - INFO - Loaded module: riohs
+2026-03-31 17:43:47,074 - CoreFramework - INFO - CoreFramework initialized successfully
+2026-03-31 17:43:47,074 - main - WARNING - Framework storage mode: in_memory_demo (configured database type: postgresql)
+2026-03-31 17:43:47,074 - main - INFO - Framework initialized successfully
+INFO:     Started server process [52592]
+INFO:     Waiting for application startup.
+2026-03-31 17:43:47,085 - Company - DEBUG - Inserted Company #1
+2026-03-31 17:43:47,085 - Company - DEBUG - Updated Company #1
+2026-03-31 17:43:47,130 - User - DEBUG - Inserted User #1
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-03-31 17:47:18,636 - Company - DEBUG - Inserted Company #2
+2026-03-31 17:47:18,636 - Stage - DEBUG - Inserted Stage #1
+2026-03-31 17:47:18,637 - Stage - DEBUG - Inserted Stage #2
+2026-03-31 17:47:18,637 - Stage - DEBUG - Inserted Stage #3
+2026-03-31 17:47:18,637 - Stage - DEBUG - Inserted Stage #4
+2026-03-31 17:47:18,638 - Stage - DEBUG - Inserted Stage #5
+2026-03-31 17:47:18,638 - Stage - DEBUG - Inserted Stage #6
+2026-03-31 17:47:18,638 - Stage - DEBUG - Inserted Stage #7
+2026-03-31 17:47:18,638 - Stage - DEBUG - Inserted Stage #8
+2026-03-31 17:47:18,638 - Stage - DEBUG - Inserted Stage #9
+2026-03-31 17:47:18,638 - Stage - DEBUG - Inserted Stage #10
+2026-03-31 17:47:18,638 - Stage - DEBUG - Inserted Stage #11
+2026-03-31 17:47:18,639 - Stage - DEBUG - Inserted Stage #12
+2026-03-31 17:47:18,639 - Department - DEBUG - Inserted Department #1
+2026-03-31 17:47:18,639 - Department - DEBUG - Inserted Department #2
+2026-03-31 17:47:18,639 - Department - DEBUG - Inserted Department #3
+2026-03-31 17:47:18,639 - Department - DEBUG - Inserted Department #4
+2026-03-31 17:47:18,639 - Department - DEBUG - Inserted Department #5
+2026-03-31 17:47:18,640 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #1
+2026-03-31 17:47:18,640 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #2
+2026-03-31 17:47:18,640 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #3
+2026-03-31 17:47:18,640 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #4
+2026-03-31 17:47:18,640 - AccreditationRequirement - DEBUG - Inserted AccreditationRequirement #5
+2026-03-31 17:47:18,640 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #1
+2026-03-31 17:47:18,641 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #2
+2026-03-31 17:47:18,641 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #3
+2026-03-31 17:47:18,641 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #4
+2026-03-31 17:47:18,641 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #5
+2026-03-31 17:47:18,641 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #6
+2026-03-31 17:47:18,641 - RecruitmentStage - DEBUG - Inserted RecruitmentStage #7
+2026-03-31 17:47:18,685 - User - DEBUG - Inserted User #2
+2026-03-31 17:47:18,685 - User - DEBUG - Updated User #2
+2026-03-31 17:48:21,602 - ServiceType - DEBUG - Inserted ServiceType #1
+2026-03-31 17:48:21,602 - ServiceType - DEBUG - Inserted ServiceType #2
+2026-03-31 17:48:21,602 - ServiceType - DEBUG - Inserted ServiceType #3
+2026-03-31 17:48:21,602 - ServiceType - DEBUG - Inserted ServiceType #4
+2026-03-31 17:49:54,558 - ReglamentoConfig - DEBUG - Inserted ReglamentoConfig #1
+2026-03-31 17:50:26,039 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #1
+2026-03-31 17:50:26,039 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #2
+2026-03-31 17:50:26,039 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #3
+2026-03-31 17:50:26,039 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #4
+2026-03-31 17:50:26,039 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #5
+2026-03-31 17:50:26,040 - SafetyProtocol - DEBUG - Inserted SafetyProtocol #6
+2026-03-31 17:50:26,040 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #1
+2026-03-31 17:50:26,040 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #2
+2026-03-31 17:50:26,040 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #3
+2026-03-31 17:50:26,040 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #4
+2026-03-31 17:50:26,040 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #5
+2026-03-31 17:50:26,041 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #6
+2026-03-31 17:50:26,041 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #7
+2026-03-31 17:50:26,041 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #8
+2026-03-31 17:50:26,041 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #9
+2026-03-31 17:50:26,041 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #10
+2026-03-31 17:50:26,041 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #11
+2026-03-31 17:50:26,042 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #12
+2026-03-31 17:50:26,042 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #13
+2026-03-31 17:50:26,042 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #14
+2026-03-31 17:50:26,042 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #15
+2026-03-31 17:50:26,042 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #16
+2026-03-31 17:50:26,042 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #17
+2026-03-31 17:50:26,042 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #18
+2026-03-31 17:50:26,043 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #19
+2026-03-31 17:50:26,043 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #20
+2026-03-31 17:50:26,043 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #21
+2026-03-31 17:50:26,043 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #22
+2026-03-31 17:50:26,043 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #23
+2026-03-31 17:50:26,043 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #24
+2026-03-31 17:50:26,044 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #25
+2026-03-31 17:50:26,044 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #26
+2026-03-31 17:50:26,044 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #27
+2026-03-31 17:50:26,044 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #28
+2026-03-31 17:50:26,044 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #29
+2026-03-31 17:50:26,044 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #30
+2026-03-31 17:50:26,045 - SafetyMasterRisk - DEBUG - Inserted SafetyMasterRisk #31
+2026-03-31 17:50:26,045 - SafetyServiceProfile - DEBUG - Inserted SafetyServiceProfile #1
+2026-03-31 17:50:26,045 - SafetyServiceProfile - DEBUG - Inserted SafetyServiceProfile #2
+2026-03-31 17:50:26,045 - SafetyServiceProfile - DEBUG - Inserted SafetyServiceProfile #3
+2026-03-31 17:50:26,045 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #1
+2026-03-31 17:50:26,046 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #2
+2026-03-31 17:50:26,046 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #3
+2026-03-31 17:50:26,046 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #4
+2026-03-31 17:50:26,046 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #5
+2026-03-31 17:50:26,046 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #6
+2026-03-31 17:50:26,046 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #7
+2026-03-31 17:50:26,047 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #8
+2026-03-31 17:50:26,047 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #9
+2026-03-31 17:50:26,047 - SafetyGeneratorRule - DEBUG - Inserted SafetyGeneratorRule #10
+2026-03-31 17:52:15,298 - InventoryItem - DEBUG - Inserted InventoryItem #1
+2026-03-31 17:52:41,394 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #1
+2026-03-31 17:52:41,394 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #2
+2026-03-31 17:52:41,394 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #3
+2026-03-31 17:52:41,394 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #4
+2026-03-31 17:52:41,394 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #5
+2026-03-31 17:52:41,395 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #6
+2026-03-31 17:52:41,395 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #7
+2026-03-31 17:52:41,395 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #8
+2026-03-31 17:52:41,395 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #9
+2026-03-31 17:52:41,395 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #10
+2026-03-31 17:52:41,395 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #11
+2026-03-31 17:52:41,396 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #12
+2026-03-31 17:52:41,396 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #13
+2026-03-31 17:52:41,396 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #14
+2026-03-31 17:52:41,396 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #15
+2026-03-31 17:52:41,396 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #16
+2026-03-31 17:52:41,397 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #17
+2026-03-31 17:52:41,397 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #18
+2026-03-31 17:52:41,397 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #19
+2026-03-31 17:52:41,397 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #20
+2026-03-31 17:52:41,398 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #21
+2026-03-31 17:52:41,398 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #22
+2026-03-31 17:52:41,398 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #23
+2026-03-31 17:52:41,398 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #24
+2026-03-31 17:52:41,398 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #25
+2026-03-31 17:52:41,398 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #26
+2026-03-31 17:52:41,399 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #27
+2026-03-31 17:52:41,399 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #28
+2026-03-31 17:52:41,399 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #29
+2026-03-31 17:52:41,399 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #30
+2026-03-31 17:52:41,400 - PayrollLegalParameter - DEBUG - Inserted PayrollLegalParameter #31
+2026-03-31 17:52:41,400 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #1
+2026-03-31 17:52:41,400 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #2
+2026-03-31 17:52:41,400 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #3
+2026-03-31 17:52:41,401 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #4
+2026-03-31 17:52:41,401 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #5
+2026-03-31 17:52:41,401 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #6
+2026-03-31 17:52:41,401 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #7
+2026-03-31 17:52:41,401 - PayrollTaxBracket - DEBUG - Inserted PayrollTaxBracket #8
+2026-03-31 17:52:41,402 - DocumentTemplate - DEBUG - Inserted DocumentTemplate #1
+2026-03-31 17:54:11,941 - Customer - DEBUG - Inserted Customer #1
+2026-03-31 17:54:11,950 - CustomerRiskAssignment - DEBUG - Inserted CustomerRiskAssignment #1
+2026-03-31 17:54:29,109 - AreaFaena - DEBUG - Inserted AreaFaena #1
+2026-03-31 17:54:29,111 - AreaRiskAssignment - DEBUG - Inserted AreaRiskAssignment #1
+2026-03-31 17:54:41,797 - AreaFaena - DEBUG - Updated AreaFaena #1
+2026-03-31 17:54:41,799 - AreaRiskAssignment - DEBUG - Inserted AreaRiskAssignment #2
+2026-03-31 17:54:41,799 - AreaRiskAssignment - DEBUG - Updated AreaRiskAssignment #1
+2026-03-31 17:54:56,038 - SectorFaena - DEBUG - Inserted SectorFaena #1
+2026-03-31 17:54:56,040 - SectorRiskAssignment - DEBUG - Inserted SectorRiskAssignment #1
+2026-03-31 17:55:58,598 - Company - DEBUG - Updated Company #2
+2026-03-31 17:55:58,599 - Lead - DEBUG - Inserted Lead #1
+2026-03-31 17:55:58,600 - ActivityLog - DEBUG - Inserted ActivityLog #1
+2026-03-31 17:56:29,322 - Lead - DEBUG - Updated Lead #1
+2026-03-31 17:56:29,323 - ActivityLog - DEBUG - Inserted ActivityLog #2
+2026-03-31 17:56:33,265 - Lead - DEBUG - Updated Lead #1
+2026-03-31 17:56:33,267 - ActivityLog - DEBUG - Inserted ActivityLog #3
+2026-03-31 17:56:35,400 - Lead - DEBUG - Updated Lead #1
+2026-03-31 17:56:35,401 - ActivityLog - DEBUG - Inserted ActivityLog #4

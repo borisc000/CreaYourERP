@@ -1,6 +1,6 @@
 """
 Event Listeners para Signature Module
-Conecta el flujo: Contract → Correspondencia → Firma
+Conecta el flujo: Contract > Correspondencia > Firma
 """
 from core.event_bus import EventBus
 from modules.signature.repository import SignatureRequestRepository
@@ -18,8 +18,8 @@ def _on_correspondence_approved_for_signature(data: dict):
         template_id = data.get('template_id')
         personalization_data = data.get('personalization_data', {})
 
-        print(f"\n📝 [EVENT] Correspondencia {correspondence_id} lista para firma")
-        print(f"   → Creando solicitud de firma para contrato {contract_id}...")
+        print(f"\n[NOTE] [EVENT] Correspondencia {correspondence_id} lista para firma")
+        print(f"   > Creando solicitud de firma para contrato {contract_id}...")
 
         # Crear solicitud de firma
         sig_req = SignatureRequestRepository.create(
@@ -41,11 +41,11 @@ def _on_correspondence_approved_for_signature(data: dict):
             'status': 'pending'
         })
 
-        print(f"   ✅ Solicitud de firma #{sig_req.id} creada")
-        print(f"   → Estado: {sig_req.status}")
+        print(f"   [OK] Solicitud de firma #{sig_req.id} creada")
+        print(f"   > Estado: {sig_req.status}")
 
     except Exception as e:
-        print(f"   ✗ Error creando solicitud de firma: {e}")
+        print(f"   [ERROR] Error creando solicitud de firma: {e}")
     finally:
         db.close()
 
@@ -55,10 +55,10 @@ def _on_signature_completed(data: dict):
     contract_id = data['contract_id']
     signature_request_id = data['signature_request_id']
 
-    print(f"\n✅ [EVENT] Firma completada")
-    print(f"   → Solicitud de firma #{signature_request_id} completada")
-    print(f"   → Contrato #{contract_id} listo para activación")
-    print(f"   → El contrato pasará a estado 'signed'")
+    print(f"\n[OK] [EVENT] Firma completada")
+    print(f"   > Solicitud de firma #{signature_request_id} completada")
+    print(f"   > Contrato #{contract_id} listo para activación")
+    print(f"   > El contrato pasará a estado 'signed'")
 
     # Emitir evento para que otros módulos se entere (notificaciones, etc)
     EventBus.emit('contract.fully_signed', {
@@ -72,10 +72,10 @@ def _on_signature_rejected(data: dict):
     contract_id = data['contract_id']
     reason = data.get('reason', 'No reason provided')
 
-    print(f"\n❌ [EVENT] Firma rechazada")
-    print(f"   → Contrato #{contract_id} rechazado")
-    print(f"   → Razón: {reason}")
-    print(f"   → El contrato vuelve a estado 'draft' para correcciones")
+    print(f"\n[FAILED] [EVENT] Firma rechazada")
+    print(f"   > Contrato #{contract_id} rechazado")
+    print(f"   > Razón: {reason}")
+    print(f"   > El contrato vuelve a estado 'draft' para correcciones")
 
     # Emitir evento para notificaciones
     EventBus.emit('contract.signature_rejected', {
@@ -88,9 +88,9 @@ def _on_signature_request_created(data: dict):
     """Listener: cuando se crea una nueva solicitud de firma"""
     signature_request_id = data['signature_request_id']
 
-    print(f"\n📋 [EVENT] Solicitud de firma creada")
-    print(f"   → Solicitud #{signature_request_id} pendiente de firma")
-    print(f"   → Enviando notificación al empleado...")
+    print(f"\n[INFO] [EVENT] Solicitud de firma creada")
+    print(f"   > Solicitud #{signature_request_id} pendiente de firma")
+    print(f"   > Enviando notificación al empleado...")
 
 
 # Registrar listeners

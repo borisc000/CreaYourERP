@@ -1,6 +1,5 @@
 /* ============================================================
-   REPORT_WORKSPACE.JS — Panel Operativo de Reporte de Terreno
-   FASE 4.4: Checkpoints + Fotos + Cierre
+   REPORT_WORKSPACE.JS - Panel operativo de reportes de terreno
    ============================================================ */
 
 const REPORT_ID = parseInt(
@@ -8,236 +7,276 @@ const REPORT_ID = parseInt(
     10
 );
 
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
+const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const photoBlobUrlCache = new Map();
+
+let reportSnapshot = null;
+let checkpointPreviewUrl = null;
+
 document.addEventListener('DOMContentLoaded', async () => {
-    if (!API.getToken()) { window.location.href = '/app/login'; return; }
+    if (!API.getToken()) {
+        window.location.href = '/app/login';
+        return;
+    }
+
+    setupCheckpointPhotoInput();
+    setupLightboxShortcuts();
     await loadReportData();
 });
 
-// ══════════════════════════════════════════════════════════════
-// 1. CARGA DE DATOS
-// ══════════════════════════════════════════════════════════════
+window.addEventListener('beforeunload', () => {
+    if (checkpointPreviewUrl) {
+        URL.revokeObjectURL(checkpointPreviewUrl);
+        checkpointPreviewUrl = null;
+    }
+
+    for (const value of photoBlobUrlCache.values()) {
+        URL.revokeObjectURL(value);
+    }
+    photoBlobUrlCache.clear();
+});
 
 async function loadReportData() {
-    const res = await API.get(`/reports/${REPORT_ID}`);
-    if (!res || !res.success) {
-        document.getElementById('ws-info-card').innerHTML = `
-            <p style="color:#ef4444;text-align:center;padding:2rem;">
-                ⚠ Error al cargar el reporte. Verifica que existe y tienes acceso.
-            </p>`;
-        return;
+    try {
+        const res = await API.get(`/reports/${REPORT_ID}`);
+        if (!res || !res.success) {
+            document.getElementById('ws-info-card').innerHTML = `
+                <div class="rw-empty">
+                    <div class="rw-kicker">No fue posible cargar</div>
+                    <p style="margin:0;">Verifica que el reporte exista y que tu usuario tenga acceso.</p>
+                </div>`;
+            showToast('No se pudo cargar el reporte.', 'error');
+            return;
+        }
+
+        reportSnapshot = res.data;
+        renderHeader(reportSnapshot);
+        renderInfoCard(reportSnapshot);
+        renderCheckpoints(reportSnapshot.checkpoints || []);
+    } catch (error) {
+        console.error('[REPORT] loadReportData error', error);
+        showToast('Error de conexión al cargar el reporte.', 'error');
     }
-    const report = res.data;
-    renderHeader(report);
-    renderInfoCard(report);
-    renderCheckpoints(report.checkpoints || []);
 }
 
-// ══════════════════════════════════════════════════════════════
-// 2. HEADER (estado + botón cerrar)
-// ══════════════════════════════════════════════════════════════
-
 function renderHeader(report) {
-    document.getElementById('ws-report-num').textContent = '#' + report.id;
+    document.getElementById('ws-report-num').textContent = `#${report.id}`;
 
     const badge = document.getElementById('ws-estado-badge');
-    if (report.estado === 'CERRADO') {
-        badge.textContent = 'CERRADO';
-        badge.style.background   = '#fee2e220';
-        badge.style.color        = '#ef4444';
-        badge.style.borderColor  = '#ef444440';
-    } else {
-        badge.textContent = 'ABIERTO';
-        badge.style.background   = '#dcfce720';
-        badge.style.color        = '#22c55e';
-        badge.style.borderColor  = '#22c55e40';
-    }
+    const isClosed = report.estado === 'CERRADO';
+    badge.textContent = isClosed ? 'CERRADO' : 'ABIERTO';
+    badge.style.background = isClosed ? 'rgba(248, 113, 113, 0.12)' : 'rgba(34, 197, 94, 0.12)';
+    badge.style.borderColor = isClosed ? 'rgba(248, 113, 113, 0.28)' : 'rgba(34, 197, 94, 0.22)';
+    badge.style.color = isClosed ? '#fca5a5' : '#86efac';
 
     const btnCerrar = document.getElementById('btn-cerrar-reporte');
-    btnCerrar.style.display = (report.estado === 'ABIERTO') ? 'inline-block' : 'none';
+    const btnAdd = document.getElementById('btn-add-cp');
+    btnCerrar.style.display = isClosed ? 'none' : 'inline-flex';
+    btnAdd.style.display = isClosed ? 'none' : 'inline-flex';
 
-    // También ocultar el formulario y botón añadir si cerrado
-    if (report.estado === 'CERRADO') {
-        document.getElementById('btn-add-cp').style.display = 'none';
+    if (isClosed) {
+        document.getElementById('add-cp-form').style.display = 'none';
     }
 
     window._reportLeadId = report.lead_id;
 }
 
-// ══════════════════════════════════════════════════════════════
-// 3. TARJETA DE INFO DEL REPORTE
-// ══════════════════════════════════════════════════════════════
-
 function renderInfoCard(report) {
+    const checkpoints = report.checkpoints || [];
+    const totalPhotos = checkpoints.reduce((sum, cp) => sum + ((cp.photos && cp.photos.length) || 0), 0);
     const leadRef = report.lead_id
-        ? `<a href="/app/crm/leads/${report.lead_id}"
-              style="color:#3b82f6;text-decoration:none;font-weight:600;">
-               &#128279; Oportunidad #${report.lead_id}
-           </a>`
-        : '—';
+        ? `<a href="/app/crm/leads/${report.lead_id}" style="color:#93c5fd;text-decoration:none;font-weight:700;">&#128279; Oportunidad #${report.lead_id}</a>`
+        : '<span style="color:#94a3b8;">Sin oportunidad vinculada</span>';
 
     document.getElementById('ws-info-card').innerHTML = `
-        <!-- Oportunidad asociada -->
-        <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;
-                    padding:0.6rem 1rem;margin-bottom:1rem;font-size:0.85rem;color:#93c5fd;">
-            <strong style="color:#bfdbfe;">Oportunidad asociada:</strong>&nbsp;${leadRef}
-        </div>
-        <!-- Cuadro resumen del servicio -->
-        <div style="background:#172554;border:1px solid #1d4ed8;border-radius:10px;
-                    padding:1rem 1.25rem;margin-bottom:1.25rem;">
-            <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;
-                        color:#60a5fa;font-weight:700;margin-bottom:0.65rem;">
-                &#128203; Contexto del Servicio
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
-                ${_summaryField('Tipo de Servicio', report.tiposervicio, '#a5b4fc')}
-                ${_summaryField('Mandante',         report.mandante,     '#a5b4fc')}
-                ${_summaryField('\xc1rea',           report.area,         '#93c5fd')}
-                ${_summaryField('Sector',            report.sector,       '#93c5fd')}
+        <div class="rw-hero-card">
+            <div class="rw-kicker">Contexto del Servicio</div>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+                <div>
+                    <h3 style="margin:0;color:#f8fafc;font-size:1.3rem;">${escHtml(report.servicio || 'Servicio sin nombre')}</h3>
+                    <div class="rw-muted" style="margin-top:0.35rem;">${leadRef}</div>
+                </div>
+                <div class="rw-chip">${escHtml(report.estado || 'ABIERTO')}</div>
             </div>
         </div>
-        <!-- Grid de datos operativos -->
-        <h3 style="margin:0 0 0.75rem;color:#f1f5f9;font-size:0.82rem;text-transform:uppercase;
-                   letter-spacing:0.05em;border-bottom:1px solid #334155;padding-bottom:0.5rem;">
-            &#128203; Datos Operativos
-        </h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.9rem;">
-            ${infoField('Servicio',             report.servicio,  true)}
-            ${infoField('Empresa / Faena',      report.empresa)}
-            ${infoField('APR (Prevencionista)', report.apr)}
-            ${infoField('Supervisor',           report.supervisor)}
-            ${infoField('ADM Contrato',         report.adm)}
-            ${infoField('Emisi\xf3n',           report.emision ? report.emision.split('T')[0] : '\u2014')}
+
+        <div class="rw-stats-grid" style="margin-bottom:1rem;">
+            ${statCard('Tipo de servicio', report.tiposervicio || 'No informado')}
+            ${statCard('Empresa / Faena', report.empresa || 'No informada')}
+            ${statCard('Checkpoints', String(checkpoints.length))}
+            ${statCard('Fotos cargadas', String(totalPhotos))}
+        </div>
+
+        <div class="rw-panel-header" style="margin-bottom:0.9rem;">
+            <div>
+                <div class="rw-kicker">Datos operativos</div>
+                <h3 class="rw-title" style="font-size:1rem;">Resumen del reporte</h3>
+            </div>
+            <div class="rw-muted">${formatDateLabel(report.emision, true)}</div>
+        </div>
+
+        <div class="rw-info-grid">
+            ${infoCell('Mandante', report.mandante)}
+            ${infoCell('Supervisor', report.supervisor)}
+            ${infoCell('APR', report.apr)}
+            ${infoCell('Administrador de contrato', report.adm)}
+            ${infoCell('Área', report.area)}
+            ${infoCell('Sector', report.sector)}
         </div>
     `;
 }
 
-function _summaryField(label, value, color) {
-    const v       = escHtml(value || '\u2014');
-    const isEmpty = !value || value === '\u2014';
+function statCard(label, value) {
     return `
-        <div>
-            <div style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;
-                        letter-spacing:0.04em;margin-bottom:0.15rem;">${label}</div>
-            <div style="color:${isEmpty ? '#475569' : color};font-weight:${isEmpty ? '400' : '600'};
-                        font-size:0.85rem;">${v}</div>
+        <div class="rw-stat-card">
+            <span>${escHtml(label)}</span>
+            <strong>${escHtml(value || '—')}</strong>
         </div>`;
 }
 
-function infoField(label, value, bold = false) {
-    const v = escHtml(value || '—');
-    const style = bold ? 'color:#f1f5f9;font-weight:600;' : 'color:#94a3b8;';
+function infoCell(label, value) {
     return `
-        <div>
-            <div style="font-size:0.7rem;color:#64748b;text-transform:uppercase;
-                        letter-spacing:0.04em;margin-bottom:0.15rem;">${label}</div>
-            <div style="${style}">${v}</div>
+        <div class="rw-info-cell">
+            <span>${escHtml(label)}</span>
+            <strong>${escHtml(value || '—')}</strong>
         </div>`;
 }
-
-// ══════════════════════════════════════════════════════════════
-// 4. LISTA DE CHECKPOINTS
-// ══════════════════════════════════════════════════════════════
 
 function renderCheckpoints(checkpoints) {
     const container = document.getElementById('ws-checkpoints-container');
+
     if (!checkpoints.length) {
         container.innerHTML = `
-            <div style="text-align:center;padding:2rem;color:#475569;font-size:0.85rem;">
-                Sin checkpoints aún. Añade el primero ↑
+            <div class="rw-empty">
+                <div class="rw-kicker">Sin checkpoints</div>
+                <p style="margin:0;">Añade el primero para comenzar a construir el historial del terreno.</p>
             </div>`;
         return;
     }
 
-    container.innerHTML = checkpoints.map((cp, idx) => {
-        const hasPhoto = cp.photos && cp.photos.length > 0;
-
-        // CORRECCIÓN 1: usar file_path (ruta relativa servida estáticamente)
-        const photoHtml = hasPhoto
-            ? `<img src="/${cp.photos[0].file_path}"
-                    alt="foto checkpoint"
-                    style="max-width:180px;max-height:120px;border-radius:6px;
-                           margin-top:0.5rem;object-fit:cover;cursor:pointer;"
-                    onclick="this.style.maxWidth='100%'">`
-            : `<label style="display:inline-block;margin-top:0.5rem;background:#334155;
-                             border:1px dashed #475569;color:#94a3b8;padding:0.3rem 0.7rem;
-                             border-radius:6px;cursor:pointer;font-size:0.78rem;">
-                 📷 Subir Foto
-                 <input type="file" accept="image/*" style="display:none"
-                        onchange="uploadPhotoFromInput(${cp.id}, this)">
-               </label>`;
-
-        return `
-            <div class="cp-card" data-cp-id="${cp.id}"
-                 style="border:1px solid #334155;border-radius:8px;padding:1rem;
-                        margin-bottom:0.75rem;background:#0f172a;">
-                <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;">
-                    <span style="background:#3b82f6;color:white;padding:0.2rem 0.6rem;
-                                 border-radius:4px;font-size:0.72rem;font-weight:700;
-                                 letter-spacing:0.04em;">
-                        ${escHtml(cp.tipo)}
-                    </span>
-                    <span style="color:#475569;font-size:0.75rem;font-weight:600;">#${idx + 1}</span>
-                    <span style="color:#64748b;font-size:0.78rem;">
-                        ${cp.emision ? cp.emision.split('T')[0] : '—'}
-                    </span>
-                </div>
-                <p style="margin:0;color:#cbd5e1;font-size:0.88rem;line-height:1.4;">
-                    ${escHtml(cp.descripcion || '')}
-                </p>
-                ${photoHtml}
-            </div>`;
-    }).join('');
+    container.innerHTML = `
+        <div class="cp-list">
+            ${checkpoints.map((cp, idx) => renderCheckpointCard(cp, idx)).join('')}
+        </div>`;
 }
 
-// ══════════════════════════════════════════════════════════════
-// 5. FORMULARIO INLINE DE CHECKPOINT
-// ══════════════════════════════════════════════════════════════
+function renderCheckpointCard(cp, idx) {
+    const photos = cp.photos || [];
+    const photoGrid = photos.length
+        ? `
+            <div class="cp-photo-grid">
+                ${photos.map((photo, photoIndex) => renderCheckpointPhoto(cp, idx, photo, photoIndex)).join('')}
+            </div>`
+        : `
+            <div class="rw-empty" style="margin-top:1rem;padding:1.3rem;">
+                <div class="rw-kicker">Sin evidencia fotográfica</div>
+                <p style="margin:0;">Puedes subir una foto ahora o más tarde para incluirla en el PDF.</p>
+            </div>`;
+
+    return `
+        <article class="cp-card" data-cp-id="${cp.id}">
+            <div class="cp-meta">
+                <span class="cp-type">${escHtml(cp.tipo || 'ITEM')}</span>
+                <span class="cp-index">#${idx + 1}</span>
+                <span class="cp-date">${formatDateLabel(cp.emision)}</span>
+                <span class="cp-photos-badge">${photos.length} foto${photos.length === 1 ? '' : 's'}</span>
+            </div>
+            <p class="cp-description">${escHtml(cp.descripcion || '')}</p>
+            ${photoGrid}
+            <div class="cp-actions">
+                <label class="rw-upload-inline" data-upload-label>
+                    <span data-upload-text>&#128247; ${photos.length ? 'Añadir otra foto' : 'Subir foto'}</span>
+                    <input type="file"
+                           accept="image/jpeg,image/png,image/webp"
+                           onchange="uploadPhotoFromInput(${cp.id}, this)">
+                </label>
+                <span class="rw-muted">Cada imagen se ajustará automáticamente al PDF sin deformarse.</span>
+            </div>
+        </article>`;
+}
+
+function renderCheckpointPhoto(cp, idx, photo, photoIndex) {
+    const fileUrl = escAttr(resolvePhotoUrl(photo));
+    const authUrl = escAttr(photo.auth_url || '');
+    const caption = `Checkpoint #${idx + 1} · Foto ${photoIndex + 1}`;
+    const fileName = photo.filename || `foto_${photoIndex + 1}`;
+
+    return `
+        <figure class="cp-photo-frame">
+            <img src="${fileUrl}"
+                 alt="${escAttr(caption)}"
+                 loading="lazy"
+                 data-auth-url="${authUrl}"
+                 data-public-url="${fileUrl}"
+                 data-caption="${escAttr(caption)}"
+                 onclick="openPhotoLightboxFromElement(this)"
+                 onerror="handleCheckpointImageError(this)">
+            <figcaption class="cp-photo-caption">
+                <div>${escHtml(fileName)}</div>
+                <span>${photoIndex + 1}/${(cp.photos || []).length}</span>
+            </figcaption>
+        </figure>`;
+}
 
 function openAddCheckpointForm() {
-    document.getElementById('add-cp-form').style.display = 'block';
-    document.getElementById('btn-add-cp').style.display  = 'none';
+    const form = document.getElementById('add-cp-form');
+    form.style.display = 'block';
+    document.getElementById('btn-add-cp').style.display = 'none';
 
-    // Default: hoy
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('cp-emision').value = today;
 
-    // CORRECCIÓN 2: Si es el primer checkpoint, forzar tipo INICIAL
     const existingCards = document.querySelectorAll('#ws-checkpoints-container .cp-card');
     const tipoSelect = document.getElementById('cp-tipo');
     if (existingCards.length === 0) {
         tipoSelect.value = 'INICIAL';
-        Array.from(tipoSelect.options).forEach(opt => {
-            opt.disabled = (opt.value !== 'INICIAL' && opt.value !== '');
+        Array.from(tipoSelect.options).forEach((option) => {
+            option.disabled = option.value !== 'INICIAL' && option.value !== '';
         });
     } else {
-        Array.from(tipoSelect.options).forEach(opt => { opt.disabled = false; });
+        Array.from(tipoSelect.options).forEach((option) => {
+            option.disabled = false;
+        });
         tipoSelect.value = '';
     }
 }
 
 function cancelCheckpoint() {
-    document.getElementById('add-cp-form').style.display  = 'none';
-    document.getElementById('btn-add-cp').style.display   = 'inline-block';
-    document.getElementById('cp-tipo').value              = '';
-    document.getElementById('cp-desc').value              = '';
-    document.getElementById('cp-foto-input').value        = '';
-    // Re-habilitar todas las opciones por si quedaron deshabilitadas
-    Array.from(document.getElementById('cp-tipo').options)
-        .forEach(opt => { opt.disabled = false; });
+    document.getElementById('add-cp-form').style.display = 'none';
+    document.getElementById('btn-add-cp').style.display = 'inline-flex';
+    document.getElementById('cp-tipo').value = '';
+    document.getElementById('cp-desc').value = '';
+    document.getElementById('cp-emision').value = '';
+    document.getElementById('cp-foto-input').value = '';
+    Array.from(document.getElementById('cp-tipo').options).forEach((option) => {
+        option.disabled = false;
+    });
+    resetCheckpointPhotoPreview();
 }
 
 async function submitCheckpoint() {
-    const tipo    = document.getElementById('cp-tipo').value;
-    const desc    = document.getElementById('cp-desc').value.trim();
+    const tipo = document.getElementById('cp-tipo').value;
+    const desc = document.getElementById('cp-desc').value.trim();
     const emision = document.getElementById('cp-emision').value;
-    const file    = document.getElementById('cp-foto-input').files[0];
+    const file = document.getElementById('cp-foto-input').files[0];
 
-    if (!tipo) { alert('Selecciona un tipo de checkpoint'); return; }
-    if (!desc) { alert('La descripción es obligatoria');   return; }
+    if (!tipo) {
+        showToast('Selecciona un tipo de checkpoint.', 'error');
+        return;
+    }
+    if (!desc) {
+        showToast('La descripción es obligatoria.', 'error');
+        return;
+    }
+    if (!validateImageFile(file)) {
+        return;
+    }
 
     const btn = document.getElementById('btn-submit-cp');
-    btn.disabled    = true;
-    btn.textContent = 'Guardando…';
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
 
     try {
         const res = await API.post(`/reports/${REPORT_ID}/checkpoints`, {
@@ -246,37 +285,68 @@ async function submitCheckpoint() {
             emision: emision || null,
         });
 
-        if (!res || !res.success) {
-            alert('Error: ' + (res?.message || 'No se pudo guardar'));
+        if (!res || !res.success || !res.data?.id) {
+            showToast((res?.errors && res.errors[0]) || 'No se pudo guardar el checkpoint.', 'error');
             return;
         }
 
-        // Subir foto si el usuario eligió una
-        if (file && res.data && res.data.id) {
-            await _uploadFile(res.data.id, file);
+        if (file) {
+            const uploadRes = await _uploadFile(res.data.id, file);
+            if (!uploadRes?.success) {
+                showToast((uploadRes?.errors && uploadRes.errors[0]) || 'Checkpoint creado, pero la foto no pudo subirse.', 'error');
+            } else {
+                showToast('Checkpoint y foto guardados correctamente.');
+            }
+        } else {
+            showToast('Checkpoint guardado correctamente.');
         }
 
         cancelCheckpoint();
-        await loadReportData();   // Recarga toda la vista
-
-    } catch(e) {
-        alert('Error de conexión');
-        console.error(e);
+        await loadReportData();
+    } catch (error) {
+        console.error('[REPORT] submitCheckpoint error', error);
+        showToast('Error de conexión al guardar el checkpoint.', 'error');
     } finally {
-        btn.disabled    = false;
-        btn.textContent = '✓ Guardar Checkpoint';
+        btn.disabled = false;
+        btn.textContent = originalText;
     }
 }
 
-// ══════════════════════════════════════════════════════════════
-// 6. UPLOAD DE FOTO A CHECKPOINT
-// ══════════════════════════════════════════════════════════════
-
 async function uploadPhotoFromInput(cpId, input) {
     const file = input.files[0];
-    if (!file) return;
-    await _uploadFile(cpId, file);
-    await loadReportData();
+    if (!validateImageFile(file)) {
+        input.value = '';
+        return;
+    }
+
+    const label = input.closest('[data-upload-label]');
+    const labelText = label?.querySelector('[data-upload-text]');
+    const originalText = labelText ? labelText.innerHTML : '';
+
+    if (label) {
+        label.classList.add('is-loading');
+    }
+    if (labelText) {
+        labelText.textContent = 'Subiendo foto...';
+    }
+
+    try {
+        const res = await _uploadFile(cpId, file);
+        if (!res?.success) {
+            showToast((res?.errors && res.errors[0]) || 'No se pudo subir la foto.', 'error');
+            return;
+        }
+        showToast('Foto cargada correctamente.');
+        await loadReportData();
+    } finally {
+        input.value = '';
+        if (label) {
+            label.classList.remove('is-loading');
+        }
+        if (labelText) {
+            labelText.innerHTML = originalText || '&#128247; Subir foto';
+        }
+    }
 }
 
 async function _uploadFile(cpId, file) {
@@ -285,103 +355,290 @@ async function _uploadFile(cpId, file) {
 
     const token = API.getToken();
     try {
-        const resp = await fetch(`/reports/checkpoints/${cpId}/photo`, {
+        const response = await fetch(`/reports/checkpoints/${cpId}/photo`, {
             method: 'POST',
-            headers: token ? { 'Authorization': 'Bearer ' + token } : {},
-            body: form   // No fijar Content-Type: el browser agrega el boundary
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: form,
         });
-        return await resp.json();
-    } catch(e) {
-        console.error('Error subiendo foto:', e);
+
+        let payload;
+        try {
+            payload = await response.json();
+        } catch {
+            payload = { success: false, errors: ['La respuesta del servidor no fue válida.'] };
+        }
+
+        if (!response.ok) {
+            return payload || { success: false, errors: ['No se pudo subir la foto.'] };
+        }
+        return payload;
+    } catch (error) {
+        console.error('[REPORT] upload error', error);
+        return { success: false, errors: ['Error de red al subir la foto.'] };
     }
 }
-
-// ══════════════════════════════════════════════════════════════
-// 7. CERRAR REPORTE
-// ══════════════════════════════════════════════════════════════
 
 async function cerrarReporte() {
     const cps = document.querySelectorAll('#ws-checkpoints-container .cp-card');
     if (cps.length === 0) {
-        alert('Debes crear al menos un checkpoint antes de cerrar el reporte.');
+        showToast('Debes crear al menos un checkpoint antes de cerrar el reporte.', 'error');
         return;
     }
     if (!confirm('¿Cerrar este reporte? Una vez cerrado no podrás agregar más checkpoints ni fotos.')) {
         return;
     }
+
     try {
         const res = await API.put(`/reports/${REPORT_ID}/close`, {});
         if (res && res.success) {
+            showToast('Reporte cerrado correctamente.');
             await loadReportData();
         } else {
-            alert('Error al cerrar: ' + (res?.message || 'Intenta de nuevo'));
+            showToast((res?.errors && res.errors[0]) || 'No se pudo cerrar el reporte.', 'error');
         }
-    } catch(e) {
-        alert('Error de conexión');
+    } catch (error) {
+        console.error('[REPORT] cerrarReporte error', error);
+        showToast('Error de conexión al cerrar el reporte.', 'error');
     }
 }
-
-// ══════════════════════════════════════════════════════════════
-// 7.5 GUARDAR CAMBIOS
-// ══════════════════════════════════════════════════════════════
 
 async function guardarReporte() {
     const btn = document.getElementById('btn-guardar-reporte');
     const originalText = btn.textContent;
     btn.disabled = true;
-    btn.textContent = '⏳ Guardando...';
+    btn.textContent = 'Guardando...';
 
     try {
-        // Actualizar el reporte con datos actuales
         const res = await API.put(`/reports/${REPORT_ID}`, {
             estado: document.getElementById('ws-estado-badge').textContent.trim(),
         });
 
         if (res && res.success) {
-            // Mostrar confirmación visual
-            btn.textContent = '✓ Guardado';
-            btn.style.background = '#22c55e';
-
-            setTimeout(() => {
-                btn.textContent = originalText;
-                btn.style.background = '#10b981';
-                btn.disabled = false;
-            }, 2000);
-
-            console.log('✓ Reporte guardado correctamente');
+            showToast('Reporte guardado.');
         } else {
-            alert('Error al guardar: ' + (res?.message || 'Intenta de nuevo'));
-            btn.disabled = false;
-            btn.textContent = originalText;
+            showToast((res?.errors && res.errors[0]) || 'No se pudo guardar el reporte.', 'error');
         }
-    } catch(e) {
-        alert('Error de conexión al guardar');
-        console.error(e);
+    } catch (error) {
+        console.error('[REPORT] guardarReporte error', error);
+        showToast('Error de conexión al guardar el reporte.', 'error');
+    } finally {
         btn.disabled = false;
         btn.textContent = originalText;
     }
 }
 
-// ══════════════════════════════════════════════════════════════
-// 8. NAVEGACIÓN
-// ══════════════════════════════════════════════════════════════
-
 function volverAlProyecto() {
     if (window._reportLeadId) {
-        window.location.href = '/app/crm/leads/' + window._reportLeadId;
-    } else {
-        history.back();
+        window.location.href = `/app/crm/leads/${window._reportLeadId}`;
+        return;
+    }
+    window.history.back();
+}
+
+function setupCheckpointPhotoInput() {
+    const input = document.getElementById('cp-foto-input');
+    if (!input) return;
+
+    input.addEventListener('change', () => {
+        const file = input.files[0];
+        if (!validateImageFile(file, false)) {
+            input.value = '';
+            resetCheckpointPhotoPreview();
+            if (file) {
+                showToast('Selecciona una imagen JPG, PNG o WebP de hasta 5MB.', 'error');
+            }
+            return;
+        }
+        updateCheckpointPhotoPreview(file);
+    });
+}
+
+function updateCheckpointPhotoPreview(file) {
+    const wrapper = document.getElementById('cp-photo-preview');
+    const image = document.getElementById('cp-photo-preview-image');
+    const name = document.getElementById('cp-photo-preview-name');
+    const size = document.getElementById('cp-photo-preview-size');
+
+    if (checkpointPreviewUrl) {
+        URL.revokeObjectURL(checkpointPreviewUrl);
+    }
+    checkpointPreviewUrl = URL.createObjectURL(file);
+
+    image.src = checkpointPreviewUrl;
+    name.textContent = file.name;
+    size.textContent = `${formatFileSize(file.size)} · ${friendlyMimeLabel(file.type)}`;
+    wrapper.classList.add('is-visible');
+}
+
+function resetCheckpointPhotoPreview() {
+    const wrapper = document.getElementById('cp-photo-preview');
+    const image = document.getElementById('cp-photo-preview-image');
+    const name = document.getElementById('cp-photo-preview-name');
+    const size = document.getElementById('cp-photo-preview-size');
+
+    if (checkpointPreviewUrl) {
+        URL.revokeObjectURL(checkpointPreviewUrl);
+        checkpointPreviewUrl = null;
+    }
+
+    wrapper.classList.remove('is-visible');
+    image.removeAttribute('src');
+    name.textContent = 'Sin archivo';
+    size.textContent = 'Aún no seleccionas una foto.';
+}
+
+function validateImageFile(file, showMessage = true) {
+    if (!file) return true;
+
+    if (!PHOTO_MIME_TYPES.includes((file.type || '').toLowerCase())) {
+        if (showMessage) {
+            showToast('Solo se permiten imágenes JPG, PNG o WebP.', 'error');
+        }
+        return false;
+    }
+
+    if (file.size > MAX_PHOTO_SIZE_BYTES) {
+        if (showMessage) {
+            showToast('La imagen no puede superar 5MB.', 'error');
+        }
+        return false;
+    }
+
+    return true;
+}
+
+function resolvePhotoUrl(photo) {
+    if (photo?.file_url) return photo.file_url;
+    if (photo?.file_path) {
+        const normalized = String(photo.file_path).replace(/^\/+/, '');
+        return `/${normalized}`;
+    }
+    if (photo?.auth_url) return photo.auth_url;
+    return '';
+}
+
+async function handleCheckpointImageError(img) {
+    if (!img || img.dataset.recovered === '1') {
+        return;
+    }
+    img.dataset.recovered = '1';
+
+    const authUrl = img.dataset.authUrl;
+    const blobUrl = await getProtectedPhotoBlobUrl(authUrl);
+    if (blobUrl) {
+        img.src = blobUrl;
+        return;
+    }
+
+    const frame = img.closest('.cp-photo-frame');
+    if (frame) {
+        frame.innerHTML = '<div class="cp-photo-failed">No se pudo cargar esta imagen. Reintenta la subida o revisa el archivo.</div>';
     }
 }
 
-// ══════════════════════════════════════════════════════════════
-// UTIL
-// ══════════════════════════════════════════════════════════════
+async function getProtectedPhotoBlobUrl(authUrl) {
+    if (!authUrl) return null;
+    if (photoBlobUrlCache.has(authUrl)) {
+        return photoBlobUrlCache.get(authUrl);
+    }
+
+    const token = API.getToken();
+    try {
+        const response = await fetch(authUrl, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!response.ok) {
+            return null;
+        }
+
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        photoBlobUrlCache.set(authUrl, blobUrl);
+        return blobUrl;
+    } catch (error) {
+        console.error('[REPORT] getProtectedPhotoBlobUrl error', error);
+        return null;
+    }
+}
+
+function openPhotoLightboxFromElement(img) {
+    if (!img) return;
+    openPhotoLightbox(img.currentSrc || img.src, img.dataset.caption || 'Foto checkpoint');
+}
+
+function openPhotoLightbox(src, caption) {
+    const modal = document.getElementById('report-photo-modal');
+    const image = document.getElementById('report-photo-modal-image');
+    const captionNode = document.getElementById('report-photo-modal-caption');
+
+    image.src = src;
+    captionNode.textContent = caption || 'Foto checkpoint';
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+}
+
+function closePhotoLightbox(event) {
+    if (event && event.target && event.target !== event.currentTarget && event.type !== 'click') {
+        return;
+    }
+
+    const modal = document.getElementById('report-photo-modal');
+    const image = document.getElementById('report-photo-modal-image');
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    image.removeAttribute('src');
+    document.body.style.overflow = '';
+}
+
+function setupLightboxShortcuts() {
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closePhotoLightbox();
+        }
+    });
+}
+
+function formatDateLabel(isoStr, long = false) {
+    if (!isoStr) return 'Sin fecha';
+    const date = new Date(isoStr);
+    const options = long
+        ? { day: '2-digit', month: 'long', year: 'numeric' }
+        : { day: '2-digit', month: '2-digit', year: 'numeric' };
+    return date.toLocaleDateString('es-CL', options);
+}
+
+function formatFileSize(bytes) {
+    if (!bytes) return '0 KB';
+    if (bytes >= 1024 * 1024) {
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function friendlyMimeLabel(mimeType) {
+    switch ((mimeType || '').toLowerCase()) {
+    case 'image/jpeg':
+    case 'image/jpg':
+        return 'JPG';
+    case 'image/png':
+        return 'PNG';
+    case 'image/webp':
+        return 'WebP';
+    default:
+        return mimeType || 'Imagen';
+    }
+}
 
 function escHtml(str) {
     return String(str || '')
         .replace(/&/g, '&amp;')
-        .replace(/</g,  '&lt;')
-        .replace(/>/g,  '&gt;')
-        .replace(/"/g,  '&quot;');
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function escAttr(str) {
+    return escHtml(str).replace(/`/g, '&#96;');
 }

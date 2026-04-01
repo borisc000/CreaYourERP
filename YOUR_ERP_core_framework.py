@@ -18,6 +18,7 @@ from datetime import datetime
 import uuid
 import logging
 from enum import Enum
+from YOUR_ERP_CORE.core.time_utils import utc_now
 
 # ============================================================================
 # 1. REQUEST & RESPONSE - Abstracción universal de HTTP
@@ -55,7 +56,7 @@ class Request:
     user_agent: str = ""
     
     # Timestamp
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=utc_now)
     
     # Metadata
     lang: str = "es_ES"
@@ -84,7 +85,7 @@ class Response:
     file_path: str = ""
     
     # Metadata
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=utc_now)
     request_id: str = ""
     
     def to_dict(self) -> Dict[str, Any]:

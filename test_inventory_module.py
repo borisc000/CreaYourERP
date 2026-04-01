@@ -79,6 +79,9 @@ class InventoryModuleTest(unittest.IsolatedAsyncioTestCase):
                 "reference": "OT-55",
                 "reason": "Entrega a cuadrilla",
                 "destination": "Terreno",
+                "delivered_by_name": "Luis Bodega",
+                "received_by_name": "Pedro Terreno",
+                "evidence_signature_data": "data:image/png;base64,firma-demo",
             },
         )
         self.assertEqual(move_res.status, 201)

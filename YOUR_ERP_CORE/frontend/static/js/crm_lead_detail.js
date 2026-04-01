@@ -163,7 +163,7 @@ function renderLeftColumn() {
     setText('prj-mandante', d.mandante?.name || '—');
     setText('prj-po',       l.po_number      || '—');
     setText('prj-hes',      l.hes_number     || '—');
-    setText('prj-report',   l.report_number  || '—');
+    setText('prj-report',   getPrimaryLeadReportNumber() || '—');
     setText('prj-invoice',  l.invoice_number || '—');
 
     // Financial summary
@@ -313,7 +313,8 @@ function renderEjeTab() {
     const l = LD.lead;
     if (!l) return;
 
-    setText('eje-report-number', l.report_number || '—');
+    const reports = LD.dossier?.reports || [];
+    setText('eje-report-number', getPrimaryLeadReportNumber() || '—');
     setText('eje-visit-date', l.visit_date || '—');
 
     // Restaurar estado del stepper desde el lead si existe
@@ -326,7 +327,78 @@ function renderEjeTab() {
         d => d.category === 'report_document' || d.category === 'acta_recepcion'
     );
     const badge = document.getElementById('tab-badge-eje');
-    if (docs.length > 0 && badge) { badge.textContent = docs.length; badge.style.display = 'inline-block'; }
+    const totalBadge = reports.length + docs.length;
+    if (badge) {
+        if (totalBadge > 0) {
+            badge.textContent = totalBadge;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    renderLeadReportsPanel(reports);
+}
+
+function getLatestLeadReport() {
+    const reports = LD.dossier?.reports || [];
+    return reports.length ? reports[0] : null;
+}
+
+function getPrimaryLeadReportNumber() {
+    return LD.lead?.report_number || getLatestLeadReport()?.report_number || (getLatestLeadReport() ? formatLeadReportNumber(getLatestLeadReport().id) : '');
+}
+
+function openLatestReportWorkspace() {
+    const latest = getLatestLeadReport();
+    if (!latest || !latest.id) {
+        showToast('Aún no existe un reporte para continuar.', 'info');
+        return;
+    }
+    window.location.href = '/app/reports/' + latest.id;
+}
+
+function renderLeadReportsPanel(reports) {
+    const listEl = document.getElementById('eje-reports-list');
+    const countEl = document.getElementById('eje-report-count-badge');
+    const metaEl = document.getElementById('eje-report-toolbar-meta');
+    const continueBtn = document.getElementById('btn-eje-open-last');
+    const titleEl = document.getElementById('eje-report-cta-title');
+    const subtitleEl = document.getElementById('eje-report-cta-subtitle');
+    if (!listEl) return;
+
+    if (countEl) countEl.textContent = String(reports.length || 0);
+
+    if (!reports.length) {
+        listEl.innerHTML = '<div class="eje-report-empty">Aún no se han generado reportes de terreno para esta oportunidad.</div>';
+        if (metaEl) metaEl.textContent = 'Aún no hay reportes guardados para esta oportunidad.';
+        if (continueBtn) continueBtn.style.display = 'none';
+        if (titleEl) titleEl.textContent = '+ Nuevo Reporte de Terreno';
+        if (subtitleEl) subtitleEl.textContent = 'Fotografías, mediciones y observaciones de terreno';
+        return;
+    }
+
+    const latest = reports[0];
+    if (metaEl) {
+        metaEl.textContent = `${reports.length} reporte(s) guardado(s). Último: ${formatLeadReportNumber(latest.id)} · ${fmtDateShort(latest.emision)}`;
+    }
+    if (continueBtn) continueBtn.style.display = 'inline-flex';
+    if (titleEl) titleEl.textContent = '+ Nuevo reporte adicional';
+    if (subtitleEl) subtitleEl.textContent = 'El histórico queda visible y puedes continuar el último cuando lo necesites';
+
+    listEl.innerHTML = reports.map((report, index) => `
+        <div class="eje-report-card">
+            <div>
+                <strong>${esc(report.report_number || formatLeadReportNumber(report.id))} · ${esc(report.servicio || 'Reporte de terreno')}</strong>
+                <div class="eje-report-card-meta">${esc(report.estado || 'ABIERTO')} · ${esc(fmtDateShort(report.emision))} · ${esc(report.last_checkpoint_tipo || 'Sin hitos')} · ${esc(String(report.checkpoints_count || 0))} checkpoint(s)</div>
+            </div>
+            <div class="eje-report-card-actions">
+                ${index === 0 ? '<span class="eje-report-link" style="cursor:default;">Actual</span>' : ''}
+                <a class="eje-report-link" href="/app/reports/${report.id}">Abrir workspace</a>
+                ${report.mirror_url ? `<a class="eje-report-link" href="${esc(report.mirror_url)}" target="_blank" rel="noopener">Vista espejo</a>` : ''}
+            </div>
+        </div>
+    `).join('');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -410,9 +482,12 @@ function finalizarHabilitarCobro() {
  * Abre el módulo de reportes para esta oportunidad.
  */
 function generarReporteAvance() {
-    const id = window._LEAD_ID;
-    if (!id) { showToast('ID de oportunidad no encontrado', 'error'); return; }
-    window.location.href = '/app/reports/new?lead_id=' + id;
+    const latest = getLatestLeadReport();
+    if (latest?.id) {
+        window.location.href = '/app/reports/' + latest.id;
+        return;
+    }
+    openNuevoReporteModal();
 }
 
 /**
@@ -874,6 +949,11 @@ function fmtDateShort(iso) {
             day:'2-digit', month:'2-digit', year:'numeric'
         });
     } catch { return iso; }
+}
+function formatLeadReportNumber(id) {
+    const numeric = Number(id || 0);
+    if (!numeric) return 'RPT-00000';
+    return `RPT-${String(numeric).padStart(5, '0')}`;
 }
 function populateSelect(id, items, valKey, labelKey, placeholder) {
     const el = document.getElementById(id);
