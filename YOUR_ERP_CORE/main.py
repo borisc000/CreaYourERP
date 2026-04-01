@@ -50,6 +50,7 @@ from modules.hr.api.job_profile_routes import router as job_profile_router
 from modules.hr.api.contract_routes import router as contract_router
 from modules.recruitment.api.vacancy_routes import router as vacancy_router
 from modules.cross_correspondence.api.hiring_routes import router as hiring_router
+from modules.crm.api.customer_documents_routes import router as customer_documents_router
 
 
 # ============================================================================
@@ -306,6 +307,9 @@ app.include_router(vacancy_router)
 
 # Cross-Correspondence API routes (hiring workflow)
 app.include_router(hiring_router)
+
+# CRM API routes - Customer Documents
+app.include_router(customer_documents_router)
 
 import os as _os
 _static_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "frontend", "static")
