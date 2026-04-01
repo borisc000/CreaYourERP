@@ -53,6 +53,9 @@ from modules.cross_correspondence.api.hiring_routes import router as hiring_rout
 from modules.crm.api.customer_documents_routes import router as customer_documents_router
 from modules.signature.api.signature_routes import router as signature_router
 
+# Import and register event listeners
+from modules.signature import listeners  # This imports and registers all listeners
+
 
 # ============================================================================
 # CONFIGURACIÓN
