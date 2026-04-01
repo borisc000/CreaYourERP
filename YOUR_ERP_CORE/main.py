@@ -13,10 +13,12 @@ Este archivo muestra:
 
 import asyncio
 import logging
-from typing import Dict, Any
+from contextlib import asynccontextmanager
+from typing import Dict, Any, List, Tuple
 from fastapi import FastAPI, Request as FastAPIRequest, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import Response as StarletteResponse
 
 # Importar framework
 from core.YOUR_ERP_core_framework import (
@@ -24,34 +26,142 @@ from core.YOUR_ERP_core_framework import (
 )
 from modules.base.module_base import BaseModule
 from modules.signature.module_signature import SignatureModule
+from modules.document_center.module_document_center import DocumentCenterModule
 from modules.crm.module_crm import CRMModule
 from modules.quotes.module_quotes import QuotesModule
+from modules.billing.module_billing import BillingModule
 from modules.reports.module_reports import ReportsModule
 from modules.hr.module_hr import HRModule
+from modules.attendance.module_attendance import AttendanceModule
+from modules.payroll.module_payroll import PayrollModule
 from modules.recruitment.module_recruitment import RecruitmentModule
 from modules.safety.module_safety import SafetyModule
 from modules.inventory.module_inventory import InventoryModule
+from modules.rentals.module_rentals import RentalsModule
+from modules.riohs.module_riohs import RiohsModule
+from modules.mail.module_mail import MailModule
+from modules.google_workspace.module_google_workspace import GoogleWorkspaceModule
+from modules.job_profiles.module_job_profiles import JobProfilesModule
+from modules.ai.module_ai import AIModule
+from core.config import settings, validate_config
+from core.time_utils import utc_now, utc_strftime
+from modules.base.api.config_routes import router as config_router
 
 
 # ============================================================================
 # CONFIGURACIÓN
 # ============================================================================
 
+ALL_MODULE_CLASSES = [
+    BaseModule,
+    SignatureModule,
+    DocumentCenterModule,
+    CRMModule,
+    QuotesModule,
+    BillingModule,
+    ReportsModule,
+    HRModule,
+    AttendanceModule,
+    PayrollModule,
+    RecruitmentModule,
+    SafetyModule,
+    JobProfilesModule,
+    InventoryModule,
+    RentalsModule,
+    RiohsModule,
+    MailModule,
+    GoogleWorkspaceModule,
+    AIModule,
+]
+AVAILABLE_MODULE_CLASSES = {
+    getattr(module_class, "name", module_class.__name__).lower(): module_class
+    for module_class in ALL_MODULE_CLASSES
+}
+DEFAULT_MODULES_TO_LOAD = list(AVAILABLE_MODULE_CLASSES.keys())
+FRAMEWORK_STORAGE_MODE = "in_memory_demo"
+FRAMEWORK_STORAGE_WARNING = (
+    "Database settings are configured, but the current ORM and adapter still persist data in memory only."
+)
+
+
+def resolve_modules_to_load(raw_modules: List[str]) -> Tuple[List[str], List[str]]:
+    """Normalizar el listado de módulos y separar entradas desconocidas."""
+    resolved = []
+    unknown = []
+
+    for raw_name in raw_modules or []:
+        module_name = str(raw_name or "").strip().lower()
+        if not module_name:
+            continue
+        if module_name in AVAILABLE_MODULE_CLASSES:
+            if module_name not in resolved:
+                resolved.append(module_name)
+            continue
+        unknown.append(module_name)
+
+    return resolved or DEFAULT_MODULES_TO_LOAD, unknown
+
+
+CONFIGURED_MODULES_TO_LOAD, UNKNOWN_MODULES = resolve_modules_to_load(settings.modules_to_load)
+validate_config()
+
 # Config del framework
 ERP_CONFIG = {
-    'database_url': 'postgresql://user:password@localhost/your_erp',
-    'debug': True,
-    'secret_key': 'your-secret-key-here',
-    'modules_to_load': ['base', 'signature', 'crm', 'quotes', 'reports', 'hr', 'recruitment', 'safety', 'inventory'],
+    'database_url': settings.database_url,
+    'debug': settings.debug,
+    'secret_key': settings.secret_key,
+    'modules_to_load': CONFIGURED_MODULES_TO_LOAD,
+    'environment': settings.environment.value,
+    'database_type': settings.database_type.value,
+    'storage_mode': FRAMEWORK_STORAGE_MODE,
 }
 
 # Setup de logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
 logger = logging.getLogger(__name__)
+if UNKNOWN_MODULES:
+    logger.warning(
+        "Ignoring unknown modules from configuration: %s",
+        ", ".join(UNKNOWN_MODULES),
+    )
+logger.warning("%s", FRAMEWORK_STORAGE_WARNING)
+
+
+def get_default_demo_modules() -> List[str]:
+    """Alinear los permisos demo con los módulos realmente cargados."""
+    loaded_modules = set(ERP_CONFIG['modules_to_load'])
+    demo_modules = ['settings', 'users']
+    module_access_map = {
+        'crm': 'crm',
+        'reports': 'operations',
+        'billing': 'finance',
+        'recruitment': 'recruitment',
+        'hr': 'hr',
+        'attendance': 'hr',
+        'payroll': 'payroll',
+        'inventory': 'inventory',
+        'rentals': 'rentals',
+        'safety': 'safety',
+        'document_center': 'document_center',
+        'signature': 'signature',
+        'mail': 'mail',
+        'google_workspace': 'google_workspace',
+        'ai': 'ai',
+    }
+
+    for module_name in ERP_CONFIG['modules_to_load']:
+        access_name = module_access_map.get(module_name)
+        if access_name and access_name not in demo_modules:
+            demo_modules.append(access_name)
+
+    if {'document_center', 'signature', 'reports'} & loaded_modules and 'operations' not in demo_modules:
+        demo_modules.append('operations')
+
+    return demo_modules
 
 
 # ============================================================================
@@ -66,18 +176,16 @@ def init_framework() -> CoreFramework:
     framework = CoreFramework(ERP_CONFIG)
     
     # Registrar módulos
-    framework.register_module_class(BaseModule)
-    framework.register_module_class(SignatureModule)
-    framework.register_module_class(CRMModule)
-    framework.register_module_class(QuotesModule)
-    framework.register_module_class(ReportsModule)
-    framework.register_module_class(HRModule)
-    framework.register_module_class(RecruitmentModule)
-    framework.register_module_class(SafetyModule)
-    framework.register_module_class(InventoryModule)
-    
+    for module_class in ALL_MODULE_CLASSES:
+        framework.register_module_class(module_class)
+
     # Inicializar
     framework.initialize()
+    logger.warning(
+        "Framework storage mode: %s (configured database type: %s)",
+        FRAMEWORK_STORAGE_MODE,
+        settings.database_type.value,
+    )
     
     logger.info("Framework initialized successfully")
     return framework
@@ -87,28 +195,31 @@ def init_framework() -> CoreFramework:
 # FASTAPI APP
 # ============================================================================
 
-# Inicializar framework una sola vez
-erp_framework = init_framework()
-
-# Crear app FastAPI
-app = FastAPI(
-    title="YOUR ERP",
-    description="Open source ERP platform",
-    version="1.0.0"
-)
-
-# Startup event - seed demo data if empty
-@app.on_event("startup")
 async def startup_seed():
     """Seed demo data on startup if database is empty"""
     try:
         from modules.base.module_base import User, Company
         from modules.crm.module_crm import Customer
-        from datetime import datetime
+        default_demo_modules = get_default_demo_modules()
 
         # Check if demo user exists
         demo_users = User.search([('email', '=', 'demo@pedroconstruction.cl')])
         if demo_users:
+            demo_user = demo_users[0]
+            changed = False
+            if demo_user.role != 'company_admin':
+                demo_user.role = 'company_admin'
+                changed = True
+            if not demo_user.is_admin:
+                demo_user.is_admin = True
+                changed = True
+            current_modules = set(demo_user.allowed_modules or [])
+            if current_modules != set(default_demo_modules):
+                demo_user.allowed_modules = list(default_demo_modules)
+                changed = True
+            if changed:
+                demo_user.save()
+                print("  [i] Demo user normalized with current permissions")
             print("  [i] Demo user already exists")
             return
 
@@ -132,10 +243,12 @@ async def startup_seed():
             email='demo@pedroconstruction.cl',
             name='Usuario Demo',
             is_active=True,
-            role='manager'
+            role='company_admin',
+            is_admin=True,
+            allowed_modules=default_demo_modules,
         )
         user.set_password('demo123')
-        user.auth_token = f"demo_token_{user.id}_{datetime.utcnow().timestamp()}"
+        user.auth_token = f"demo_token_{user.id}_{utc_now().timestamp()}"
         user.save()
 
         print(f"  [+] Demo data seeded - Email: demo@pedroconstruction.cl / Password: demo123")
@@ -143,11 +256,31 @@ async def startup_seed():
     except Exception as e:
         print(f"  [!] Seed error: {str(e)[:100]}")
 
+
+@asynccontextmanager
+async def app_lifespan(_: FastAPI):
+    """Lifespan hook used instead of deprecated startup events."""
+    await startup_seed()
+    yield
+
+
+# Inicializar framework una sola vez
+erp_framework = init_framework()
+
+# Crear app FastAPI
+app = FastAPI(
+    title="YOUR ERP",
+    description="Open source ERP platform",
+    version="1.0.0",
+    lifespan=app_lifespan,
+)
+
 # Middleware CORS
+_cors_allowed_origins = [origin for origin in settings.allowed_origins if origin]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_allowed_origins or ["*"],
+    allow_credentials=bool(_cors_allowed_origins) and "*" not in _cors_allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -156,6 +289,9 @@ app.add_middleware(
 from fastapi.staticfiles import StaticFiles
 from frontend.routes import router as frontend_router
 app.include_router(frontend_router)
+
+# Base API config routes
+app.include_router(config_router)
 import os as _os
 _static_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "frontend", "static")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
@@ -543,11 +679,20 @@ async function runTests() {{
 @app.get("/health")
 async def health():
     """Health check endpoint"""
+    modules_loaded = list(erp_framework.module_registry.get_all_loaded().keys())
     return {
         "status": "ok",
         "framework": "YOUR_ERP",
+        "environment": settings.environment.value,
         "debug": ERP_CONFIG['debug'],
-        "modules_loaded": list(erp_framework.module_registry.get_all_loaded().keys())
+        "modules_configured": ERP_CONFIG['modules_to_load'],
+        "modules_loaded": modules_loaded,
+        "storage_mode": FRAMEWORK_STORAGE_MODE,
+        "persistence_ready": False,
+        "database_configured_type": settings.database_type.value,
+        "database_configured_host": settings.database_host if settings.database_type.value != "sqlite" else None,
+        "database_configured_name": settings.database_name if settings.database_type.value != "sqlite" else "db.sqlite3",
+        "warnings": [FRAMEWORK_STORAGE_WARNING],
     }
 
 
@@ -575,6 +720,9 @@ async def upload_report_photo(cp_id: int, file: UploadFile = File(...), fastapi_
             if users:
                 user_id = users[0].id
 
+        if not user_id:
+            return JSONResponse(status_code=401, content={"success": False, "errors": ["Authentication required"]})
+
         # Validar acceso al checkpoint
         from modules.reports.module_reports import ReportCheckpoint, Report
         checkpoint = ReportCheckpoint.find_by_id(cp_id)
@@ -586,8 +734,14 @@ async def upload_report_photo(cp_id: int, file: UploadFile = File(...), fastapi_
             return JSONResponse(status_code=403, content={"success": False, "errors": ["Reporte cerrado o no existe"]})
 
         # Validar MIME
-        PHOTO_ALLOWED_MIMES = {'image/jpeg', 'image/png', 'image/webp'}
-        if file.content_type not in PHOTO_ALLOWED_MIMES:
+        photo_allowed_mimes = {
+            'image/jpeg': 'jpg',
+            'image/jpg': 'jpg',
+            'image/png': 'png',
+            'image/webp': 'webp',
+        }
+        file_mime = (file.content_type or '').lower()
+        if file_mime not in photo_allowed_mimes:
             return JSONResponse(status_code=415, content={"success": False, "errors": ["Solo JPEG, PNG, WebP permitidos"]})
 
         # Leer contenido
@@ -596,12 +750,16 @@ async def upload_report_photo(cp_id: int, file: UploadFile = File(...), fastapi_
             return JSONResponse(status_code=413, content={"success": False, "errors": ["Imagen no puede superar 5MB"]})
 
         # Guardar en disco
-        from datetime import datetime
-        rel_dir = _os_file.path.join('uploads', 'report_photos', str(cp_id))
-        abs_dir = _os_file.path.join(_os_file.dirname(_os_file.abspath(__file__)), 'YOUR_ERP_CORE', rel_dir)
+        rel_dir = _os_file.path.join('report_photos', str(cp_id))
+        abs_dir = _os_file.path.join(
+            _os_file.path.dirname(_os_file.path.abspath(__file__)),
+            'uploads',
+            rel_dir,
+        )
         _os_file.makedirs(abs_dir, exist_ok=True)
 
-        filename = f"foto_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.jpg"
+        extension = photo_allowed_mimes[file_mime]
+        filename = f"foto_{utc_now().strftime('%Y%m%d%H%M%S%f')}.{extension}"
         abs_path = _os_file.path.join(abs_dir, filename)
         file_path = _os_file.path.join(rel_dir, filename)
 
@@ -610,21 +768,24 @@ async def upload_report_photo(cp_id: int, file: UploadFile = File(...), fastapi_
 
         # Crear registro de foto en BD
         from modules.reports.module_reports import ReportPhoto
-        photo = ReportPhoto(
-            checkpoint_id=cp_id,
-            file_path=file_path,
-            file_url=f"/uploads/{file_path.replace(chr(92), '/')}",
-            created_at=datetime.utcnow().isoformat()
-        )
-        photo.save()
+        file_url = f"/uploads/{file_path.replace(chr(92), '/')}"
+        photo = ReportPhoto.create({
+            "company_id": report.company_id,
+            "checkpoint_id": cp_id,
+            "filename": filename,
+            "file_path": file_path,
+            "mime_type": file_mime,
+            "uploaded_by": user_id,
+        })
 
         logger.info(f"Photo uploaded: {file_path} for checkpoint {cp_id}")
         return JSONResponse(status_code=201, content={
             "success": True,
             "data": {
                 "id": photo.id,
-                "file_path": photo.file_path,
-                "file_url": photo.file_url
+                "file_path": f"uploads/{file_path.replace(chr(92), '/')}",
+                "file_url": file_url,
+                "auth_url": f"/reports/photos/{photo.id}",
             }
         })
 
@@ -654,6 +815,8 @@ async def catch_all(fastapi_request: FastAPIRequest, path: str):
         response = await erp_framework.dispatch_request(request)
 
         # Convertir response a JSON de FastAPI
+        if isinstance(response, StarletteResponse):
+            return response
         return JSONResponse(
             status_code=response.status,
             content=response.to_dict(),
@@ -688,16 +851,18 @@ if __name__ == "__main__":
 
     print(f"  Modules loaded: {list(erp_framework.module_registry.get_all_loaded().keys())}")
     print(f"  Debug mode: {ERP_CONFIG['debug']}")
-    print(f"  Server running at: http://localhost:8000")
-    print(f"  API docs at: http://localhost:8000/docs")
+    print(f"  Environment: {settings.environment.value}")
+    print(f"  Storage mode: {FRAMEWORK_STORAGE_MODE}")
+    print(f"  Server running at: http://{settings.host}:{settings.port}")
+    print(f"  API docs at: http://{settings.host}:{settings.port}/docs")
     
     # Iniciar servidor
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=False,  # Disabled auto-reload to prevent issues
-        log_level="info"
+        host=settings.host,
+        port=settings.port,
+        reload=False,
+        log_level=settings.log_level.lower(),
     )
 
 
