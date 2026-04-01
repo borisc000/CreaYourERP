@@ -48,6 +48,7 @@ from core.time_utils import utc_now, utc_strftime
 from modules.base.api.config_routes import router as config_router
 from modules.hr.api.job_profile_routes import router as job_profile_router
 from modules.hr.api.contract_routes import router as contract_router
+from modules.recruitment.api.vacancy_routes import router as vacancy_router
 from modules.cross_correspondence.api.hiring_routes import router as hiring_router
 
 
@@ -299,6 +300,9 @@ app.include_router(config_router)
 # HR API routes
 app.include_router(job_profile_router)
 app.include_router(contract_router)
+
+# Recruitment API routes
+app.include_router(vacancy_router)
 
 # Cross-Correspondence API routes (hiring workflow)
 app.include_router(hiring_router)
