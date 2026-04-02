@@ -113,3 +113,115 @@ footer {
 .list-group-item:hover {
     background-color: var(--light-bg);
 }
+
+/* =========================================================================
+   Accreditation Matrix
+   ========================================================================= */
+
+.accreditation-card {
+    border-left: 4px solid;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.accreditation-card.compliant {
+    border-left-color: #28a745;
+}
+
+.accreditation-card.attention {
+    border-left-color: #ffc107;
+}
+
+.accreditation-card.non_compliant {
+    border-left-color: #dc3545;
+}
+
+.accreditation-card.pending {
+    border-left-color: #6c757d;
+}
+
+.accreditation-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+/* Progress bars */
+.accreditation-progress {
+    height: 8px;
+    border-radius: 4px;
+    margin-top: 5px;
+}
+
+/* Status badges / pills */
+.status-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.status-pill.compliant { background: #d4edda; color: #155724; }
+.status-pill.attention { background: #fff3cd; color: #856404; }
+.status-pill.non_compliant { background: #f8d7da; color: #721c24; }
+.status-pill.pending { background: #cce5ff; color: #004085; }
+.status-pill.signing { background: #e2e3f1; color: #383d41; }
+
+/* Document list */
+.doc-list {
+    list-style: none;
+    padding: 0;
+}
+
+.doc-list li {
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.doc-list li:last-child {
+    border-bottom: none;
+}
+
+.doc-status-icon {
+    font-size: 1.1em;
+    margin-right: 8px;
+}
+
+/* Crew summary bar */
+.crew-summary {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 0;
+}
+
+.crew-summary .stat {
+    font-size: 1.2em;
+    font-weight: 600;
+}
+
+/* Employee selector modal */
+.employee-selector {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.employee-selector .form-check {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.employee-selector .form-check:hover {
+    background-color: #f8f9fa;
+}
+
+/* Responsive adjustments for doc-list on small screens */
+@media (max-width: 768px) {
+    .doc-list li {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}

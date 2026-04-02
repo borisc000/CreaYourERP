@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Acreditación - YOUR ERP{% endblock %}
+
+{% block content %}
+<!-- Section 1: Service Order Header -->
+<div class="row mb-3">
+    <div class="col-md-8">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/accreditation">Acreditación</a></li>
+                <li class="breadcrumb-item active" id="breadcrumb-title">Orden #{{ service_order_id }}</li>
+            </ol>
+        </nav>
+        <h1 id="so-title">Cargando...</h1>
+        <div id="so-meta" class="text-muted"></div>
+    </div>
+    <div class="col-md-4 text-end">
+        <span id="so-status-badge"></span>
+    </div>
+</div>
+
+<!-- Service Order Info Card -->
+<div class="card mb-4" id="so-info-card">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <small class="text-muted">Cliente</small>
+                <p class="fw-bold mb-1" id="so-customer">-</p>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Ubicación</small>
+                <p class="fw-bold mb-1" id="so-location">-</p>
+            </div>
+            <div class="col-md-2">
+                <small class="text-muted">Nivel de Riesgo</small>
+                <p class="fw-bold mb-1" id="so-risk">-</p>
+            </div>
+            <div class="col-md-2">
+                <small class="text-muted">Fecha Inicio</small>
+                <p class="fw-bold mb-1" id="so-start">-</p>
+            </div>
+            <div class="col-md-2">
+                <small class="text-muted">Fecha Fin</small>
+                <p class="fw-bold mb-1" id="so-end">-</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 2: Toolbar -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmployeesModal">
+                    + Agregar Trabajadores
+                </button>
+                <button class="btn btn-outline-secondary" onclick="recomputeChecks()">
+                    Recomputar Checks
+                </button>
+                <button class="btn btn-outline-warning" onclick="generateAllMissing()">
+                    Generar Todos los Pendientes
+                </button>
+            </div>
+            <div class="crew-summary">
+                <span id="crew-badge" class="badge bg-info fs-6">0 de 0 trabajadores acreditados</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 3: Accreditation Matrix -->
+<div id="matrix-container">
+    <div class="text-center py-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+        <p class="text-muted mt-2">Cargando matriz de acreditación...</p>
+    </div>
+</div>
+
+<!-- Section 4: Employee Selection Modal -->
+<div class="modal fade" id="addEmployeesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Agregar Trabajadores a la Cuadrilla</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="employeeSearch" placeholder="Buscar empleado por nombre..." oninput="filterEmployees()">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Rol en la Cuadrilla</label>
+                    <select class="form-select" id="crewRole">
+                        <option value="operator">Operador</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="helper">Ayudante</option>
+                    </select>
+                </div>
+                <div class="employee-selector" id="employee-list">
+                    <div class="text-center py-3">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        Cargando empleados...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="addSelectedEmployees()">Agregar a Cuadrilla</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const SERVICE_ORDER_ID = {{ service_order_id }};
+let allEmployees = [];
+let matrixRefreshInterval = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadServiceOrder(SERVICE_ORDER_ID);
+    loadAccreditationMatrix(SERVICE_ORDER_ID);
+    loadAvailableEmployees();
+
+    // Auto-refresh every 15 seconds
+    matrixRefreshInterval = setInterval(function() {
+        refreshMatrix();
+    }, 15000);
+});
+
+// =========================================================================
+// Core Data Loading
+// =========================================================================
+
+function loadServiceOrder(id) {
+    fetch(`/api/accreditation/service-orders/${id}`)
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        })
+        .then(so => {
+            document.getElementById('so-title').textContent = so.title || `Orden #${so.id}`;
+            document.getElementById('breadcrumb-title').textContent = so.title || `Orden #${so.id}`;
+            document.getElementById('so-customer').textContent = so.customer_id ? `Cliente #${so.customer_id}` : (so.lead_id ? `Lead #${so.lead_id}` : 'Sin asignar');
+            document.getElementById('so-location').textContent = so.location || 'No especificada';
+
+            const riskMap = { low: 'Bajo', medium: 'Medio', high: 'Alto', critical: 'Crítico' };
+            const riskColors = { low: 'success', medium: 'warning', high: 'danger', critical: 'danger' };
+            const riskLevel = so.risk_level || 'medium';
+            document.getElementById('so-risk').innerHTML = `<span class="badge bg-${riskColors[riskLevel] || 'secondary'}">${riskMap[riskLevel] || riskLevel}</span>`;
+
+            document.getElementById('so-start').textContent = so.start_date || '-';
+            document.getElementById('so-end').textContent = so.end_date || '-';
+
+            const statusMap = {
+                draft: ['Borrador', 'secondary'],
+                active: ['Activo', 'success'],
+                completed: ['Completado', 'info'],
+                cancelled: ['Cancelado', 'danger']
+            };
+            const [statusText, statusColor] = statusMap[so.status] || [so.status, 'secondary'];
+            document.getElementById('so-status-badge').innerHTML = `<span class="badge bg-${statusColor} fs-6">${statusText}</span>`;
+        })
+        .catch(err => {
+            console.error('Error loading service order:', err);
+            document.getElementById('so-title').textContent = 'Error al cargar';
+        });
+}
+
+function loadAccreditationMatrix(id) {
+    fetch(`/api/accreditation/service-orders/${id}/checks`)
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        })
+        .then(checks => {
+            renderMatrix(checks);
+        })
+        .catch(err => {
+            console.error('Error loading matrix:', err);
+            document.getElementById('matrix-container').innerHTML =
+                '<div class="alert alert-warning">No se pudo cargar la matriz de acreditación. Asegúrese de que hay trabajadores asignados.</div>';
+        });
+}
+
+function loadEmployeeDetail(soId, empId) {
+    return fetch(`/api/accreditation/service-orders/${soId}/checks/${empId}`)
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        });
+}
+
+function loadAvailableEmployees() {
+    fetch('/api/hr/employees')
+        .then(res => res.json())
+        .then(data => {
+            allEmployees = Array.isArray(data) ? data : [];
+            renderEmployeeList(allEmployees);
+        })
+        .catch(err => {
+            console.error('Error loading employees:', err);
+            document.getElementById('employee-list').innerHTML = '<p class="text-danger">Error al cargar empleados</p>';
+        });
+}
+
+// =========================================================================
+// Actions
+// =========================================================================
+
+function addSelectedEmployees() {
+    const checkboxes = document.querySelectorAll('#employee-list input[type="checkbox"]:checked');
+    const employeeIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    const role = document.getElementById('crewRole').value;
+
+    if (employeeIds.length === 0) {
+        showNotification('Seleccione al menos un empleado', 'warning');
+        return;
+    }
+
+    fetch(`/api/accreditation/service-orders/${SERVICE_ORDER_ID}/crew`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee_ids: employeeIds, role: role })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(data => {
+        showNotification(`${employeeIds.length} trabajador(es) agregados a la cuadrilla`, 'success');
+        bootstrap.Modal.getInstance(document.getElementById('addEmployeesModal')).hide();
+        // Uncheck all
+        document.querySelectorAll('#employee-list input[type="checkbox"]').forEach(cb => cb.checked = false);
+        refreshMatrix();
+        loadServiceOrder(SERVICE_ORDER_ID);
+    })
+    .catch(err => {
+        console.error('Error adding crew:', err);
+        showNotification('Error al agregar trabajadores', 'danger');
+    });
+}
+
+function removeCrewMember(empId) {
+    if (!confirm('¿Está seguro de remover este trabajador de la cuadrilla?')) return;
+
+    fetch(`/api/accreditation/service-orders/${SERVICE_ORDER_ID}/crew/${empId}`, {
+        method: 'DELETE'
+    })
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(() => {
+        showNotification('Trabajador removido de la cuadrilla', 'success');
+        refreshMatrix();
+        loadServiceOrder(SERVICE_ORDER_ID);
+    })
+    .catch(err => {
+        console.error('Error removing crew member:', err);
+        showNotification('Error al remover trabajador', 'danger');
+    });
+}
+
+function recomputeChecks() {
+    showNotification('Recomputando checks...', 'info');
+    fetch(`/api/accreditation/service-orders/${SERVICE_ORDER_ID}/checks/recompute`, {
+        method: 'POST'
+    })
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(data => {
+        showNotification(`Checks recomputados: ${data.recomputed_count} verificaciones`, 'success');
+        refreshMatrix();
+    })
+    .catch(err => {
+        console.error('Error recomputing:', err);
+        showNotification('Error al recomputar checks', 'danger');
+    });
+}
+
+function generateMissing(empId) {
+    showNotification('Generando documentos pendientes...', 'info');
+    fetch(`/api/accreditation/service-orders/${SERVICE_ORDER_ID}/checks/${empId}/generate-missing`, {
+        method: 'POST'
+    })
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(data => {
+        showNotification(`Generados: ${data.generated_count}, Omitidos: ${data.skipped_count}`, 'success');
+        refreshMatrix();
+    })
+    .catch(err => {
+        console.error('Error generating missing:', err);
+        showNotification('Error al generar documentos', 'danger');
+    });
+}
+
+function generateAllMissing() {
+    if (!confirm('¿Generar solicitudes de documentos para TODOS los trabajadores con pendientes?')) return;
+
+    showNotification('Generando todos los documentos pendientes...', 'info');
+    fetch(`/api/accreditation/service-orders/${SERVICE_ORDER_ID}/checks/generate-all-missing`, {
+        method: 'POST'
+    })
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(data => {
+        showNotification(
+            `Procesados: ${data.employees_processed} trabajadores, Generados: ${data.total_generated}, Omitidos: ${data.total_skipped}`,
+            'success'
+        );
+        refreshMatrix();
+    })
+    .catch(err => {
+        console.error('Error generating all missing:', err);
+        showNotification('Error al generar documentos', 'danger');
+    });
+}
+
+function refreshMatrix() {
+    loadAccreditationMatrix(SERVICE_ORDER_ID);
+}
+
+// =========================================================================
+// UI Rendering
+// =========================================================================
+
+function renderMatrix(checks) {
+    const container = document.getElementById('matrix-container');
+
+    if (!checks || checks.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <strong>Sin trabajadores asignados.</strong> Agregue trabajadores a la cuadrilla para ver la matriz de acreditación.
+            </div>`;
+        document.getElementById('crew-badge').textContent = '0 de 0 trabajadores acreditados';
+        return;
+    }
+
+    const totalWorkers = checks.length;
+    const compliantWorkers = checks.filter(c => c.overall_status === 'compliant').length;
+    document.getElementById('crew-badge').textContent = `${compliantWorkers} de ${totalWorkers} trabajadores acreditados`;
+
+    let html = '';
+    for (const check of checks) {
+        html += renderAccreditationCard(check);
+    }
+    container.innerHTML = html;
+}
+
+function renderAccreditationCard(check) {
+    const empId = check.employee_id;
+    const empName = check.employee_name || `Empleado #${empId}`;
+    const overall = check.overall_status || 'non_compliant';
+
+    const statusIcons = {
+        compliant: '&#9989;',
+        attention: '&#9888;&#65039;',
+        non_compliant: '&#10060;',
+        pending: '&#128260;'
+    };
+    const statusLabels = {
+        compliant: 'Completo',
+        attention: 'Atención',
+        non_compliant: 'No Cumple',
+        pending: 'Pendiente'
+    };
+
+    const overallIcon = statusIcons[overall] || statusIcons.non_compliant;
+    const cardClass = overall;
+
+    // Level A progress
+    const aValid = check.level_a_valid || 0;
+    const aTotal = check.level_a_total || 0;
+    const aPct = aTotal > 0 ? Math.round((aValid / aTotal) * 100) : 0;
+    const aStatus = check.level_a_status || 'pending';
+
+    // Level B progress
+    const bValid = check.level_b_valid || 0;
+    const bTotal = check.level_b_total || 0;
+    const bPct = bTotal > 0 ? Math.round((bValid / bTotal) * 100) : 0;
+    const bStatus = check.level_b_status || 'pending';
+
+    function progressBarColor(pct) {
+        if (pct >= 80) return 'bg-success';
+        if (pct >= 50) return 'bg-warning';
+        return 'bg-danger';
+    }
+
+    return `
+    <div class="card accreditation-card ${cardClass}">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h5 class="card-title mb-0">&#128100; ${empName}</h5>
+                </div>
+                <span class="status-pill ${overall}">${statusLabels[overall] || overall} ${overallIcon}</span>
+            </div>
+
+            <div class="row mb-2">
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="fw-bold">Level A (General):</small>
+                        <span class="status-pill ${aStatus}" style="font-size:0.75em">${statusLabels[aStatus] || aStatus}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <div class="progress accreditation-progress flex-grow-1">
+                            <div class="progress-bar ${progressBarColor(aPct)}" style="width: ${aPct}%"></div>
+                        </div>
+                        <small class="text-nowrap">${aValid}/${aTotal}</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="fw-bold">Level B (Específico):</small>
+                        <span class="status-pill ${bStatus}" style="font-size:0.75em">${statusLabels[bStatus] || bStatus}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <div class="progress accreditation-progress flex-grow-1">
+                            <div class="progress-bar ${progressBarColor(bPct)}" style="width: ${bPct}%"></div>
+                        </div>
+                        <small class="text-nowrap">${bValid}/${bTotal}</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <button class="btn btn-sm btn-outline-primary" onclick="toggleDocuments(${empId})">
+                    Ver Documentos &#9660;
+                </button>
+                <button class="btn btn-sm btn-outline-warning" onclick="generateMissing(${empId})">
+                    Generar Pendientes
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="removeCrewMember(${empId})">
+                    Remover
+                </button>
+            </div>
+
+            <div id="docs-${empId}" class="mt-3" style="display:none;">
+                <div class="text-center py-2">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                    Cargando documentos...
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function toggleDocuments(empId) {
+    const container = document.getElementById(`docs-${empId}`);
+    if (!container) return;
+
+    if (container.style.display === 'none') {
+        container.style.display = 'block';
+        // Load detailed data
+        loadEmployeeDetail(SERVICE_ORDER_ID, empId)
+            .then(detail => {
+                container.innerHTML = renderDocumentList(detail);
+            })
+            .catch(err => {
+                console.error('Error loading employee detail:', err);
+                container.innerHTML = '<div class="alert alert-warning">Error al cargar documentos</div>';
+            });
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+function renderDocumentList(detail) {
+    let html = '';
+
+    // Level A documents
+    const levelA = detail.level_a || [];
+    html += '<div class="mb-3">';
+    html += '<h6 class="fw-bold">Documentos Generales (Level A):</h6>';
+    if (levelA.length === 0) {
+        html += '<p class="text-muted ms-3">Sin requisitos generales configurados</p>';
+    } else {
+        html += '<ul class="doc-list">';
+        for (const doc of levelA) {
+            html += renderDocumentItem(doc, detail.employee_id);
+        }
+        html += '</ul>';
+    }
+    html += '</div>';
+
+    // Level B documents
+    const levelB = detail.level_b || [];
+    html += '<div class="mb-3">';
+    html += '<h6 class="fw-bold">Documentos Específicos (Level B):</h6>';
+    if (levelB.length === 0) {
+        html += '<p class="text-muted ms-3">Sin requisitos específicos configurados</p>';
+    } else {
+        html += '<ul class="doc-list">';
+        for (const doc of levelB) {
+            html += renderDocumentItem(doc, detail.employee_id);
+        }
+        html += '</ul>';
+    }
+    html += '</div>';
+
+    return html;
+}
+
+function renderDocumentItem(doc, empId) {
+    const statusConfig = {
+        approved: { icon: '&#9989;', label: 'Aprobado', pillClass: 'compliant' },
+        valid: { icon: '&#9989;', label: 'Válido', pillClass: 'compliant' },
+        signing: { icon: '&#128260;', label: 'EN FIRMA', pillClass: 'signing' },
+        pending: { icon: '&#10060;', label: 'PENDIENTE', pillClass: 'non_compliant' },
+        missing: { icon: '&#10060;', label: 'PENDIENTE', pillClass: 'non_compliant' },
+        expired: { icon: '&#9888;&#65039;', label: 'EXPIRADO', pillClass: 'attention' }
+    };
+
+    const status = doc.status || 'missing';
+    const config = statusConfig[status] || statusConfig.missing;
+    const docName = doc.name || doc.code || `Requisito #${doc.requirement_id}`;
+    const dateStr = doc.approved_date ? doc.approved_date : '';
+
+    let actionBtn = '';
+    if (status === 'missing' || status === 'pending') {
+        actionBtn = `<button class="btn btn-sm btn-outline-primary ms-2" onclick="generateMissing(${empId})">Generar Solicitud de Firma</button>`;
+    }
+
+    return `
+        <li>
+            <div class="d-flex align-items-center">
+                <span class="doc-status-icon">${config.icon}</span>
+                <span>${docName}</span>
+            </div>
+            <div class="d-flex align-items-center">
+                <span class="status-pill ${config.pillClass}">${config.label}</span>
+                ${dateStr ? `<small class="text-muted ms-2">${dateStr}</small>` : ''}
+                ${actionBtn}
+            </div>
+        </li>`;
+}
+
+function updateProgressBar(valid, total) {
+    const pct = total > 0 ? Math.round((valid / total) * 100) : 0;
+    let colorClass = 'bg-danger';
+    if (pct >= 80) colorClass = 'bg-success';
+    else if (pct >= 50) colorClass = 'bg-warning';
+    return { pct, colorClass };
+}
+
+// =========================================================================
+// Employee Selector
+// =========================================================================
+
+function renderEmployeeList(employees) {
+    const container = document.getElementById('employee-list');
+    if (employees.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">No se encontraron empleados</p>';
+        return;
+    }
+
+    let html = '';
+    for (const emp of employees) {
+        const name = `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || `Empleado #${emp.id}`;
+        const cedula = emp.cedula || '-';
+        html += `
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="${emp.id}" id="emp-check-${emp.id}">
+                <label class="form-check-label d-flex justify-content-between w-100" for="emp-check-${emp.id}">
+                    <span>${name}</span>
+                    <small class="text-muted">${cedula}</small>
+                </label>
+            </div>`;
+    }
+    container.innerHTML = html;
+}
+
+function filterEmployees() {
+    const query = document.getElementById('employeeSearch').value.toLowerCase();
+    const filtered = allEmployees.filter(emp => {
+        const name = `${emp.first_name || ''} ${emp.last_name || ''}`.toLowerCase();
+        const cedula = (emp.cedula || '').toLowerCase();
+        return name.includes(query) || cedula.includes(query);
+    });
+    renderEmployeeList(filtered);
+}
+</script>
+{% endblock %}

@@ -25,3 +25,18 @@ async def employees_page(request: Request):
 async def contracts_page(request: Request):
     """Render contracts management page"""
     return templates.TemplateResponse("contracts.html", {"request": request})
+
+
+@router.get("/accreditation", response_class=HTMLResponse)
+async def accreditation_page(request: Request):
+    """Render accreditation service orders list page"""
+    return templates.TemplateResponse("accreditation.html", {"request": request})
+
+
+@router.get("/accreditation/{service_order_id}", response_class=HTMLResponse)
+async def accreditation_detail_page(request: Request, service_order_id: int):
+    """Render accreditation detail page with dynamic worker matrix"""
+    return templates.TemplateResponse("accreditation_detail.html", {
+        "request": request,
+        "service_order_id": service_order_id,
+    })
