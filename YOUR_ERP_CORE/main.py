@@ -58,6 +58,9 @@ from modules.crm.api.customer_documents_routes import router as customer_documen
 from modules.signature.api.signature_routes import router as signature_router
 from modules.frontend.routes import router as frontend_template_router
 from modules.notifications.api.notification_routes import router as notification_router
+from modules.accreditation.api.service_order_routes import router as service_order_router
+from modules.accreditation.api.crew_routes import router as crew_router
+from modules.accreditation.api.check_routes import router as check_router
 
 # Import and register event listeners
 from modules.signature import listeners  # This imports and registers all listeners
@@ -335,6 +338,11 @@ app.include_router(signature_router)
 
 # Notification API routes
 app.include_router(notification_router)
+
+# Accreditation API routes
+app.include_router(service_order_router)
+app.include_router(crew_router)
+app.include_router(check_router)
 
 import os as _os
 _static_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "frontend", "static")
