@@ -5,6 +5,7 @@ API Routes - Accreditation Checks
 Endpoints for the accreditation matrix, check recomputation,
 and document generation triggers.
 """
+import logging
 from fastapi import APIRouter, HTTPException
 from modules.accreditation.models import (
     AccreditationCheck,
@@ -12,8 +13,11 @@ from modules.accreditation.models import (
     DocumentGenerationRequest,
     ServiceOrder,
 )
+from modules.accreditation.service import AccreditationService
 from core.event_bus import EventBus
 from core.time_utils import utc_now
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/accreditation/service-orders/{service_order_id}/checks",
@@ -54,45 +58,35 @@ def _get_order_or_404(service_order_id: int) -> ServiceOrder:
 async def get_accreditation_matrix(service_order_id: int):
     """
     Return the accreditation matrix: all crew members with their check status.
+    Uses AccreditationService.compute_all_checks() to ensure fresh data.
     """
-    _get_order_or_404(service_order_id)
+    order = _get_order_or_404(service_order_id)
 
-    crew = CrewAssignment.search([
-        ("service_order_id", "=", service_order_id),
-        ("status", "!=", "removed"),
-    ])
+    try:
+        checks = AccreditationService.compute_all_checks(
+            service_order_id, order.company_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error computing checks: {e}")
+
+    from modules.hr.module_hr import EmployeeProfile
 
     results = []
-    for member in crew:
-        checks = AccreditationCheck.search([
-            ("service_order_id", "=", service_order_id),
-            ("employee_id", "=", member.employee_id),
-        ])
-        if checks:
-            check = checks[0]
-            results.append({
-                "employee_id": member.employee_id,
-                "employee_name": f"Employee #{member.employee_id}",  # TODO: resolve from HR module
-                "level_a_status": check.level_a_status,
-                "level_a_total": check.level_a_total,
-                "level_a_valid": check.level_a_valid,
-                "level_b_status": check.level_b_status,
-                "level_b_total": check.level_b_total,
-                "level_b_valid": check.level_b_valid,
-                "overall_status": check.overall_status,
-            })
-        else:
-            results.append({
-                "employee_id": member.employee_id,
-                "employee_name": f"Employee #{member.employee_id}",
-                "level_a_status": "pending",
-                "level_a_total": 0,
-                "level_a_valid": 0,
-                "level_b_status": "pending",
-                "level_b_total": 0,
-                "level_b_valid": 0,
-                "overall_status": "non_compliant",
-            })
+    for check_data in checks:
+        employee_id = check_data.get("employee_id")
+        emp = EmployeeProfile.find_by_id(employee_id) if employee_id else None
+        employee_name = getattr(emp, "full_name", f"Employee #{employee_id}") if emp else f"Employee #{employee_id}"
+        results.append({
+            "employee_id": employee_id,
+            "employee_name": employee_name,
+            "level_a_status": check_data.get("level_a_status", "pending"),
+            "level_a_total": check_data.get("level_a_total", 0),
+            "level_a_valid": check_data.get("level_a_valid", 0),
+            "level_b_status": check_data.get("level_b_status", "pending"),
+            "level_b_total": check_data.get("level_b_total", 0),
+            "level_b_valid": check_data.get("level_b_valid", 0),
+            "overall_status": check_data.get("overall_status", "non_compliant"),
+        })
 
     return results
 
@@ -105,40 +99,52 @@ async def get_accreditation_matrix(service_order_id: int):
 async def get_employee_check(service_order_id: int, employee_id: int):
     """
     Return detailed check for one employee with per-requirement breakdown.
+    Uses AccreditationService.compute_check() for fresh computation and
+    detect_gaps() for the per-requirement detail.
     """
     order = _get_order_or_404(service_order_id)
 
-    checks = AccreditationCheck.search([
-        ("service_order_id", "=", service_order_id),
-        ("employee_id", "=", employee_id),
-    ])
+    from modules.hr.module_hr import EmployeeProfile, AccreditationRequirement
 
-    if checks:
-        check = checks[0]
-        # TODO: Integrate with AccreditationService for per-requirement breakdown
-        level_a_details = [
-            {"requirement_id": rid, "name": f"Requirement #{rid}", "status": "pending"}
-            for rid in (check.level_a_missing_ids or [])
-        ]
-        level_b_details = [
-            {"requirement_id": rid, "name": f"Requirement #{rid}", "status": "pending"}
-            for rid in (check.level_b_missing_ids or [])
-        ]
-        return {
-            "employee_id": employee_id,
-            "employee_name": f"Employee #{employee_id}",
-            "level_a": level_a_details,
-            "level_b": level_b_details,
-            "overall_status": check.overall_status,
-        }
-    else:
-        return {
-            "employee_id": employee_id,
-            "employee_name": f"Employee #{employee_id}",
-            "level_a": [],
-            "level_b": [],
-            "overall_status": "non_compliant",
-        }
+    try:
+        check_data = AccreditationService.compute_check(
+            service_order_id, employee_id, order.company_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error computing check: {e}")
+
+    emp = EmployeeProfile.find_by_id(employee_id)
+    employee_name = getattr(emp, "full_name", f"Employee #{employee_id}") if emp else f"Employee #{employee_id}"
+
+    # Build per-requirement breakdown using the missing IDs
+    def _build_details(missing_ids):
+        details = []
+        for rid in (missing_ids or []):
+            req = AccreditationRequirement.find_by_id(rid)
+            details.append({
+                "requirement_id": rid,
+                "name": req.name if req else f"Requirement #{rid}",
+                "code": req.code if req else "",
+                "status": "missing",
+            })
+        return details
+
+    level_a_details = _build_details(check_data.get("level_a_missing_ids", []))
+    level_b_details = _build_details(check_data.get("level_b_missing_ids", []))
+
+    return {
+        "employee_id": employee_id,
+        "employee_name": employee_name,
+        "level_a_status": check_data.get("level_a_status", "pending"),
+        "level_a_total": check_data.get("level_a_total", 0),
+        "level_a_valid": check_data.get("level_a_valid", 0),
+        "level_a": level_a_details,
+        "level_b_status": check_data.get("level_b_status", "pending"),
+        "level_b_total": check_data.get("level_b_total", 0),
+        "level_b_valid": check_data.get("level_b_valid", 0),
+        "level_b": level_b_details,
+        "overall_status": check_data.get("overall_status", "non_compliant"),
+    }
 
 
 # ============================================================================
@@ -148,40 +154,17 @@ async def get_employee_check(service_order_id: int, employee_id: int):
 @router.post("/recompute")
 async def recompute_checks(service_order_id: int):
     """
-    Force recompute all accreditation checks for this service order.
+    Force recompute all accreditation checks for this service order
+    using AccreditationService.compute_all_checks().
     """
     order = _get_order_or_404(service_order_id)
 
-    crew = CrewAssignment.search([
-        ("service_order_id", "=", service_order_id),
-        ("status", "!=", "removed"),
-    ])
-
-    results = []
-    for member in crew:
-        # Find or create check record
-        existing = AccreditationCheck.search([
-            ("service_order_id", "=", service_order_id),
-            ("employee_id", "=", member.employee_id),
-        ])
-
-        if existing:
-            check = existing[0]
-            # TODO: Call AccreditationService.compute_check() when available
-            check.last_checked_at = utc_now().isoformat()
-            check.save()
-        else:
-            check = AccreditationCheck.create({
-                "service_order_id": service_order_id,
-                "employee_id": member.employee_id,
-                "company_id": order.company_id,
-                "level_a_status": "pending",
-                "level_b_status": "pending",
-                "overall_status": "non_compliant",
-                "last_checked_at": utc_now().isoformat(),
-            })
-
-        results.append(_serialize_check(check))
+    try:
+        results = AccreditationService.compute_all_checks(
+            service_order_id, order.company_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error recomputing checks: {e}")
 
     EventBus.emit("accreditation.checks_recomputed", {
         "service_order_id": service_order_id,
@@ -199,8 +182,18 @@ async def recompute_checks(service_order_id: int):
 async def generate_missing_for_employee(service_order_id: int, employee_id: int):
     """
     Trigger document generation for all missing documents for one employee.
+    Uses AccreditationService.trigger_document_generation() which creates
+    DocumentGenerationRequests and emits generation events.
     """
     order = _get_order_or_404(service_order_id)
+
+    # Ensure check exists (compute it first)
+    try:
+        AccreditationService.compute_check(
+            service_order_id, employee_id, order.company_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error computing check: {e}")
 
     checks = AccreditationCheck.search([
         ("service_order_id", "=", service_order_id),
@@ -214,39 +207,23 @@ async def generate_missing_for_employee(service_order_id: int, employee_id: int)
         )
 
     check = checks[0]
-    missing_ids = list(set((check.level_a_missing_ids or []) + (check.level_b_missing_ids or [])))
 
-    generated_count = 0
-    skipped_count = 0
-    requests = []
+    try:
+        created = AccreditationService.trigger_document_generation(check.id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error triggering generation: {e}"
+        )
 
-    for req_id in missing_ids:
-        # Check if a request already exists for this requirement
-        existing_reqs = DocumentGenerationRequest.search([
-            ("accreditation_check_id", "=", check.id),
-            ("requirement_id", "=", req_id),
-            ("status", "!=", "failed"),
-        ])
-        if existing_reqs:
-            skipped_count += 1
-            continue
-
-        # TODO: Integrate with AccreditationService for real template matching
-        doc_req = DocumentGenerationRequest.create({
-            "accreditation_check_id": check.id,
-            "service_order_id": service_order_id,
-            "employee_id": employee_id,
-            "requirement_id": req_id,
-            "company_id": order.company_id,
-            "status": "pending",
-        })
-        requests.append(_serialize_doc_req(doc_req))
-        generated_count += 1
+    generated_count = sum(
+        1 for r in created if r.status == "template_found"
+    )
+    skipped_count = sum(1 for r in created if r.status == "skipped")
 
     return {
         "generated_count": generated_count,
         "skipped_count": skipped_count,
-        "requests": requests,
+        "requests": [_serialize_doc_req(r) for r in created],
     }
 
 
@@ -258,8 +235,17 @@ async def generate_missing_for_employee(service_order_id: int, employee_id: int)
 async def generate_all_missing(service_order_id: int):
     """
     Trigger document generation for ALL crew members with gaps.
+    Recomputes all checks first, then triggers generation for each.
     """
     order = _get_order_or_404(service_order_id)
+
+    # Recompute all checks first to ensure fresh data
+    try:
+        AccreditationService.compute_all_checks(
+            service_order_id, order.company_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error computing checks: {e}")
 
     checks = AccreditationCheck.search([
         ("service_order_id", "=", service_order_id),
@@ -278,25 +264,16 @@ async def generate_all_missing(service_order_id: int):
 
         employees_processed += 1
 
-        for req_id in missing_ids:
-            existing_reqs = DocumentGenerationRequest.search([
-                ("accreditation_check_id", "=", check.id),
-                ("requirement_id", "=", req_id),
-                ("status", "!=", "failed"),
-            ])
-            if existing_reqs:
-                total_skipped += 1
-                continue
-
-            DocumentGenerationRequest.create({
-                "accreditation_check_id": check.id,
-                "service_order_id": service_order_id,
-                "employee_id": check.employee_id,
-                "requirement_id": req_id,
-                "company_id": order.company_id,
-                "status": "pending",
-            })
-            total_generated += 1
+        try:
+            created = AccreditationService.trigger_document_generation(check.id)
+            total_generated += sum(
+                1 for r in created if r.status == "template_found"
+            )
+            total_skipped += sum(1 for r in created if r.status == "skipped")
+        except Exception as e:
+            logger.error(
+                f"Error triggering generation for check {check.id}: {e}"
+            )
 
     return {
         "employees_processed": employees_processed,

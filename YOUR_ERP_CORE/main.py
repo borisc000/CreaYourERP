@@ -65,6 +65,7 @@ from modules.accreditation.api.check_routes import router as check_router
 # Import and register event listeners
 from modules.signature import listeners  # This imports and registers all listeners
 from modules.notifications.listeners import setup_notification_listeners
+from modules.accreditation.listeners import setup_accreditation_listeners
 
 
 # ============================================================================
@@ -283,6 +284,7 @@ async def app_lifespan(_: FastAPI):
     await startup_seed()
     init_db()
     setup_notification_listeners()
+    setup_accreditation_listeners()
     yield
 
 
