@@ -48,9 +48,17 @@ def setup_notification_listeners():
                 department=data.get('department', 'Indefinido')
             )
     
+    def on_accreditation_check_updated(data):
+        logger.info(f"Accreditation check updated: employee {data.get('employee_id')}, status {data.get('overall_status')}")
+
+    def on_accreditation_generation_requested(data):
+        logger.info(f"Document generation requested for employee {data.get('employee_id')}")
+
     # Register all listeners
     EventBus.subscribe('contract.approved', on_contract_approved)
     EventBus.subscribe('signature.request_created', on_signature_requested)
     EventBus.subscribe('employee.hired', on_employee_hired)
-    
-    logger.info("✅ Notification event listeners registered")
+    EventBus.subscribe('accreditation.check_updated', on_accreditation_check_updated)
+    EventBus.subscribe('accreditation.generation_requested', on_accreditation_generation_requested)
+
+    logger.info("Notification event listeners registered")

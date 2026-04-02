@@ -219,8 +219,8 @@ def test_get_accreditation_matrix():
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
-    # Without checks computed, all should be non_compliant
-    assert all(e["overall_status"] == "non_compliant" for e in data)
+    # With no requirements configured, all should be compliant
+    assert all(e["overall_status"] == "compliant" for e in data)
 
 
 def test_recompute_checks():

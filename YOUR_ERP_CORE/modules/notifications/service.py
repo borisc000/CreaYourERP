@@ -225,6 +225,40 @@ Departamento de Recursos Humanos
         )
 
     @staticmethod
+    def send_accreditation_alert(employee_email: str, employee_name: str,
+                                  service_order_title: str, missing_count: int):
+        """Notify employee about missing accreditation documents"""
+        subject = f"Documentos Pendientes: {service_order_title}"
+        message = f"""
+    Estimado(a) {employee_name},
+
+    Tiene {missing_count} documento(s) pendiente(s) de acreditacion para:
+    {service_order_title}
+
+    Por favor acceda al portal para completar el proceso.
+
+    Saludos,
+    Departamento de Prevencion de Riesgos
+    """
+        return NotificationService.send_email(to_email=employee_email, subject=subject, message=message)
+
+    @staticmethod
+    def send_accreditation_complete(employee_email: str, employee_name: str,
+                                     service_order_title: str):
+        """Notify employee they are fully accredited"""
+        subject = f"Acreditacion Completa: {service_order_title}"
+        message = f"""
+    Estimado(a) {employee_name},
+
+    Su acreditacion para {service_order_title} esta completa.
+    Todos los documentos han sido verificados y aprobados.
+
+    Saludos,
+    Departamento de Prevencion de Riesgos
+    """
+        return NotificationService.send_email(to_email=employee_email, subject=subject, message=message)
+
+    @staticmethod
     def send_signature_reminder(employee_email: str, employee_name: str,
                                 contract_id: int):
         """
