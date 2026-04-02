@@ -43,6 +43,7 @@ from modules.mail.module_mail import MailModule
 from modules.google_workspace.module_google_workspace import GoogleWorkspaceModule
 from modules.job_profiles.module_job_profiles import JobProfilesModule
 from modules.ai.module_ai import AIModule
+from modules.accreditation.module_accreditation import AccreditationModule
 from core.config import settings, validate_config
 from config.database import init_db, SessionLocal
 from core.time_utils import utc_now, utc_strftime
@@ -87,6 +88,7 @@ ALL_MODULE_CLASSES = [
     MailModule,
     GoogleWorkspaceModule,
     AIModule,
+    AccreditationModule,
 ]
 AVAILABLE_MODULE_CLASSES = {
     getattr(module_class, "name", module_class.__name__).lower(): module_class
