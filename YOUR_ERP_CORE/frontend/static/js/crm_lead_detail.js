@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderAll();
     setupDragDrop();
+
+    // Initialize accreditation system for Step 1
+    initAccreditation(leadId).then(() => startAccreditationRefresh());
 });
 
 // ── Render All ────────────────────────────────────────────────
@@ -406,45 +409,21 @@ function renderLeadReportsPanel(reports) {
 // ══════════════════════════════════════════════════════════════
 
 /**
- * Valida el Paso 1: habilita el botón de Aprobar Despliegue
- * solo si los 3 checkboxes obligatorios están marcados.
+ * Valida el Paso 1: función legacy mantenida para compatibilidad.
+ * La validación real ahora la hace updateAprobarButton() via accreditation.
  */
 function validateStep1() {
-    const das   = document.getElementById('check-das')?.checked;
-    const epp   = document.getElementById('check-epp')?.checked;
-    const acred = document.getElementById('check-acred')?.checked;
-    const btn   = document.getElementById('btn-aprobar-despliegue');
-    const warn  = document.getElementById('step1-warning');
-
-    // Actualizar estilo visual de cada item del checklist
-    ['das', 'epp', 'acred'].forEach(k => {
-        const checked = document.getElementById('check-' + k)?.checked;
-        const label   = document.getElementById('check-label-' + k);
-        if (label) label.classList.toggle('checked', !!checked);
-    });
-
-    const allDone = das && epp && acred;
-
-    if (btn) {
-        btn.disabled = !allDone;
-        btn.style.opacity  = allDone ? '1' : '0.45';
-        btn.style.cursor   = allDone ? 'pointer' : 'not-allowed';
-    }
-    if (warn) {
-        warn.style.display = (!allDone && (das || epp || acred)) ? 'block' : 'none';
-    }
+    // No-op: accreditation system manages button state via updateAprobarButton()
 }
 
 /**
  * Usuario hizo clic en [Aprobar Despliegue].
- * Cierra el Paso 1 con resumen y desbloquea el Paso 2.
+ * Verifica que el botón no esté deshabilitado (accreditación completa).
  */
 function aprobarDespliegue() {
-    const das   = document.getElementById('check-das')?.checked;
-    const epp   = document.getElementById('check-epp')?.checked;
-    const acred = document.getElementById('check-acred')?.checked;
-    if (!das || !epp || !acred) {
-        showToast('Completa todos los checks antes de aprobar', 'error');
+    const btn = document.getElementById('btn-aprobar-despliegue');
+    if (btn && btn.disabled) {
+        showToast('Completa la acreditación de todos los trabajadores antes de aprobar', 'error');
         return;
     }
     advanceStep(1);
@@ -1209,4 +1188,502 @@ async function submitNuevoReporte() {
         btn.disabled    = false;
         btn.textContent = 'Crear Reporte →';
     }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  ACCREDITATION INTEGRATION — Step 1 Dynamic System
+// ══════════════════════════════════════════════════════════════
+
+let currentServiceOrderId = null;
+let selectedWorkerIds = new Set();
+
+/**
+ * Initialize accreditation for this lead.
+ * Called on page load to find or create the service order.
+ */
+async function initAccreditation(leadId) {
+    if (!leadId) return;
+
+    try {
+        const resp = await fetch(`/api/accreditation/service-orders?company_id=1&lead_id=${leadId}`);
+        const orders = await resp.json();
+
+        if (orders && orders.length > 0) {
+            currentServiceOrderId = orders[0].id;
+        } else {
+            // Create service order for this lead
+            const lead = LD.lead || {};
+            const createResp = await fetch('/api/accreditation/service-orders', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    lead_id: parseInt(leadId),
+                    customer_id: lead.customer_id || 1,
+                    company_id: 1,
+                    title: lead.title || `Orden de Servicio - Lead ${leadId}`,
+                    status: 'active'
+                })
+            });
+            if (createResp.ok) {
+                const order = await createResp.json();
+                currentServiceOrderId = order.id;
+            }
+        }
+
+        if (currentServiceOrderId) {
+            await loadCrewList();
+            await loadAccreditationMatrix();
+        }
+    } catch (e) {
+        console.error('Error initializing accreditation:', e);
+    }
+}
+
+/**
+ * Load and render the crew list in step 1.
+ */
+async function loadCrewList() {
+    if (!currentServiceOrderId) return;
+
+    const container = document.getElementById('crew-list-container');
+    if (!container) return;
+
+    try {
+        const resp = await fetch(`/api/accreditation/service-orders/${currentServiceOrderId}/crew`);
+        const crew = await resp.json();
+
+        if (!crew || crew.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted py-3 border border-secondary rounded">
+                    <i class="fas fa-users" style="font-size:1.5rem; opacity:0.3"></i>
+                    <p class="mt-2 mb-0 small">Sin trabajadores asignados.<br>Usa "Agregar Trabajador" para comenzar.</p>
+                </div>`;
+            return;
+        }
+
+        let html = '<div class="list-group list-group-flush">';
+        for (const member of crew) {
+            html += `
+            <div class="list-group-item d-flex justify-content-between align-items-center"
+                 style="background:#1a1f2e; border-color:#333; color:#e0e0e0;">
+                <div>
+                    <i class="fas fa-user-hard-hat me-2 text-primary"></i>
+                    <strong>${member.employee_name || 'Trabajador #' + member.employee_id}</strong>
+                    <span class="badge bg-secondary ms-2 small">${member.role || 'operador'}</span>
+                </div>
+                <button class="btn btn-sm btn-outline-danger py-0 px-2"
+                        onclick="removeWorker(${member.employee_id})"
+                        title="Remover de cuadrilla">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>`;
+        }
+        html += '</div>';
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<div class="text-danger small p-2">Error cargando cuadrilla</div>';
+    }
+}
+
+/**
+ * Load and render the accreditation matrix for all crew members.
+ */
+async function loadAccreditationMatrix() {
+    if (!currentServiceOrderId) return;
+
+    const container = document.getElementById('accreditation-matrix-container');
+    const badgeEl = document.getElementById('accred-summary-badge');
+    const generateBtn = document.getElementById('generate-all-btn-container');
+    if (!container) return;
+
+    try {
+        const resp = await fetch(`/api/accreditation/service-orders/${currentServiceOrderId}/checks`);
+        const checks = await resp.json();
+
+        if (!checks || checks.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-info-circle"></i> Sin datos de acreditación aún
+                </div>`;
+            if (badgeEl) badgeEl.innerHTML = '';
+            updateAprobarButton(false, 0);
+            return;
+        }
+
+        const compliant = checks.filter(c => c.overall_status === 'compliant').length;
+        const total = checks.length;
+        const allCompliant = compliant === total;
+
+        // Update summary badge
+        if (badgeEl) {
+            const color = allCompliant ? 'success' : (compliant > 0 ? 'warning' : 'danger');
+            badgeEl.innerHTML = `<span class="badge bg-${color}">${compliant}/${total} acreditados</span>`;
+        }
+
+        // Show/hide generate all button
+        if (generateBtn) {
+            const hasMissing = checks.some(c => c.overall_status !== 'compliant');
+            generateBtn.style.display = hasMissing ? 'block' : 'none';
+        }
+
+        // Render matrix
+        let html = '';
+        for (const check of checks) {
+            const statusColor = {compliant:'success', attention:'warning', non_compliant:'danger', pending:'secondary'}[check.overall_status] || 'secondary';
+            const statusIcon = {compliant:'✅', attention:'⚠️', non_compliant:'❌', pending:'🔄'}[check.overall_status] || '❓';
+            const statusLabel = {compliant:'Acreditado', attention:'Atención', non_compliant:'Documentos Pendientes', pending:'Calculando...'}[check.overall_status] || check.overall_status;
+
+            html += `
+            <div class="accreditation-card card mb-2"
+                 style="background:#242a3d; border-left:4px solid var(--bs-${statusColor}); border-color:#444;">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="me-2">${statusIcon}</span>
+                            <strong>${check.employee_name || 'Trabajador #' + check.employee_id}</strong>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span class="badge bg-${statusColor} small">${statusLabel}</span>
+                            ${check.overall_status !== 'compliant' ?
+                                `<button class="btn btn-sm btn-outline-warning py-0 px-2"
+                                         onclick="generateMissingForWorker(${check.employee_id})"
+                                         title="Generar documentos pendientes">
+                                     <i class="fas fa-file-signature"></i>
+                                 </button>` : ''}
+                            <button class="btn btn-sm btn-link p-0 text-muted"
+                                    onclick="toggleWorkerDetail(${check.employee_id})"
+                                    title="Ver detalle">
+                                <i class="fas fa-chevron-down" id="chevron-${check.employee_id}"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Progress bars -->
+                    <div class="row mt-2 small">
+                        <div class="col-6">
+                            <span class="text-muted">General (A):</span>
+                            <div class="progress mt-1" style="height:5px">
+                                <div class="progress-bar bg-${check.level_a_valid === check.level_a_total && check.level_a_total > 0 ? 'success' : 'warning'}"
+                                     style="width:${check.level_a_total > 0 ? (check.level_a_valid/check.level_a_total*100) : 0}%"></div>
+                            </div>
+                            <small class="text-muted">${check.level_a_valid || 0}/${check.level_a_total || 0}</small>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Específico (B):</span>
+                            <div class="progress mt-1" style="height:5px">
+                                <div class="progress-bar bg-${check.level_b_valid === check.level_b_total && check.level_b_total > 0 ? 'success' : 'danger'}"
+                                     style="width:${check.level_b_total > 0 ? (check.level_b_valid/check.level_b_total*100) : 0}%"></div>
+                            </div>
+                            <small class="text-muted">${check.level_b_valid || 0}/${check.level_b_total || 0}</small>
+                        </div>
+                    </div>
+
+                    <!-- Expandable detail -->
+                    <div id="worker-detail-${check.employee_id}" style="display:none" class="mt-2"></div>
+                </div>
+            </div>`;
+        }
+
+        container.innerHTML = html || '<div class="text-muted small p-2">Sin datos</div>';
+
+        // Update "Aprobar Despliegue" button state based on accreditation
+        updateAprobarButton(allCompliant, total);
+
+    } catch (e) {
+        console.error('Error loading accreditation matrix:', e);
+        container.innerHTML = '<div class="text-danger small p-2">Error cargando acreditación</div>';
+    }
+}
+
+/**
+ * Toggle expandable per-worker document detail.
+ */
+async function toggleWorkerDetail(employeeId) {
+    const detailEl = document.getElementById(`worker-detail-${employeeId}`);
+    const chevron = document.getElementById(`chevron-${employeeId}`);
+    if (!detailEl) return;
+
+    if (detailEl.style.display === 'none') {
+        detailEl.innerHTML = '<div class="text-center py-2"><i class="fas fa-spinner fa-spin"></i></div>';
+        detailEl.style.display = 'block';
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+
+        try {
+            const resp = await fetch(`/api/accreditation/service-orders/${currentServiceOrderId}/checks/${employeeId}`);
+            const detail = await resp.json();
+
+            let html = '<div class="border-top border-secondary pt-2 mt-1">';
+
+            if (detail.level_a && detail.level_a.length > 0) {
+                html += '<div class="small fw-bold text-muted mb-1">📋 Documentos Generales (Level A)</div>';
+                html += '<ul class="doc-list small mb-2" style="list-style:none;padding-left:0;">';
+                for (const doc of detail.level_a) {
+                    const icon = doc.status === 'valid' ? '✅' : (doc.status === 'signing' ? '🔄' : '❌');
+                    const label = doc.status === 'valid' ? 'Aprobado' : (doc.status === 'signing' ? 'En Firma' : 'PENDIENTE');
+                    html += `
+                    <li class="d-flex justify-content-between align-items-center py-1">
+                        <span>${icon} ${doc.name}</span>
+                        <span class="text-muted">${label}</span>
+                    </li>`;
+                }
+                html += '</ul>';
+            }
+
+            if (detail.level_b && detail.level_b.length > 0) {
+                html += '<div class="small fw-bold text-muted mb-1">🎯 Documentos Específicos (Level B)</div>';
+                html += '<ul class="doc-list small mb-2" style="list-style:none;padding-left:0;">';
+                for (const doc of detail.level_b) {
+                    const icon = doc.status === 'valid' ? '✅' : (doc.status === 'signing' ? '🔄' : '❌');
+                    html += `
+                    <li class="d-flex justify-content-between align-items-center py-1">
+                        <span>${icon} ${doc.name}</span>
+                        <span class="text-muted">${doc.status === 'valid' ? 'Aprobado' : (doc.status === 'signing' ? 'En Firma' : 'PENDIENTE')}</span>
+                    </li>`;
+                }
+                html += '</ul>';
+            }
+
+            if (!detail.level_a?.length && !detail.level_b?.length) {
+                html += '<div class="text-muted text-center py-2 small">Sin requisitos definidos — trabajador acreditado ✅</div>';
+            }
+
+            html += '</div>';
+            detailEl.innerHTML = html;
+        } catch (e) {
+            detailEl.innerHTML = '<div class="text-danger small">Error cargando detalle</div>';
+        }
+    } else {
+        detailEl.style.display = 'none';
+        if (chevron) chevron.style.transform = '';
+    }
+}
+
+/**
+ * Open worker selector modal and load employees list.
+ */
+async function openWorkerSelector(leadId) {
+    selectedWorkerIds.clear();
+    updateSelectedCount();
+
+    const listEl = document.getElementById('worker-selector-list');
+    if (listEl) listEl.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i></div>';
+
+    const modal = new bootstrap.Modal(document.getElementById('workerSelectorModal'));
+    modal.show();
+
+    try {
+        const resp = await fetch('/api/hr/employees');
+        const employees = await resp.json();
+
+        if (!listEl) return;
+
+        if (!employees || employees.length === 0) {
+            listEl.innerHTML = '<div class="text-muted text-center py-3">No hay empleados registrados</div>';
+            return;
+        }
+
+        window._allEmployees = employees;
+        renderEmployeeList(employees);
+    } catch (e) {
+        if (listEl) listEl.innerHTML = '<div class="text-danger p-2">Error cargando empleados</div>';
+    }
+}
+
+function renderEmployeeList(employees) {
+    const listEl = document.getElementById('worker-selector-list');
+    if (!listEl) return;
+
+    let html = '';
+    for (const emp of employees) {
+        const checked = selectedWorkerIds.has(emp.id) ? 'checked' : '';
+        html += `
+        <div class="form-check border-bottom border-secondary py-2 px-3 employee-item">
+            <input class="form-check-input" type="checkbox"
+                   value="${emp.id}" id="emp-${emp.id}" ${checked}
+                   onchange="toggleWorkerSelection(${emp.id})">
+            <label class="form-check-label w-100" for="emp-${emp.id}">
+                <div class="d-flex justify-content-between">
+                    <span><strong>${esc(emp.first_name || '')} ${esc(emp.last_name || '')}</strong></span>
+                    <span class="text-muted small">${esc(emp.cedula || '')}</span>
+                </div>
+                <div class="text-muted small">${esc(emp.email || '')} ${emp.status === 'active' ? '· <span class="text-success">Activo</span>' : ''}</div>
+            </label>
+        </div>`;
+    }
+    listEl.innerHTML = html || '<div class="text-muted p-2">Sin resultados</div>';
+}
+
+function filterWorkers(query) {
+    if (!window._allEmployees) return;
+    const q = query.toLowerCase();
+    const filtered = window._allEmployees.filter(e =>
+        `${e.first_name} ${e.last_name}`.toLowerCase().includes(q) ||
+        (e.cedula || '').includes(q) ||
+        (e.email || '').toLowerCase().includes(q)
+    );
+    renderEmployeeList(filtered);
+}
+
+function toggleWorkerSelection(empId) {
+    if (selectedWorkerIds.has(empId)) {
+        selectedWorkerIds.delete(empId);
+    } else {
+        selectedWorkerIds.add(empId);
+    }
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const el = document.getElementById('selected-count-badge');
+    if (el) el.textContent = `${selectedWorkerIds.size} seleccionado(s)`;
+}
+
+/**
+ * Add selected workers to the crew of the current service order.
+ */
+async function addSelectedWorkers(leadId) {
+    if (!currentServiceOrderId || selectedWorkerIds.size === 0) return;
+
+    const role = document.getElementById('worker-role-select')?.value || 'operador';
+
+    try {
+        const resp = await fetch(`/api/accreditation/service-orders/${currentServiceOrderId}/crew`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                employee_ids: Array.from(selectedWorkerIds),
+                role: role
+            })
+        });
+
+        if (resp.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('workerSelectorModal'))?.hide();
+            await loadCrewList();
+            await loadAccreditationMatrix();
+            showToast(`✅ ${selectedWorkerIds.size} trabajador(es) agregado(s)`, 'success');
+            selectedWorkerIds.clear();
+        } else {
+            showToast('Error al agregar trabajadores', 'error');
+        }
+    } catch (e) {
+        showToast('Error agregando trabajadores', 'error');
+    }
+}
+
+/**
+ * Remove a worker from the crew.
+ */
+async function removeWorker(employeeId) {
+    if (!currentServiceOrderId) return;
+
+    try {
+        await fetch(`/api/accreditation/service-orders/${currentServiceOrderId}/crew/${employeeId}`, {
+            method: 'DELETE'
+        });
+        await loadCrewList();
+        await loadAccreditationMatrix();
+        showToast('Trabajador removido de la cuadrilla', 'success');
+    } catch (e) {
+        showToast('Error removiendo trabajador', 'error');
+    }
+}
+
+/**
+ * Generate missing documents for a single worker.
+ */
+async function generateMissingForWorker(employeeId) {
+    if (!currentServiceOrderId) return;
+
+    try {
+        showToast('Generando documentos pendientes...', 'info');
+        const resp = await fetch(
+            `/api/accreditation/service-orders/${currentServiceOrderId}/checks/${employeeId}/generate-missing`,
+            {method: 'POST'}
+        );
+        const result = await resp.json();
+        showToast(`✅ ${result.generated_count || 0} documento(s) enviados a firma`, 'success');
+        await loadAccreditationMatrix();
+    } catch (e) {
+        showToast('Error generando documentos', 'error');
+    }
+}
+
+/**
+ * Generate all missing documents for all crew members.
+ */
+async function generateAllMissingDocs(leadId) {
+    if (!currentServiceOrderId) return;
+
+    try {
+        showToast('Generando todos los documentos pendientes...', 'info');
+        const resp = await fetch(
+            `/api/accreditation/service-orders/${currentServiceOrderId}/checks/generate-all-missing`,
+            {method: 'POST'}
+        );
+        const result = await resp.json();
+        showToast(`✅ ${result.total_generated || 0} documento(s) enviados a firma`, 'success');
+        await loadAccreditationMatrix();
+    } catch (e) {
+        showToast('Error generando documentos', 'error');
+    }
+}
+
+/**
+ * Force recompute accreditation state for all crew.
+ */
+async function recomputeAccreditation(leadId) {
+    if (!currentServiceOrderId) return;
+
+    try {
+        await fetch(`/api/accreditation/service-orders/${currentServiceOrderId}/checks/recompute`,
+                    {method: 'POST'});
+        await loadAccreditationMatrix();
+        showToast('Acreditación actualizada', 'success');
+    } catch (e) {
+        showToast('Error actualizando acreditación', 'error');
+    }
+}
+
+/**
+ * Update "Aprobar Despliegue" button based on accreditation status.
+ * Enabled only when ALL workers are compliant (or no workers → disabled).
+ */
+function updateAprobarButton(allCompliant, totalWorkers) {
+    const btn = document.getElementById('btn-aprobar-despliegue');
+    const warning = document.getElementById('step1-warning');
+
+    if (!btn) return;
+
+    if (totalWorkers === 0) {
+        btn.disabled = true;
+        btn.style.opacity = '0.45';
+        btn.style.cursor = 'not-allowed';
+        if (warning) {
+            warning.style.display = 'block';
+            warning.innerHTML = '⚠️ Debes asignar al menos un trabajador antes de aprobar';
+        }
+    } else if (allCompliant) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+        if (warning) warning.style.display = 'none';
+    } else {
+        btn.disabled = true;
+        btn.style.opacity = '0.45';
+        btn.style.cursor = 'not-allowed';
+        if (warning) {
+            warning.style.display = 'block';
+            warning.innerHTML = '⚠️ Todos los trabajadores deben estar acreditados para aprobar el despliegue';
+        }
+    }
+}
+
+// Auto-refresh accreditation every 20 seconds while on the page
+let accreditationRefreshInterval = null;
+function startAccreditationRefresh() {
+    if (accreditationRefreshInterval) clearInterval(accreditationRefreshInterval);
+    accreditationRefreshInterval = setInterval(() => {
+        if (currentServiceOrderId) loadAccreditationMatrix();
+    }, 20000);
 }

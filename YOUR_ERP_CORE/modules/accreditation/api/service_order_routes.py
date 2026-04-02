@@ -35,12 +35,15 @@ def _serialize(order: ServiceOrder) -> dict:
 async def list_service_orders(
     company_id: int = Query(..., description="Company ID (required)"),
     customer_id: Optional[int] = Query(None),
+    lead_id: Optional[int] = Query(None),
     status: Optional[str] = Query(None),
 ):
-    """List service orders filtered by company, optionally by customer and status."""
+    """List service orders filtered by company, optionally by customer, lead and status."""
     domain = [("company_id", "=", company_id)]
     if customer_id is not None:
         domain.append(("customer_id", "=", customer_id))
+    if lead_id is not None:
+        domain.append(("lead_id", "=", lead_id))
     if status is not None:
         domain.append(("status", "=", status))
 

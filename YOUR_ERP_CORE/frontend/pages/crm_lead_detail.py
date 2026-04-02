@@ -254,46 +254,53 @@ def crm_lead_detail_page(lead_id: str):
                         </div>
 
                         <div class="step-content" id="step-1-content">
-                            <!-- Asignar Cuadrilla -->
-                            <div class="step-field-group">
-                                <label class="step-label">&#128104;&#8205;&#128295; Cuadrilla Asignada</label>
-                                <select id="eje-cuadrilla" class="step-select" multiple size="3">
-                                    <option value="">— Sin cuadrilla asignada —</option>
-                                    <option value="cuad-1">Cuadrilla A — Montaje Estructural</option>
-                                    <option value="cuad-2">Cuadrilla B — Instalaciones</option>
-                                    <option value="cuad-3">Cuadrilla C — Soporte Terreno</option>
-                                </select>
-                                <span style="font-size:0.7rem;color:#475569;margin-top:0.3rem;display:block;">Mantén Ctrl para seleccionar m&aacute;ltiples</span>
+
+                            <!-- SECCIÓN 1: ASIGNACIÓN DE TRABAJADORES -->
+                            <div class="section-block mb-4">
+                                <div class="section-label">
+                                    <i class="fas fa-hard-hat"></i> TRABAJADORES ASIGNADOS
+                                </div>
+
+                                <!-- Botones para gestionar cuadrilla -->
+                                <div class="d-flex gap-2 mb-3" style="margin-top:0.75rem;">
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                            onclick="openWorkerSelector(window._LEAD_ID)">
+                                        <i class="fas fa-user-plus"></i> Agregar Trabajador
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            onclick="recomputeAccreditation(window._LEAD_ID)">
+                                        <i class="fas fa-sync"></i> Actualizar Estado
+                                    </button>
+                                </div>
+
+                                <!-- Lista dinámica de trabajadores asignados -->
+                                <div id="crew-list-container">
+                                    <div class="text-center text-muted py-3">
+                                        <i class="fas fa-spinner fa-spin"></i> Cargando trabajadores...
+                                    </div>
+                                </div>
                             </div>
 
-                            <!-- Checklist Obligatorio -->
-                            <div class="step-field-group" style="margin-top:1.25rem;">
-                                <label class="step-label">&#9989; Checklist Obligatorio <span style="color:#ef4444;font-size:0.7rem;">(Requerido para continuar)</span></label>
-                                <div class="step-checklist">
-                                    <label class="step-check-item" id="check-label-das">
-                                        <input type="checkbox" id="check-das" onchange="validateStep1()" class="step-checkbox">
-                                        <span class="step-check-icon">&#128221;</span>
-                                        <div>
-                                            <div class="step-check-title">Charla DAS Generada</div>
-                                            <div class="step-check-desc">Documento de Análisis de Seguridad firmado y registrado</div>
-                                        </div>
-                                    </label>
-                                    <label class="step-check-item" id="check-label-epp">
-                                        <input type="checkbox" id="check-epp" onchange="validateStep1()" class="step-checkbox">
-                                        <span class="step-check-icon">&#9875;</span>
-                                        <div>
-                                            <div class="step-check-title">EPP Entregados</div>
-                                            <div class="step-check-desc">Equipos de protección personal entregados y verificados</div>
-                                        </div>
-                                    </label>
-                                    <label class="step-check-item" id="check-label-acred">
-                                        <input type="checkbox" id="check-acred" onchange="validateStep1()" class="step-checkbox">
-                                        <span class="step-check-icon">&#127959;</span>
-                                        <div>
-                                            <div class="step-check-title">Acreditaci&oacute;n Cliente OK</div>
-                                            <div class="step-check-desc">Credenciales de acceso a faena validadas por el cliente</div>
-                                        </div>
-                                    </label>
+                            <!-- SECCIÓN 2: CONTROL DE ACREDITACIÓN -->
+                            <div class="section-block mb-4">
+                                <div class="section-label">
+                                    <i class="fas fa-clipboard-check"></i> CONTROL DE ACREDITACIÓN
+                                    <span id="accred-summary-badge" class="ms-2"></span>
+                                </div>
+
+                                <!-- Matriz de acreditación dinámica por trabajador -->
+                                <div id="accreditation-matrix-container" style="margin-top:0.75rem;">
+                                    <div class="text-center text-muted py-3">
+                                        <i class="fas fa-info-circle"></i> Asigna trabajadores para ver su estado de acreditación
+                                    </div>
+                                </div>
+
+                                <!-- Acción masiva -->
+                                <div id="generate-all-btn-container" class="mt-3" style="display:none">
+                                    <button type="button" class="btn btn-sm btn-warning"
+                                            onclick="generateAllMissingDocs(window._LEAD_ID)">
+                                        <i class="fas fa-file-signature"></i> Generar Documentos Pendientes
+                                    </button>
                                 </div>
                             </div>
 
@@ -307,15 +314,53 @@ def crm_lead_detail_page(lead_id: str):
                                     &#9989; Aprobar Despliegue
                                 </button>
                                 <div id="step1-warning" style="margin-top:0.6rem;font-size:0.75rem;color:#f59e0b;text-align:center;display:none;">
-                                    &#9888; Marca los 3 checkboxes obligatorios para continuar
+                                    &#9888; Asigna y acredita trabajadores para continuar
                                 </div>
                             </div>
+
+                            <!-- Modal: Selección de Empleados -->
+                            <div class="modal fade" id="workerSelectorModal" tabindex="-1">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content" style="background:#1a1f2e; color:#e0e0e0;">
+                                        <div class="modal-header border-secondary">
+                                            <h5 class="modal-title">Seleccionar Trabajadores</h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="mb-3">
+                                                <input type="text" class="form-control form-control-sm"
+                                                       id="worker-search" placeholder="Buscar por nombre, cédula..."
+                                                       oninput="filterWorkers(this.value)">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label small">Rol:</label>
+                                                <select class="form-select form-select-sm" id="worker-role-select" style="width:auto">
+                                                    <option value="operador">Operador</option>
+                                                    <option value="supervisor">Supervisor</option>
+                                                    <option value="ayudante">Ayudante</option>
+                                                </select>
+                                            </div>
+                                            <div id="worker-selector-list" class="employee-selector" style="max-height:350px; overflow-y:auto">
+                                                <div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i></div>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer border-secondary">
+                                            <span id="selected-count-badge" class="text-muted small me-auto">0 seleccionados</span>
+                                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="button" class="btn btn-primary btn-sm" onclick="addSelectedWorkers(window._LEAD_ID)">
+                                                Agregar a Cuadrilla
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
 
                         <!-- Resumen Paso 1 (se muestra cuando está completado) -->
                         <div class="step-summary" id="step-1-summary" style="display:none;">
                             <span style="color:#22c55e;">&#10003; Despliegue Aprobado</span>
-                            <span style="color:#475569;font-size:0.78rem;">Charla DAS &#10003; &nbsp;·&nbsp; EPP &#10003; &nbsp;·&nbsp; Acreditaci&oacute;n &#10003;</span>
+                            <span style="color:#475569;font-size:0.78rem;">Acreditación &#10003; &nbsp;·&nbsp; Cuadrilla habilitada &#10003;</span>
                         </div>
                     </div>
                 </div>
