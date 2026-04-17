@@ -13,15 +13,43 @@ const documentCenterState = {
     preview: null,
     activeDocument: null,
     signatureWorkspace: null,
+    activeTemplate: null,
+    templateSignatureWorkspace: null,
+    templatePreview: null,
+    context: {
+        generated_document_id: '',
+        employee_id: '',
+        customer_id: '',
+        service_order_id: '',
+        requirement_code: '',
+        source_module: '',
+        source_record_id: '',
+        target_module: '',
+    },
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!API.requireAuth()) return;
+    syncDocumentCenterContextFromUrl();
     document.getElementById('dc-template-file')?.addEventListener('change', updateTemplateFileLabel);
     toggleDocumentSourceInputs();
     setWorkerDefaultDates();
     await loadDocumentCenterData();
 });
+
+function syncDocumentCenterContextFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    documentCenterState.context = {
+        generated_document_id: params.get('generated_document_id') || '',
+        employee_id: params.get('employee_id') || '',
+        customer_id: params.get('customer_id') || '',
+        service_order_id: params.get('service_order_id') || '',
+        requirement_code: params.get('requirement_code') || '',
+        source_module: params.get('source_module') || '',
+        source_record_id: params.get('source_record_id') || '',
+        target_module: params.get('target_module') || '',
+    };
+}
 
 function dcTodayIso() {
     return new Date().toISOString().slice(0, 10);
@@ -44,6 +72,11 @@ function dcEscape(value) {
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#39;');
+}
+
+function dcResolvePublicUrl(publicUrl) {
+    if (!publicUrl) return '';
+    return publicUrl.startsWith('http') ? publicUrl : `${window.location.origin}${publicUrl}`;
 }
 
 function dcBadge(label, background, color, border = '#334155') {
@@ -90,14 +123,34 @@ async function loadDocumentCenterData() {
     renderDocumentTemplates();
     fillDocumentTemplateSelects();
     fillWorkerLookups();
+    applyDocumentCenterContextDefaults();
     renderWorkerTemplatePicker();
     renderGeneratedDocuments();
 
-    const params = new URLSearchParams(window.location.search);
-    const generatedDocumentId = params.get('generated_document_id');
+    const generatedDocumentId = documentCenterState.context.generated_document_id;
     if (generatedDocumentId) {
         await openGeneratedDocument(generatedDocumentId);
     }
+}
+
+function applyDocumentCenterContextDefaults() {
+    const context = documentCenterState.context || {};
+    if (context.employee_id && document.getElementById('dc-worker-employee')) {
+        document.getElementById('dc-worker-employee').value = context.employee_id;
+    }
+    if (context.customer_id && document.getElementById('dc-worker-customer')) {
+        document.getElementById('dc-worker-customer').value = context.customer_id;
+    }
+    if (context.service_order_id && document.getElementById('dc-worker-service-order')) {
+        document.getElementById('dc-worker-service-order').value = context.service_order_id;
+    }
+    if (context.requirement_code && document.getElementById('dc-worker-requirement-code')) {
+        document.getElementById('dc-worker-requirement-code').value = context.requirement_code;
+    }
+    if (context.target_module && document.getElementById('dc-worker-target-module')) {
+        document.getElementById('dc-worker-target-module').value = context.target_module;
+    }
+    syncWorkerContextSelections();
 }
 
 function renderDocumentCenterStats() {
@@ -144,15 +197,24 @@ function renderDocumentTemplates() {
                 <div style="display:flex;flex-direction:column;gap:0.35rem;align-items:flex-end;">
                     ${dcStatusBadge(item.status)}
                     ${item.requires_signature ? dcBadge('Requiere firma', '#172554', '#93c5fd', '#1d4ed8') : dcBadge('Sin firma', '#0f172a', '#cbd5e1', '#334155')}
+                    ${item.requires_signature
+                        ? (item.signature_layout_confirmed
+                            ? dcBadge(`Firma configurada (${(item.signature_layout || []).length})`, '#052e16', '#86efac', '#166534')
+                            : dcBadge('Firma pendiente de ubicar', '#422006', '#fde68a', '#ca8a04'))
+                        : ''}
                 </div>
             </div>
             <div style="display:flex;gap:0.45rem;flex-wrap:wrap;margin-top:0.75rem;">
                 ${dcBadge(`${(item.placeholder_keys || []).length} llaves`, '#0f172a', '#cbd5e1', '#334155')}
+                ${dcBadge(item.placeholder_validation_status === 'invalid' ? 'Llaves invalidas' : 'Llaves OK', item.placeholder_validation_status === 'invalid' ? '#450a0a' : '#0f2b1e', item.placeholder_validation_status === 'invalid' ? '#fca5a5' : '#86efac', item.placeholder_validation_status === 'invalid' ? '#991b1b' : '#166534')}
+                ${dcBadge(item.scope_type || 'general_empresa', '#0f172a', '#cbd5e1', '#334155')}
+                ${dcBadge(item.subject_type || 'trabajador', '#0f172a', '#cbd5e1', '#334155')}
                 ${dcBadge(item.category || 'general', '#0f172a', '#94a3b8', '#334155')}
                 ${item.auto_register_accreditation ? dcBadge(`Acreditacion ${item.accreditation_requirement_code || ''}`.trim(), '#0f2b1e', '#86efac', '#166534') : ''}
             </div>
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.9rem;">
                 <button class="btn btn-ghost btn-sm" onclick="openDocumentTemplateModal(${item.id})">Editar</button>
+                ${item.requires_signature ? `<button class="btn ${item.signature_layout_confirmed ? 'btn-secondary' : 'btn-ghost'} btn-sm" onclick="openTemplateSignatureLayoutDesigner(${item.id})">${item.signature_layout_confirmed ? 'Ajustar firma' : 'Disenar firma'}</button>` : ''}
                 <button class="btn btn-ghost btn-sm" onclick="useTemplateForGeneration(${item.id})">Usar en lote</button>
                 <button class="btn btn-ghost btn-sm" onclick="deleteDocumentTemplate(${item.id})">Eliminar</button>
             </div>
@@ -263,12 +325,19 @@ function syncWorkerContextSelections() {
 
 function getVisibleWorkerTemplates() {
     const search = (document.getElementById('dc-worker-template-search')?.value || '').trim().toLowerCase();
+    const customerId = document.getElementById('dc-worker-customer')?.value || documentCenterState.context.customer_id || '';
+    const serviceOrderId = document.getElementById('dc-worker-service-order')?.value || documentCenterState.context.service_order_id || '';
+    const requirementCode = (document.getElementById('dc-worker-requirement-code')?.value || documentCenterState.context.requirement_code || '').trim().toUpperCase();
     return (documentCenterState.templates || []).filter((item) => {
         if (item.status !== 'active') return false;
+        if (customerId && item.customer_id && String(item.customer_id) !== String(customerId)) return false;
+        if (serviceOrderId && item.service_order_id && String(item.service_order_id) !== String(serviceOrderId)) return false;
+        if (requirementCode && String(item.accreditation_requirement_code || '').trim().toUpperCase() !== requirementCode) return false;
         if (!search) return true;
         return (item.name || '').toLowerCase().includes(search)
             || (item.document_type || '').toLowerCase().includes(search)
-            || (item.category || '').toLowerCase().includes(search);
+            || (item.category || '').toLowerCase().includes(search)
+            || (item.accreditation_requirement_code || '').toLowerCase().includes(search);
     });
 }
 
@@ -313,8 +382,9 @@ async function generateWorkerDocuments() {
         showToast('Selecciona un trabajador para generar documentos', 'error');
         return;
     }
-    if (!templateIds.length) {
-        showToast('Selecciona al menos una plantilla', 'error');
+    const requirementCode = document.getElementById('dc-worker-requirement-code')?.value || documentCenterState.context.requirement_code || '';
+    if (!templateIds.length && !requirementCode.trim()) {
+        showToast('Selecciona al menos una plantilla o indica un codigo de requisito', 'error');
         return;
     }
 
@@ -322,6 +392,8 @@ async function generateWorkerDocuments() {
         employee_id: employeeId,
         template_ids: templateIds,
         customer_id: document.getElementById('dc-worker-customer')?.value || null,
+        service_order_id: document.getElementById('dc-worker-service-order')?.value || null,
+        requirement_code: requirementCode,
         lead_id: document.getElementById('dc-worker-lead')?.value || null,
         safety_folder_id: document.getElementById('dc-worker-folder')?.value || null,
         target_module: document.getElementById('dc-worker-target-module')?.value || 'hr',
@@ -329,6 +401,8 @@ async function generateWorkerDocuments() {
         effective_date: document.getElementById('dc-worker-effective-date')?.value || dcTodayIso(),
         detail_items: (document.getElementById('dc-worker-items')?.value || '').split('\n').map((item) => item.trim()).filter(Boolean),
         notes: document.getElementById('dc-worker-notes')?.value || '',
+        source_module: documentCenterState.context.source_module || 'document_center',
+        source_record_id: documentCenterState.context.source_record_id || null,
     };
 
     const response = await API.post('/document-center/worker-generate', payload);
@@ -348,18 +422,28 @@ async function generateWorkerDocuments() {
 function openDocumentTemplateModal(templateId = null) {
     const modal = document.getElementById('dc-template-modal');
     const template = documentCenterState.templates.find((item) => item.id === templateId);
+    documentCenterState.activeTemplate = template || null;
     document.getElementById('dc-template-modal-title').textContent = template ? 'Editar plantilla' : 'Nueva plantilla';
     document.getElementById('dc-template-id').value = template?.id || '';
     document.getElementById('dc-template-name').value = template?.name || '';
     document.getElementById('dc-template-type').value = template?.document_type || '';
     document.getElementById('dc-template-category').value = template?.category || '';
     document.getElementById('dc-template-target-module').value = template?.target_module || 'general';
+    document.getElementById('dc-template-scope-type').value = template?.scope_type || 'general_empresa';
+    document.getElementById('dc-template-subject-type').value = template?.subject_type || 'trabajador';
+    document.getElementById('dc-template-customer-id').value = template?.customer_id || '';
+    document.getElementById('dc-template-service-order-id').value = template?.service_order_id || '';
     document.getElementById('dc-template-filename-pattern').value = template?.filename_pattern || '';
-    document.getElementById('dc-template-status').value = template?.status || 'active';
+    document.getElementById('dc-template-form-status').value = template?.status || 'active';
     document.getElementById('dc-template-requires-signature').checked = !!template?.requires_signature;
     document.getElementById('dc-template-accreditation-auto').checked = !!template?.auto_register_accreditation;
     document.getElementById('dc-template-accreditation-code').value = template?.accreditation_requirement_code || '';
     document.getElementById('dc-template-accreditation-category').value = template?.accreditation_category || 'other';
+    document.getElementById('dc-template-signature-roles').value = JSON.stringify(
+        template?.signature_roles?.length ? template.signature_roles : [{ role_key: 'trabajador', signer_name: 'Trabajador', signer_email: '' }],
+        null,
+        2,
+    );
     document.getElementById('dc-template-description').value = template?.description || '';
     document.getElementById('dc-template-file').value = '';
     document.getElementById('dc-template-file-label').textContent = template
@@ -390,21 +474,48 @@ function readFileAsBase64(file) {
     });
 }
 
+function getTemplateSignatureRolesFromForm() {
+    const rawValue = document.getElementById('dc-template-signature-roles')?.value || '';
+    if (!rawValue.trim()) {
+        return [{ role_key: 'trabajador', signer_name: 'Trabajador', signer_email: '', signing_order: 1 }];
+    }
+    try {
+        const parsed = JSON.parse(rawValue);
+        return Array.isArray(parsed) && parsed.length
+            ? parsed
+            : [{ role_key: 'trabajador', signer_name: 'Trabajador', signer_email: '', signing_order: 1 }];
+    } catch (error) {
+        showToast('El JSON de firmantes no es valido', 'error');
+        throw error;
+    }
+}
+
 async function saveDocumentTemplate(event) {
     event.preventDefault();
     const id = document.getElementById('dc-template-id').value;
     const file = document.getElementById('dc-template-file').files?.[0];
+    let signatureRoles = [];
+    try {
+        signatureRoles = getTemplateSignatureRolesFromForm();
+    } catch (error) {
+        return;
+    }
     const payload = {
         name: document.getElementById('dc-template-name').value,
         description: document.getElementById('dc-template-description').value,
         category: document.getElementById('dc-template-category').value || 'general',
         document_type: document.getElementById('dc-template-type').value || 'general',
         target_module: document.getElementById('dc-template-target-module').value || 'general',
-        status: document.getElementById('dc-template-status').value,
+        scope_type: document.getElementById('dc-template-scope-type').value || 'general_empresa',
+        subject_type: document.getElementById('dc-template-subject-type').value || 'trabajador',
+        customer_id: document.getElementById('dc-template-customer-id').value || null,
+        service_order_id: document.getElementById('dc-template-service-order-id').value || null,
+        status: document.getElementById('dc-template-form-status').value,
         requires_signature: document.getElementById('dc-template-requires-signature').checked,
         auto_register_accreditation: document.getElementById('dc-template-accreditation-auto').checked,
         accreditation_requirement_code: document.getElementById('dc-template-accreditation-code').value,
         accreditation_category: document.getElementById('dc-template-accreditation-category').value || 'other',
+        signature_roles: signatureRoles,
         filename_pattern: document.getElementById('dc-template-filename-pattern').value,
     };
 
@@ -431,6 +542,111 @@ async function saveDocumentTemplate(event) {
     closeDocumentCenterModal('dc-template-modal');
     showToast(id ? 'Plantilla actualizada' : 'Plantilla creada');
     await loadDocumentCenterData();
+    if (payload.requires_signature && response.data?.id) {
+        await openTemplateSignatureLayoutDesigner(response.data.id);
+    }
+}
+
+async function openTemplateSignatureLayoutDesigner(templateId = null) {
+    const resolvedTemplateId = templateId || document.getElementById('dc-template-id')?.value;
+    if (!resolvedTemplateId) {
+        showToast('Guarda la plantilla antes de disenar su layout de firma', 'error');
+        return;
+    }
+
+    const template = documentCenterState.templates.find((item) => String(item.id) === String(resolvedTemplateId));
+    if (!template?.requires_signature) {
+        showToast('Esta plantilla no esta marcada como firmable', 'error');
+        return;
+    }
+
+    const response = await API.get(`/pdf-workspace/templates/${resolvedTemplateId}`);
+    if (!response?.success) {
+        showToast(response?.errors?.[0] || 'No se pudo cargar la previsualizacion PDF', 'error');
+        return;
+    }
+
+    documentCenterState.activeTemplate = template || null;
+    documentCenterState.templatePreview = response.data || null;
+    document.getElementById('dc-template-signature-title').textContent = `Firma · ${template?.name || 'Plantilla'}`;
+    const invalidKeys = response.data?.invalid_placeholders || [];
+    document.getElementById('dc-template-signature-subtitle').textContent = invalidKeys.length
+        ? `Corrige estas llaves invalidas: ${invalidKeys.join(', ')}`
+        : `Layout visual para ${response.data?.placeholder_keys?.length || 0} llaves detectadas.`;
+
+    const host = document.getElementById('dc-template-signature-workspace');
+    if (documentCenterState.templateSignatureWorkspace) {
+        documentCenterState.templateSignatureWorkspace.destroy();
+        documentCenterState.templateSignatureWorkspace = null;
+    }
+    documentCenterState.templateSignatureWorkspace = PdfSignatureWorkspace.create(host, {
+        title: template?.name || 'Plantilla firmable',
+        readOnly: false,
+        pdfBase64: response.data?.pdf_data || '',
+        pdfLayout: response.data?.pdf_layout || [],
+        positions: response.data?.signature_positions || response.data?.signature_layout || [],
+        signers: response.data?.signature_roles || template?.signature_roles || [],
+        fieldPalette: [
+            { field_type: 'signature', label: 'Firma' },
+            { field_type: 'date', label: 'Fecha' },
+            { field_type: 'name', label: 'Nombre' },
+            { field_type: 'text', label: 'Texto' },
+            { field_type: 'stamp', label: 'Sello' },
+        ],
+        onChange(nextPositions) {
+            if (documentCenterState.templatePreview) {
+                documentCenterState.templatePreview.signature_layout = nextPositions;
+            }
+        },
+    });
+    document.getElementById('dc-template-signature-modal')?.classList.add('open');
+    try {
+        await documentCenterState.templateSignatureWorkspace.load();
+    } catch (error) {
+        showToast(error?.message || 'No se pudo renderizar el PDF de la plantilla', 'error');
+    }
+}
+
+async function saveTemplateSignatureLayout() {
+    const templateId = documentCenterState.activeTemplate?.id || document.getElementById('dc-template-id')?.value;
+    if (!templateId || !documentCenterState.templateSignatureWorkspace) return;
+
+    let signatureRoles = documentCenterState.templatePreview?.signature_roles || documentCenterState.activeTemplate?.signature_roles || [];
+    if (document.getElementById('dc-template-modal')?.classList.contains('open')) {
+        try {
+            signatureRoles = getTemplateSignatureRolesFromForm();
+        } catch (error) {
+            return;
+        }
+    }
+
+    const response = await API.post(`/pdf-workspace/templates/${templateId}/layout`, {
+        signature_positions: documentCenterState.templateSignatureWorkspace.getPositions(),
+        signature_roles: signatureRoles,
+    });
+    if (!response?.success) {
+        showToast(response?.errors?.[0] || 'No se pudo guardar el layout de firma de la plantilla', 'error');
+        return;
+    }
+
+    showToast(`Plantilla sellada con ${(response.data?.signature_positions || response.data?.signature_layout || []).length} caja(s) de firma`);
+    documentCenterState.templatePreview = {
+        ...(documentCenterState.templatePreview || {}),
+        signature_layout: response.data?.signature_positions || response.data?.signature_layout || [],
+        signature_roles: response.data?.signature_roles || [],
+    };
+    documentCenterState.templates = documentCenterState.templates.map((item) => (
+        String(item.id) === String(templateId)
+            ? {
+                ...item,
+                signature_layout: response.data?.signature_positions || response.data?.signature_layout || [],
+                signature_roles: response.data?.signature_roles || [],
+                signature_layout_confirmed: true,
+            }
+            : item
+    ));
+    renderDocumentTemplates();
+    renderWorkerTemplatePicker();
 }
 
 async function deleteDocumentTemplate(templateId) {
@@ -684,7 +900,9 @@ function renderGeneratedDocumentDetail() {
                 </div>
                 <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
                     ${canEditSignatureLayout ? `<button class="btn btn-ghost btn-sm" onclick="saveGeneratedSignatureLayout(${detail.id})">Guardar ubicacion</button>` : ''}
-                    ${linkedSignature?.public_url ? `<button class="btn btn-ghost btn-sm" onclick="copyText('${dcEscape(linkedSignature.public_url)}', 'Enlace publico copiado')">Copiar enlace de firma</button>` : ''}
+                    ${linkedSignature?.public_url ? `<button class="btn btn-ghost btn-sm" onclick="copyText('${dcEscape(dcResolvePublicUrl(linkedSignature.public_url))}', 'Enlace publico copiado')">Copiar enlace de firma</button>` : ''}
+                    ${linkedSignature?.public_url ? `<button class="btn btn-ghost btn-sm" onclick="window.open('${dcEscape(dcResolvePublicUrl(linkedSignature.public_url))}', '_blank', 'noopener')">Abrir enlace</button>` : ''}
+                    ${linkedSignature?.id ? '<a href="/app/signature-center" class="btn btn-secondary btn-sm">Ir a Control de Firmas</a>' : ''}
                 </div>
             </div>
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin:0.9rem 0;">
@@ -693,6 +911,8 @@ function renderGeneratedDocumentDetail() {
                 ${linkedSignature?.status ? dcStatusBadge(linkedSignature.status) : ''}
                 ${linkedSignature?.signed_document_hash ? dcBadge(`Hash ${linkedSignature.signed_document_hash.slice(0, 12)}`, '#0f172a', '#93c5fd', '#1d4ed8') : ''}
                 ${linkedSignature?.digital_key_fingerprint ? dcBadge(`Llave ${linkedSignature.digital_key_fingerprint.slice(0, 12)}`, '#0f2b1e', '#86efac', '#166534') : ''}
+                ${linkedSignature?.public_url ? dcBadge('Enlace publico disponible', '#172554', '#93c5fd', '#1d4ed8') : ''}
+                ${!detail.recipient_email ? dcBadge('Sin correo: compartir link manual', '#422006', '#fde68a', '#ca8a04') : ''}
             </div>
             <div id="dc-signature-workspace"></div>
         </div>
@@ -735,7 +955,9 @@ function renderGeneratedDocumentDetail() {
         </div>
     `;
 
-    mountGeneratedSignatureWorkspace();
+    mountGeneratedSignatureWorkspace().catch((error) => {
+        showToast(error?.message || 'No se pudo renderizar el PDF del documento', 'error');
+    });
 }
 
 function getGeneratedSignaturePositions() {
@@ -744,6 +966,8 @@ function getGeneratedSignaturePositions() {
     const fallback = [{
         id: 'sig-1',
         label: 'Firma principal',
+        role_key: detail.signature_roles_snapshot?.[0]?.role_key || 'trabajador',
+        field_type: 'signature',
         page: 0,
         x: 340,
         y: 640,
@@ -757,7 +981,7 @@ function getGeneratedSignaturePositions() {
     );
 }
 
-function mountGeneratedSignatureWorkspace() {
+async function mountGeneratedSignatureWorkspace() {
     const detail = documentCenterState.activeDocument;
     const host = document.getElementById('dc-signature-workspace');
     if (!host || !detail?.requires_signature || !detail?.pdf_data) return;
@@ -767,19 +991,43 @@ function mountGeneratedSignatureWorkspace() {
         documentCenterState.signatureWorkspace = null;
     }
 
+    host.innerHTML = '<div class="workspace-empty">Cargando editor de firma...</div>';
+    const response = await API.get(`/pdf-workspace/generated/${detail.id}`);
+    if (!response?.success) {
+        host.innerHTML = `<div class="workspace-empty">${dcEscape(response?.errors?.[0] || 'No se pudo cargar el editor PDF')}</div>`;
+        return;
+    }
+
+    const workspaceData = response.data || {};
+    if (documentCenterState.activeDocument) {
+        documentCenterState.activeDocument.pdf_data = workspaceData.pdf_data || documentCenterState.activeDocument.pdf_data || '';
+        documentCenterState.activeDocument.pdf_layout = workspaceData.pdf_layout || documentCenterState.activeDocument.pdf_layout || [];
+        documentCenterState.activeDocument.signature_positions = workspaceData.signature_positions || documentCenterState.activeDocument.signature_positions || [];
+        documentCenterState.activeDocument.signature_roles_snapshot = workspaceData.signature_roles || documentCenterState.activeDocument.signature_roles_snapshot || [];
+        documentCenterState.activeDocument.signature_layout_confirmed = !!workspaceData.layout_confirmed;
+    }
+
     documentCenterState.signatureWorkspace = PdfSignatureWorkspace.create(host, {
         title: detail.status === 'signed' ? 'PDF firmado' : 'PDF listo para configurar firma',
         readOnly: ['signed', 'closed'].includes(detail.status),
-        pdfBase64: detail.pdf_data,
-        pdfLayout: detail.pdf_layout || [],
-        positions: getGeneratedSignaturePositions(),
+        pdfBase64: workspaceData.pdf_data || detail.pdf_data,
+        pdfLayout: workspaceData.pdf_layout || detail.pdf_layout || [],
+        positions: workspaceData.signature_positions || getGeneratedSignaturePositions(),
+        signers: workspaceData.signature_roles || detail.signature_roles_snapshot || [],
+        fieldPalette: [
+            { field_type: 'signature', label: 'Firma' },
+            { field_type: 'date', label: 'Fecha' },
+            { field_type: 'name', label: 'Nombre' },
+            { field_type: 'text', label: 'Texto' },
+            { field_type: 'stamp', label: 'Sello' },
+        ],
         onChange(nextPositions) {
             if (documentCenterState.activeDocument) {
                 documentCenterState.activeDocument.signature_positions = nextPositions;
             }
         },
     });
-    documentCenterState.signatureWorkspace.load();
+    await documentCenterState.signatureWorkspace.load();
 }
 
 async function saveGeneratedSignatureLayout(documentId, options = {}) {
@@ -787,8 +1035,11 @@ async function saveGeneratedSignatureLayout(documentId, options = {}) {
     if (!detail || !documentCenterState.signatureWorkspace) return false;
     const payload = {
         signature_positions: documentCenterState.signatureWorkspace.getPositions(),
+        signature_roles: documentCenterState.signatureWorkspace.getSigners
+            ? documentCenterState.signatureWorkspace.getSigners()
+            : documentCenterState.activeDocument?.signature_roles_snapshot || [],
     };
-    const response = await API.post(`/document-center/generated/${documentId}/signature-layout`, payload);
+    const response = await API.post(`/pdf-workspace/generated/${documentId}/layout`, payload);
     if (!response?.success) {
         if (!options.silent) {
             showToast(response?.errors?.[0] || 'No se pudo guardar la ubicacion de firma', 'error');
@@ -797,8 +1048,9 @@ async function saveGeneratedSignatureLayout(documentId, options = {}) {
     }
     if (documentCenterState.activeDocument) {
         documentCenterState.activeDocument.signature_positions = response.data?.signature_positions || [];
+        documentCenterState.activeDocument.signature_roles_snapshot = response.data?.signature_roles || documentCenterState.activeDocument.signature_roles_snapshot || [];
         documentCenterState.activeDocument.pdf_layout = response.data?.pdf_layout || documentCenterState.activeDocument.pdf_layout || [];
-        documentCenterState.activeDocument.signature_layout_confirmed = true;
+        documentCenterState.activeDocument.signature_layout_confirmed = response.data?.layout_confirmed !== false;
     }
     if (!options.silent) {
         showToast('Ubicacion de firma guardada');
@@ -832,7 +1084,13 @@ async function sendGeneratedToSignature(documentId) {
         return;
     }
     const publicUrl = response.data?.signature_request?.public_url;
-    showToast(publicUrl ? `Documento enviado a firma. Link: ${publicUrl}` : 'Documento enviado a firma');
+    if (publicUrl) {
+        const absoluteUrl = dcResolvePublicUrl(publicUrl);
+        copyText(absoluteUrl, 'Solicitud creada y enlace de firma copiado');
+        showToast(`Solicitud de firma creada. Link: ${absoluteUrl}`);
+    } else {
+        showToast('Solicitud de firma creada');
+    }
     await loadDocumentCenterData();
     await openGeneratedDocument(documentId);
 }
@@ -874,6 +1132,10 @@ function closeDocumentCenterModal(id) {
     if (id === 'dc-document-modal' && documentCenterState.signatureWorkspace) {
         documentCenterState.signatureWorkspace.destroy();
         documentCenterState.signatureWorkspace = null;
+    }
+    if (id === 'dc-template-signature-modal' && documentCenterState.templateSignatureWorkspace) {
+        documentCenterState.templateSignatureWorkspace.destroy();
+        documentCenterState.templateSignatureWorkspace = null;
     }
     document.getElementById(id)?.classList.remove('open');
 }

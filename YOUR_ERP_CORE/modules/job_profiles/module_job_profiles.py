@@ -10,7 +10,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from core.YOUR_ERP_core_framework import BaseModule, Request, Response, ValidationError
 from core.YOUR_ERP_orm import BaseModel, Column, ColumnType, AuditMixin
 from core.time_utils import utc_now_iso
-from modules.safety.miper_engine import action_from_vep, build_row_fingerprint, calculate_vep, risk_level_from_vep
+from modules.safety.miper_engine import (
+    action_from_vep,
+    build_row_fingerprint,
+    calculate_vep,
+    merge_generated_rows,
+    risk_level_from_vep,
+)
 
 RISK_LEVELS = ("low", "medium", "high", "critical")
 
@@ -237,6 +243,66 @@ class JobRisk(BaseModel, AuditMixin):
         }
 
 
+class JobProfileRiskLink(BaseModel, AuditMixin):
+    __tablename__ = "job_profile_risk_links"
+    __displayname__ = "master_risk_id"
+
+    job_profile_id = Column(ColumnType.INTEGER, required=True, label="Job Profile")
+    master_risk_id = Column(ColumnType.INTEGER, required=True, label="Master Risk")
+    display_order = Column(ColumnType.INTEGER, default=10, label="Order")
+    active = Column(ColumnType.BOOLEAN, default=True, label="Active")
+    company_id = Column(ColumnType.INTEGER, required=True, label="Company")
+
+    def validate(self):
+        super().validate()
+        if not self.job_profile_id:
+            raise ValidationError("job_profile_id is required")
+        if not self.master_risk_id:
+            raise ValidationError("master_risk_id is required")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "job_profile_id": self.job_profile_id,
+            "master_risk_id": self.master_risk_id,
+            "display_order": self.display_order or 10,
+            "active": bool(self.active),
+            "company_id": self.company_id,
+        }
+
+
+class JobProfileActivityLink(BaseModel, AuditMixin):
+    __tablename__ = "job_profile_activity_links"
+    __displayname__ = "activity_block_id"
+
+    job_profile_id = Column(ColumnType.INTEGER, required=True, label="Job Profile")
+    activity_block_id = Column(ColumnType.INTEGER, required=True, label="Activity Block")
+    link_type = Column(ColumnType.STRING, default="global", label="Link Type")
+    display_order = Column(ColumnType.INTEGER, default=10, label="Order")
+    active = Column(ColumnType.BOOLEAN, default=True, label="Active")
+    company_id = Column(ColumnType.INTEGER, required=True, label="Company")
+
+    def validate(self):
+        super().validate()
+        if not self.job_profile_id:
+            raise ValidationError("job_profile_id is required")
+        if not self.activity_block_id:
+            raise ValidationError("activity_block_id is required")
+        if self.link_type not in ("global", "profile_specific"):
+            raise ValidationError("link_type must be global or profile_specific")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "job_profile_id": self.job_profile_id,
+            "activity_block_id": self.activity_block_id,
+            "link_type": self.link_type or "global",
+            "display_order": self.display_order or 10,
+            "active": bool(self.active),
+            "company_id": self.company_id,
+        }
+
+
 def _default_job_profiles() -> List[Dict[str, Any]]:
     return [
         {
@@ -370,7 +436,75 @@ def resolve_job_profile_for_employee(employee: Any) -> Optional[JobProfile]:
     return None
 
 
-def build_job_profile_matrix_rows_for_employee(employee: Any, profile: JobProfile) -> List[Dict[str, Any]]:
+def _profile_risk_link_payload(link: JobProfileRiskLink) -> Dict[str, Any]:
+    try:
+        from modules.safety.module_safety import SafetyMasterRisk
+
+        risk = SafetyMasterRisk.find_by_id(_safe_int(link.master_risk_id))
+    except Exception:
+        risk = None
+    return {
+        "id": link.id,
+        "job_profile_id": link.job_profile_id,
+        "master_risk_id": link.master_risk_id,
+        "display_order": link.display_order or 10,
+        "active": bool(link.active),
+        "isp_code": risk.isp_code if risk else "",
+        "risk_name": risk.risk_name if risk else "",
+        "family": risk.family if risk else "",
+        "official_definition": risk.official_definition if risk else "",
+    }
+
+
+def _profile_activity_link_payload(link: JobProfileActivityLink) -> Dict[str, Any]:
+    try:
+        from modules.safety_activities.module_safety_activities import SafetyActivityBlock, SafetyActivityHazard
+
+        block = SafetyActivityBlock.find_by_id(_safe_int(link.activity_block_id))
+        hazard_count = len(
+            [
+                hazard
+                for hazard in SafetyActivityHazard.search([("activity_block_id", "=", _safe_int(link.activity_block_id))])
+                if hazard.active
+            ]
+        )
+    except Exception:
+        block = None
+        hazard_count = 0
+    return {
+        "id": link.id,
+        "job_profile_id": link.job_profile_id,
+        "activity_block_id": link.activity_block_id,
+        "link_type": link.link_type or "global",
+        "display_order": link.display_order or 10,
+        "active": bool(link.active),
+        "activity_code": block.code if block else "",
+        "activity_name": block.name if block else "",
+        "block_type": block.block_type if block else "",
+        "description": block.description if block else "",
+        "default_process_name": block.default_process_name if block else "",
+        "default_task_name": block.default_task_name if block else "",
+        "default_position_name": block.default_position_name if block else "",
+        "default_owner_name": block.default_owner_name if block else "",
+        "hazard_count": hazard_count,
+    }
+
+
+def _activity_block_scope(activity_block_id: Any) -> str:
+    block_id = _safe_int(activity_block_id, None)
+    if not block_id:
+        return "global"
+    links = [
+        item
+        for item in JobProfileActivityLink.search([("activity_block_id", "=", block_id)])
+        if item.active
+    ]
+    if any((item.link_type or "global") == "profile_specific" for item in links):
+        return "profile_specific"
+    return "global"
+
+
+def _legacy_job_profile_matrix_rows(employee: Any, profile: JobProfile) -> List[Dict[str, Any]]:
     employee_payload = employee.to_dict() if hasattr(employee, "to_dict") else {}
     rows = []
     for risk in JobRisk.search([("job_profile_id", "=", profile.id)]):
@@ -399,9 +533,9 @@ def build_job_profile_matrix_rows_for_employee(employee: Any, profile: JobProfil
             "vep": item["vep"],
             "risk_level": item["risk_level_label"],
             "action_required": item["action_required"],
-            "origin_blocks": ["cargo_profile"],
+            "origin_blocks": ["cargo_profile", "legacy_risk"],
             "origin_rule_ids": [],
-            "source_labels": [profile.name],
+            "source_labels": [f"Legacy cargo: {profile.name}"],
             "sensitivity_tags": [str(profile.code or "").strip().lower()],
             "restriction_alerts": [],
             "legal_reference": "",
@@ -416,6 +550,58 @@ def build_job_profile_matrix_rows_for_employee(employee: Any, profile: JobProfil
         row["row_fingerprint"] = build_row_fingerprint(row)
         rows.append(row)
     return rows
+
+
+def _activity_rows_for_profile(profile: JobProfile, employee: Any = None) -> List[Dict[str, Any]]:
+    try:
+        from modules.safety_activities.module_safety_activities import SafetyActivityBlock, build_activity_block_matrix_rows
+    except Exception:
+        return []
+
+    employee_payload = employee.to_dict() if hasattr(employee, "to_dict") else {}
+    links = JobProfileActivityLink.search([("job_profile_id", "=", profile.id)])
+    links = [link for link in links if link.active]
+    links.sort(key=lambda item: (_safe_int(item.display_order, 10) or 10, item.id or 0))
+    rows_map: Dict[str, Dict[str, Any]] = {}
+    for link in links:
+        block = SafetyActivityBlock.find_by_id(_safe_int(link.activity_block_id))
+        if not block or not block.active:
+            continue
+        rows = build_activity_block_matrix_rows(
+            block.id,
+            process_name=block.default_process_name or profile.name,
+            task_name=block.default_task_name or block.name or profile.name,
+            position_name=employee_payload.get("position_title") or block.default_position_name or profile.name,
+            owner_name=block.default_owner_name or employee_payload.get("manager_name") or "",
+            source_labels=[f"Actividad cargo: {block.name or block.code or block.id}"],
+            origin_blocks=["cargo_profile", "activity"],
+        )
+        for row in rows:
+            row["employee_id"] = employee_payload.get("id")
+            row["employee_name"] = employee_payload.get("full_name")
+            row["job_profile_id"] = profile.id
+            row["job_profile_name"] = profile.name
+            row["activity_block_id"] = block.id
+            row["activity_block_code"] = block.code or ""
+            row["activity_link_type"] = link.link_type or "global"
+            fingerprint = row.get("row_fingerprint") or build_row_fingerprint(row)
+            row["row_fingerprint"] = fingerprint
+            if fingerprint in rows_map:
+                rows_map[fingerprint] = merge_generated_rows(rows_map[fingerprint], row)
+            else:
+                rows_map[fingerprint] = row
+    return list(rows_map.values())
+
+
+def build_job_profile_matrix_rows(profile: JobProfile, employee: Any = None) -> List[Dict[str, Any]]:
+    rows = _activity_rows_for_profile(profile, employee)
+    if rows:
+        return rows
+    return _legacy_job_profile_matrix_rows(employee, profile)
+
+
+def build_job_profile_matrix_rows_for_employee(employee: Any, profile: JobProfile) -> List[Dict[str, Any]]:
+    return build_job_profile_matrix_rows(profile, employee)
 
 
 def build_personalized_matrix_rows_for_employees(employee_ids: List[int]) -> Dict[str, Any]:
@@ -447,6 +633,8 @@ class JobProfilesModule(BaseModule):
         self.register_model("job.function", JobFunction)
         self.register_model("job.responsibility", JobResponsibility)
         self.register_model("job.risk", JobRisk)
+        self.register_model("job.profile_risk_link", JobProfileRiskLink)
+        self.register_model("job.profile_activity_link", JobProfileActivityLink)
         self.register_route("/job-profiles/stats", self.get_stats, methods=["GET"], auth_required=True)
         self.register_route("/job-profiles/lookups", self.get_lookups, methods=["GET"], auth_required=True)
         self.register_route("/job-profiles/profiles", self.list_profiles, methods=["GET"], auth_required=True)
@@ -463,6 +651,10 @@ class JobProfilesModule(BaseModule):
         self.register_route("/job-profiles/profiles/{id}/risks", self.create_risk, methods=["POST"], auth_required=True)
         self.register_route("/job-profiles/risks/{item_id}", self.update_risk, methods=["PUT"], auth_required=True)
         self.register_route("/job-profiles/risks/{item_id}", self.delete_risk, methods=["DELETE"], auth_required=True)
+        self.register_route("/job-profiles/profiles/{id}/risk-links", self.replace_risk_links, methods=["PUT"], auth_required=True)
+        self.register_route("/job-profiles/profiles/{id}/activities", self.list_profile_activities, methods=["GET"], auth_required=True)
+        self.register_route("/job-profiles/profiles/{id}/activities", self.create_profile_activity, methods=["POST"], auth_required=True)
+        self.register_route("/job-profiles/profile-activities/{id}", self.delete_profile_activity, methods=["DELETE"], auth_required=True)
         self.register_route("/job-profiles/profiles/{id}/matrix-template", self.get_profile_matrix_template, methods=["GET"], auth_required=True)
         self.register_route("/job-profiles/employees/{id}/matrix-template", self.get_employee_matrix_template, methods=["GET"], auth_required=True)
         self.logger.info("Job profiles module initialized")
@@ -506,6 +698,19 @@ class JobProfilesModule(BaseModule):
             return None, Response.not_found("Job profile not found")
         return profile, None
 
+    def _profile_code_exists(self, code: Any, exclude_id: Optional[int] = None) -> bool:
+        normalized = str(code or "").strip().lower()
+        if not normalized:
+            return False
+        for item in JobProfile.search([("company_id", "=", self._company_id())]):
+            if exclude_id and item.id == exclude_id:
+                continue
+            if not item.active:
+                continue
+            if str(item.code or "").strip().lower() == normalized:
+                return True
+        return False
+
     def _item_or_404(self, model: Any, item_id: Any, label: str) -> Tuple[Optional[Any], Optional[Response]]:
         item = model.find_by_id(_safe_int(item_id))
         if not item or (self.env.user.role != "superadmin" and item.company_id != self._company_id()):
@@ -515,7 +720,19 @@ class JobProfilesModule(BaseModule):
     def _profile_payload(self, profile: JobProfile) -> Dict[str, Any]:
         functions = [item.to_dict() for item in JobFunction.search([("job_profile_id", "=", profile.id)])]
         responsibilities = [item.to_dict() for item in JobResponsibility.search([("job_profile_id", "=", profile.id)])]
-        risks = [item.to_dict() for item in JobRisk.search([("job_profile_id", "=", profile.id)])]
+        risk_links = [
+            _profile_risk_link_payload(item)
+            for item in JobProfileRiskLink.search([("job_profile_id", "=", profile.id)])
+            if item.active
+        ]
+        legacy_risks = [item.to_dict() for item in JobRisk.search([("job_profile_id", "=", profile.id)])]
+        activities = [
+            _profile_activity_link_payload(item)
+            for item in JobProfileActivityLink.search([("job_profile_id", "=", profile.id)])
+            if item.active
+        ]
+        risk_links.sort(key=lambda item: (str(item.get("family") or "").lower(), str(item.get("isp_code") or "").lower(), item.get("display_order") or 10))
+        activities.sort(key=lambda item: (_safe_int(item.get("display_order"), 10) or 10, str(item.get("activity_name") or "").lower(), item.get("id") or 0))
         try:
             from modules.hr.module_hr import EmployeeProfile
 
@@ -526,7 +743,17 @@ class JobProfilesModule(BaseModule):
                     employees.append(employee.to_dict())
         except Exception:
             employees = []
-        return {**profile.to_dict(), "functions": functions, "responsibilities": responsibilities, "risks": risks, "employees": employees, "employees_count": len(employees)}
+        return {
+            **profile.to_dict(),
+            "functions": functions,
+            "responsibilities": responsibilities,
+            "activities": activities,
+            "risk_links": risk_links,
+            "risks": risk_links,
+            "legacy_risks": legacy_risks,
+            "employees": employees,
+            "employees_count": len(employees),
+        }
 
     async def get_stats(self, request: Request) -> Response:
         err = self._require_access()
@@ -534,7 +761,15 @@ class JobProfilesModule(BaseModule):
             return err
         self._ensure_defaults()
         profiles = JobProfile.search(self._tenant_filter())
-        return Response.ok({"profiles_total": len(profiles), "profiles_active": len([p for p in profiles if p.active]), "functions_total": len(JobFunction.search(self._tenant_filter())), "responsibilities_total": len(JobResponsibility.search(self._tenant_filter())), "risks_total": len(JobRisk.search(self._tenant_filter()))})
+        return Response.ok({
+            "profiles_total": len(profiles),
+            "profiles_active": len([p for p in profiles if p.active]),
+            "functions_total": len(JobFunction.search(self._tenant_filter())),
+            "responsibilities_total": len(JobResponsibility.search(self._tenant_filter())),
+            "activities_total": len([item for item in JobProfileActivityLink.search(self._tenant_filter()) if item.active]),
+            "risks_total": len([item for item in JobProfileRiskLink.search(self._tenant_filter()) if item.active]),
+            "legacy_risks_total": len(JobRisk.search(self._tenant_filter())),
+        })
 
     async def get_lookups(self, request: Request) -> Response:
         err = self._require_access()
@@ -543,6 +778,10 @@ class JobProfilesModule(BaseModule):
         self._ensure_defaults()
         departments = []
         employees = []
+        master_risks = []
+        protocols = []
+        ppe_catalog = []
+        global_activity_blocks = []
         try:
             from modules.hr.module_hr import Department, EmployeeProfile
 
@@ -550,8 +789,40 @@ class JobProfilesModule(BaseModule):
             employees = [item.to_dict() for item in EmployeeProfile.search(self._tenant_filter())]
         except Exception:
             pass
+        try:
+            from modules.safety.module_safety import SafetyMasterRisk, SafetyProtocol, SafetyPPEItem, seed_default_ppe_catalog
+
+            seed_default_ppe_catalog(self._company_id())
+            master_risks = [item.to_dict() for item in SafetyMasterRisk.search(self._tenant_filter()) if item.active]
+            master_risks.sort(key=lambda item: ((item.get("family") or "").lower(), (item.get("isp_code") or "").lower()))
+            protocols = [item.to_dict() for item in SafetyProtocol.search(self._tenant_filter()) if item.active]
+            protocols.sort(key=lambda item: ((item.get("code") or "").lower(), (item.get("name") or "").lower()))
+            ppe_catalog = [item.to_dict() for item in SafetyPPEItem.search(self._tenant_filter()) if item.active]
+            ppe_catalog.sort(key=lambda item: ((item.get("category") or "").lower(), (item.get("name") or "").lower()))
+        except Exception:
+            pass
+        try:
+            from modules.safety_activities.module_safety_activities import SafetyActivityBlock, seed_default_activity_blocks
+
+            seed_default_activity_blocks(self._company_id())
+            global_activity_blocks = [
+                item.to_dict()
+                for item in SafetyActivityBlock.search(self._tenant_filter())
+                if item.active and _activity_block_scope(item.id) != "profile_specific"
+            ]
+            global_activity_blocks.sort(key=lambda item: ((item.get("block_type") or "").lower(), (item.get("name") or "").lower()))
+        except Exception:
+            pass
         profiles = [item.to_dict() for item in JobProfile.search(self._tenant_filter()) if item.active]
-        return Response.ok({"departments": departments, "employees": employees, "profiles": profiles})
+        return Response.ok({
+            "departments": departments,
+            "employees": employees,
+            "profiles": profiles,
+            "master_risks": master_risks,
+            "protocols": protocols,
+            "ppe_catalog": ppe_catalog,
+            "global_activity_blocks": global_activity_blocks,
+        })
 
     async def list_profiles(self, request: Request) -> Response:
         err = self._require_access()
@@ -577,6 +848,8 @@ class JobProfilesModule(BaseModule):
         if err:
             return err
         data = request.data or {}
+        if self._profile_code_exists(data.get("code")):
+            return Response.bad_request("A job profile with this code already exists")
         try:
             profile = JobProfile.create({"name": data.get("name"), "code": data.get("code"), "department_id": _safe_int(data.get("department_id"), None), "objective": data.get("objective") or "", "scope": data.get("scope") or "", "risk_level": data.get("risk_level") or "medium", "active": _normalize_bool(data.get("active"), True), "company_id": self._company_id()})
             return Response.created(self._profile_payload(profile))
@@ -591,6 +864,8 @@ class JobProfilesModule(BaseModule):
         if error:
             return error
         data = request.data or {}
+        if "code" in data and self._profile_code_exists(data.get("code"), exclude_id=profile.id):
+            return Response.bad_request("A job profile with this code already exists")
         for field in ("name", "code", "objective", "scope", "risk_level"):
             if field in data:
                 setattr(profile, field, data.get(field))
@@ -768,6 +1043,180 @@ class JobProfilesModule(BaseModule):
         item.delete()
         return Response.ok({"message": "Risk deleted"})
 
+    async def replace_risk_links(self, request: Request) -> Response:
+        err = self._require_admin()
+        if err:
+            return err
+        profile, error = self._profile_or_404(request.params.get("id"))
+        if error:
+            return error
+        data = request.data or {}
+        master_risk_ids: List[int] = []
+        for raw in data.get("master_risk_ids") or []:
+            risk_id = _safe_int(raw, None)
+            if risk_id and risk_id not in master_risk_ids:
+                master_risk_ids.append(risk_id)
+        try:
+            from modules.safety.module_safety import SafetyMasterRisk
+
+            valid_ids = {
+                risk.id
+                for risk in SafetyMasterRisk.search(self._tenant_filter())
+                if risk.active and risk.id
+            }
+        except Exception:
+            valid_ids = set()
+        if any(risk_id not in valid_ids for risk_id in master_risk_ids):
+            return Response.bad_request("Uno o mas riesgos maestros no existen para la empresa")
+        for link in JobProfileRiskLink.search([("job_profile_id", "=", profile.id)]):
+            link.delete()
+        created: List[Dict[str, Any]] = []
+        for idx, risk_id in enumerate(master_risk_ids, start=1):
+            link = JobProfileRiskLink.create(
+                {
+                    "job_profile_id": profile.id,
+                    "master_risk_id": risk_id,
+                    "display_order": idx * 10,
+                    "active": True,
+                    "company_id": self._company_id(),
+                }
+            )
+            created.append(_profile_risk_link_payload(link))
+        return Response.ok({"profile_id": profile.id, "risks": created})
+
+    async def list_profile_activities(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+        profile, error = self._profile_or_404(request.params.get("id"))
+        if error:
+            return error
+        results = [
+            _profile_activity_link_payload(item)
+            for item in JobProfileActivityLink.search([("job_profile_id", "=", profile.id)])
+            if item.active
+        ]
+        results.sort(key=lambda item: (_safe_int(item.get("display_order"), 10) or 10, str(item.get("activity_name") or "").lower(), item.get("id") or 0))
+        return Response.ok({"count": len(results), "results": results})
+
+    async def create_profile_activity(self, request: Request) -> Response:
+        err = self._require_admin()
+        if err:
+            return err
+        profile, error = self._profile_or_404(request.params.get("id"))
+        if error:
+            return error
+        data = request.data or {}
+        activity_block_id = _safe_int(data.get("activity_block_id"), None)
+        link_type = "global"
+        block = None
+        if activity_block_id:
+            try:
+                from modules.safety_activities.module_safety_activities import SafetyActivityBlock
+
+                block = SafetyActivityBlock.find_by_id(activity_block_id)
+            except Exception:
+                block = None
+            if not block or (self.env.user.role != "superadmin" and block.company_id != self._company_id()):
+                return Response.not_found("Activity block not found")
+            if _activity_block_scope(activity_block_id) == "profile_specific":
+                return Response.bad_request("Este bloque es especifico de un cargo y no puede vincularse como bloque global")
+        else:
+            try:
+                from modules.safety_activities.module_safety_activities import SafetyActivityBlock, SafetyActivityHazard
+            except Exception:
+                return Response.bad_request("No fue posible cargar la biblioteca de bloques de actividad")
+            hazards = data.get("hazards") or []
+            if not isinstance(hazards, list) or not hazards:
+                return Response.bad_request("La actividad especifica necesita al menos un peligro")
+            try:
+                block = SafetyActivityBlock.create(
+                    {
+                        "company_id": self._company_id(),
+                        "code": data.get("code") or data.get("activity_code") or "",
+                        "name": data.get("name") or data.get("activity_name") or "",
+                        "description": data.get("description") or "",
+                        "block_type": data.get("block_type") or "custom",
+                        "default_process_name": data.get("default_process_name") or data.get("process_name") or profile.name,
+                        "default_task_name": data.get("default_task_name") or data.get("task_name") or data.get("name") or "",
+                        "default_position_name": data.get("default_position_name") or profile.name,
+                        "default_owner_name": data.get("default_owner_name") or "",
+                        "active": True,
+                    }
+                )
+                for idx, hazard in enumerate(hazards, start=1):
+                    SafetyActivityHazard.create(
+                        {
+                            "company_id": self._company_id(),
+                            "activity_block_id": block.id,
+                            "hazard_factor": hazard.get("hazard_factor") or hazard.get("hazard") or "",
+                            "master_risk_id": _safe_int(hazard.get("master_risk_id"), None),
+                            "probability": _safe_int(hazard.get("probability"), 2) or 2,
+                            "consequence": _safe_int(hazard.get("consequence"), 2) or 2,
+                            "controls_summary": hazard.get("controls_summary") or hazard.get("controls") or "",
+                            "control_hierarchy": hazard.get("control_hierarchy") or {},
+                            "required_ppe": hazard.get("required_ppe") or [],
+                            "protocol_codes": hazard.get("protocol_codes") or [],
+                            "sensitivity_tags": hazard.get("sensitivity_tags") or [],
+                            "legal_reference": hazard.get("legal_reference") or "",
+                            "source_note": hazard.get("source_note") or "",
+                            "display_order": _safe_int(hazard.get("display_order"), idx * 10) or idx * 10,
+                            "active": True,
+                        }
+                    )
+            except ValidationError as exc:
+                return Response.bad_request(str(exc))
+            activity_block_id = block.id
+            link_type = "profile_specific"
+        for existing in JobProfileActivityLink.search([("job_profile_id", "=", profile.id)]):
+            if existing.active and _safe_int(existing.activity_block_id, None) == activity_block_id:
+                return Response.ok(_profile_activity_link_payload(existing))
+        try:
+            link = JobProfileActivityLink.create(
+                {
+                    "job_profile_id": profile.id,
+                    "activity_block_id": activity_block_id,
+                    "link_type": link_type,
+                    "display_order": _safe_int(data.get("display_order"), 10) or 10,
+                    "active": True,
+                    "company_id": self._company_id(),
+                }
+            )
+        except ValidationError as exc:
+            return Response.bad_request(str(exc))
+        return Response.created(_profile_activity_link_payload(link))
+
+    async def delete_profile_activity(self, request: Request) -> Response:
+        err = self._require_admin()
+        if err:
+            return err
+        link, error = self._item_or_404(JobProfileActivityLink, request.params.get("id"), "Profile activity")
+        if error:
+            return error
+        activity_block_id = _safe_int(link.activity_block_id, None)
+        link_type = link.link_type or "global"
+        link.delete()
+        if link_type == "profile_specific" and activity_block_id:
+            siblings = [
+                item
+                for item in JobProfileActivityLink.search([("activity_block_id", "=", activity_block_id)])
+                if item.active and item.id != link.id
+            ]
+            if not siblings:
+                try:
+                    from modules.safety_activities.module_safety_activities import SafetyActivityBlock, SafetyActivityHazard
+
+                    block = SafetyActivityBlock.find_by_id(activity_block_id)
+                    if block:
+                        block.active = False
+                        block.save()
+                    for hazard in SafetyActivityHazard.search([("activity_block_id", "=", activity_block_id)]):
+                        hazard.active = False
+                        hazard.save()
+                except Exception:
+                    pass
+        return Response.ok({"message": "Activity unlinked"})
+
     async def get_profile_matrix_template(self, request: Request) -> Response:
         err = self._require_access()
         if err:
@@ -783,11 +1232,11 @@ class JobProfilesModule(BaseModule):
 
                 employee = EmployeeProfile.find_by_id(employee_id)
                 if employee:
-                    rows = build_job_profile_matrix_rows_for_employee(employee, profile)
+                    rows = build_job_profile_matrix_rows(profile, employee)
             except Exception:
                 rows = []
         if not rows:
-            rows = [{"process_name": item.process_name or profile.name, "task_name": item.task_name, "position_name": profile.name, "hazard_factor": item.hazard_factor, "risk_name": item.risk_name, "controls": item.controls_summary, "risk_level": risk_level_from_vep(calculate_vep(_safe_int(item.probability, 2) or 2, _safe_int(item.severity, 2) or 2))} for item in JobRisk.search([("job_profile_id", "=", profile.id)]) if item.active]
+            rows = build_job_profile_matrix_rows(profile)
         return Response.ok({"profile": profile.to_dict(), "rows": rows, "summary": {"row_count": len(rows), "generated_at": utc_now_iso()}})
 
     async def get_employee_matrix_template(self, request: Request) -> Response:
@@ -806,5 +1255,5 @@ class JobProfilesModule(BaseModule):
         profile = resolve_job_profile_for_employee(employee)
         if not profile:
             return Response.bad_request("Employee does not have a linked job profile")
-        rows = build_job_profile_matrix_rows_for_employee(employee, profile)
+        rows = build_job_profile_matrix_rows(profile, employee)
         return Response.ok({"employee": employee.to_dict(), "profile": profile.to_dict(), "rows": rows, "summary": {"row_count": len(rows), "generated_at": utc_now_iso()}})

@@ -126,7 +126,7 @@ class Settings:
     # MÓDULOS A CARGAR
     modules_to_load: List[str] = os.getenv(
         "MODULES_TO_LOAD",
-        "base,signature,mail"
+        "base,signature,mail,hr,job_profiles"
     ).split(",")
     
     # PAGINACIÓN

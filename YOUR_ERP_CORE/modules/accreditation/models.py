@@ -46,7 +46,7 @@ class ServiceOrder(BaseModel, AuditMixin):
     __displayname__ = "title"
 
     lead_id = Column(ColumnType.INTEGER, required=True, label="Lead")
-    customer_id = Column(ColumnType.INTEGER, required=True, label="Customer")
+    customer_id = Column(ColumnType.INTEGER, label="Customer")
     company_id = Column(ColumnType.INTEGER, required=True, label="Company")
     title = Column(ColumnType.STRING, required=True, label="Title")
     description = Column(ColumnType.TEXT, label="Description")

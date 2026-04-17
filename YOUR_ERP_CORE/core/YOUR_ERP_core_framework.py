@@ -236,18 +236,23 @@ class BaseModule(ABC):
     description: str = ""
     depends: List[str] = []
     
-    # Atributos internos
-    _models = {}
-    _routes = {}
-    _views = {}
-    _permissions = []
-    _hooks = {}
+    # Atributos internos por instancia
+    _models: Dict[str, type] = {}
+    _routes: Dict[str, Dict[str, Any]] = {}
+    _views: Dict[str, Dict[str, Any]] = {}
+    _permissions: List[Dict[str, Any]] = []
+    _hooks: Dict[str, List[Callable]] = {}
     
     def __init__(self, core: "CoreFramework"):
         """Inicializar módulo"""
         self.core = core
         self.env = core.env
         self.db = core.db
+        self._models = {}
+        self._routes = {}
+        self._views = {}
+        self._permissions = []
+        self._hooks = {}
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.info(f"Initializing module: {self.name}")
     
@@ -671,7 +676,8 @@ class CoreFramework:
                     # Ejecutar handler
                     handler = route_config['handler']
                     response = await handler(request)
-                    response.request_id = request.request_id
+                    if isinstance(response, Response):
+                        response.request_id = request.request_id
                     return response
 
             # No encontrada

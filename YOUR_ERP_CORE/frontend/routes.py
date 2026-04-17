@@ -1,8 +1,17 @@
 import time
 from fastapi import APIRouter, Body
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+
+from core.mvp import get_mvp_disabled_app_module
 
 router = APIRouter(prefix="/app")
+
+
+def _mvp_redirect(path: str):
+    disabled_module = get_mvp_disabled_app_module(path)
+    if not disabled_module:
+        return None
+    return RedirectResponse(url=f"/app/dashboard?mvp={disabled_module}", status_code=307)
 
 
 @router.get("/test-demo", response_class=HTMLResponse)
@@ -110,6 +119,9 @@ async def settings():
 
 @router.get("/google-workspace", response_class=HTMLResponse)
 async def google_workspace():
+    redirect = _mvp_redirect("/app/google-workspace")
+    if redirect:
+        return redirect
     from frontend.pages.google_workspace import google_workspace_page
     return google_workspace_page()
 
@@ -148,6 +160,18 @@ async def quotes_list():
 async def billing():
     from frontend.pages.billing import billing_page
     return billing_page()
+
+
+@router.get("/expenses", response_class=HTMLResponse)
+async def expenses():
+    from frontend.pages.expenses import expenses_page
+    return expenses_page()
+
+
+@router.get("/planning", response_class=HTMLResponse)
+async def planning():
+    from frontend.pages.planning import planning_page
+    return planning_page()
 
 
 @router.get("/billing/{document_id}/preview", response_class=HTMLResponse)
@@ -212,14 +236,31 @@ async def safety():
 
 @router.get("/safety/admin", response_class=HTMLResponse)
 async def safety_admin():
-    from frontend.pages.safety_admin import safety_admin_page
-    return safety_admin_page()
+    return RedirectResponse(url="/app/safety/activities", status_code=307)
 
 
 @router.get("/safety/locations", response_class=HTMLResponse)
 async def safety_locations():
     from frontend.pages.safety_locations import safety_locations_page
     return safety_locations_page()
+
+
+@router.get("/safety/activities", response_class=HTMLResponse)
+async def safety_activities():
+    from frontend.pages.safety_activities import safety_activities_page
+    return safety_activities_page()
+
+
+@router.get("/safety/miper", response_class=HTMLResponse)
+async def safety_miper():
+    from frontend.pages.safety_miper import safety_miper_page
+    return safety_miper_page()
+
+
+@router.get("/safety/procedures", response_class=HTMLResponse)
+async def safety_procedures():
+    from frontend.pages.safety_procedures import safety_procedures_page
+    return safety_procedures_page()
 
 
 @router.get("/safety/folders/{folder_id}", response_class=HTMLResponse)
@@ -240,6 +281,12 @@ async def recruitment():
     return recruitment_page()
 
 
+@router.get("/tasks", response_class=HTMLResponse)
+async def tasks():
+    from frontend.pages.tasks import tasks_page
+    return tasks_page()
+
+
 @router.get("/hr", response_class=HTMLResponse)
 async def hr():
     from frontend.pages.hr import hr_page
@@ -254,12 +301,18 @@ async def job_profiles():
 
 @router.get("/attendance", response_class=HTMLResponse)
 async def attendance():
+    redirect = _mvp_redirect("/app/attendance")
+    if redirect:
+        return redirect
     from frontend.pages.attendance import attendance_page
     return attendance_page()
 
 
 @router.get("/payroll", response_class=HTMLResponse)
 async def payroll():
+    redirect = _mvp_redirect("/app/payroll")
+    if redirect:
+        return redirect
     from frontend.pages.payroll import payroll_page
     return payroll_page()
 
@@ -288,6 +341,21 @@ async def inventory():
     return inventory_page()
 
 
+@router.get("/activos", response_class=HTMLResponse)
+async def assets():
+    redirect = _mvp_redirect("/app/activos")
+    if redirect:
+        return redirect
+    from frontend.pages.assets import assets_page
+    return assets_page()
+
+
+@router.get("/suppliers", response_class=HTMLResponse)
+async def suppliers():
+    from frontend.pages.suppliers import suppliers_page
+    return suppliers_page()
+
+
 @router.get("/rentals", response_class=HTMLResponse)
 async def rentals():
     from frontend.pages.rentals import rentals_page
@@ -296,17 +364,26 @@ async def rentals():
 
 @router.get("/riohs", response_class=HTMLResponse)
 async def riohs():
+    redirect = _mvp_redirect("/app/riohs")
+    if redirect:
+        return redirect
     from frontend.pages.riohs import riohs_page
     return riohs_page()
 
 @router.get("/ai", response_class=HTMLResponse)
 async def ai():
+    redirect = _mvp_redirect("/app/ai")
+    if redirect:
+        return redirect
     from frontend.pages.ai import ai_page
     return ai_page()
 
 
 @router.get("/riohs/download/{filename}", response_class=HTMLResponse)
 async def riohs_download(filename: str):
+    redirect = _mvp_redirect("/app/riohs/download")
+    if redirect:
+        return redirect
     import os
     from fastapi.responses import FileResponse
     # Buscar en generated_docs relativo a la raíz del proyecto

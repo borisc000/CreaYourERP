@@ -78,12 +78,25 @@ function sigDownloadBase64(fileName, mimeType, base64Data) {
         showToast('No hay contenido disponible para descargar', 'error');
         return;
     }
+    const binary = atob(String(base64Data || ''));
+    const chunks = [];
+    const chunkSize = 8192;
+    for (let offset = 0; offset < binary.length; offset += chunkSize) {
+        const slice = binary.slice(offset, offset + chunkSize);
+        const bytes = new Uint8Array(slice.length);
+        for (let i = 0; i < slice.length; i += 1) {
+            bytes[i] = slice.charCodeAt(i);
+        }
+        chunks.push(bytes);
+    }
+    const url = URL.createObjectURL(new Blob(chunks, { type: mimeType || 'application/octet-stream' }));
     const anchor = document.createElement('a');
-    anchor.href = `data:${mimeType};base64,${base64Data}`;
+    anchor.href = url;
     anchor.download = fileName;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 function sigDownloadJson(fileName, payload) {
@@ -390,6 +403,7 @@ function mountSignatureWorkspace() {
     signatureState.workspace = PdfSignatureWorkspace.create(host, {
         title: detail.status === 'signed' ? 'PDF firmado y sellado' : 'Editor visual de firma',
         readOnly: detail.status === 'signed',
+        showMarkers: detail.status !== 'signed',
         pdfBase64: detail.status === 'signed' && detail.signed_document ? detail.signed_document : detail.document_data,
         pdfLayout: detail.pdf_layout || [],
         positions: getDetailSignaturePositions(),

@@ -2,19 +2,12 @@ let CUSTS = {
     all: [],
     filtered: [],
 };
-let ACCREDITATION_TEMPLATES = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!API.getToken()) { window.location.href = '/app/login'; return; }
     highlightNav('/app/crm');
-    await Promise.all([loadCustomers(), loadAccreditationTemplates()]);
+    await loadCustomers();
 });
-
-async function loadAccreditationTemplates() {
-    const res = await API.get('/hr/accreditation/templates');
-    ACCREDITATION_TEMPLATES = res?.data?.results || [];
-    fillCustomerTemplateSelector([]);
-}
 
 async function loadCustomers() {
     const res = await API.get('/crm/customers');
@@ -73,6 +66,7 @@ function renderTable(list) {
             </td>
             <td style="text-align:right;white-space:nowrap;">
                 <button class="btn btn-ghost btn-sm" onclick="openMandanteModal(${c.id})" style="margin-right:0.25rem;color:#38bdf8;" title="Agregar contacto">+ Mandante</button>
+                <a class="btn btn-ghost btn-sm" href="/app/cross-correspondence?customer_id=${c.id}" style="margin-right:0.25rem">Plantillas</a>
                 <button class="btn btn-ghost btn-sm" onclick="window.location.href='/app/crm/customers/${c.id}'" style="margin-right:0.25rem">Detalle</button>
                 <button class="btn btn-ghost btn-sm" onclick="openEditModal(${c.id})">Editar</button>
             </td>
@@ -91,27 +85,9 @@ function _fillCustModal(c) {
     document.getElementById('cust-city').value = c.city || '';
 }
 
-function fillCustomerTemplateSelector(selectedCodes = []) {
-    const select = document.getElementById('cust-acc-template-selector');
-    if (!select) return;
-    const selected = new Set((selectedCodes || []).map(item => String(item)));
-    select.innerHTML = ACCREDITATION_TEMPLATES.map((item) => `
-        <option value="${escHtml(item.code)}" ${selected.has(String(item.code)) ? 'selected' : ''}>
-            ${escHtml(item.name)}
-        </option>
-    `).join('');
-}
-
-function getSelectedTemplateCodes() {
-    const select = document.getElementById('cust-acc-template-selector');
-    if (!select) return [];
-    return Array.from(select.selectedOptions).map(option => option.value).filter(Boolean);
-}
-
 function openCreateModal() {
     document.getElementById('cust-modal-title').textContent = 'Nuevo cliente';
     _fillCustModal({});
-    fillCustomerTemplateSelector([]);
     document.getElementById('cust-delete-btn').style.display = 'none';
     document.getElementById('cust-modal').style.display = 'flex';
     setTimeout(() => document.getElementById('cust-name').focus(), 80);
@@ -124,8 +100,6 @@ async function openEditModal(id) {
     _fillCustModal(c);
     document.getElementById('cust-delete-btn').style.display = '';
     document.getElementById('cust-modal').style.display = 'flex';
-    const res = await API.get(`/hr/accreditation/customers/${id}/requirements`);
-    fillCustomerTemplateSelector(res?.data?.selected_codes || []);
     setTimeout(() => document.getElementById('cust-name').focus(), 80);
 }
 
@@ -134,7 +108,7 @@ function closeCustModal() {
 }
 
 function closeCustModalBackdrop(event) {
-    if (event.target === document.getElementById('cust-modal')) closeCustModal();
+    if (!erpModalAllowsBackdropClose(event, 'cust-modal')) return;
 }
 
 async function saveCust() {
@@ -154,10 +128,6 @@ async function saveCust() {
         : await API.post('/crm/customers', payload);
 
     if (res && res.success) {
-        const customerId = res.data?.id || id;
-        await API.put(`/hr/accreditation/customers/${customerId}/requirements`, {
-            template_codes: getSelectedTemplateCodes(),
-        });
         showToast(id ? 'Cliente actualizado' : 'Cliente creado', 'success');
         closeCustModal();
         await loadCustomers();
@@ -197,9 +167,7 @@ function closeMandanteModal() {
 }
 
 function closeMandanteModalBackdrop(event) {
-    if (event.target === document.getElementById('mandante-modal')) {
-        closeMandanteModal();
-    }
+    if (!erpModalAllowsBackdropClose(event, 'mandante-modal')) return;
 }
 
 async function saveMandante() {
@@ -231,7 +199,7 @@ async function saveMandante() {
 }
 
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeCustModal();
+    if (e.key === 'Escape' && erpModalAllowsEscapeClose()) closeCustModal();
 });
 
 function highlightNav(path) {

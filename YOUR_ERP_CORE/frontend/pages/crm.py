@@ -6,7 +6,7 @@ def crm_page():
 <div class="page-header">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
         <div>
-            <h1>CRM &mdash; Pipeline</h1>
+            <h1>CRM &mdash; Servicios</h1>
             <p>Gestiona oportunidades de venta y clientes</p>
         </div>
         <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
@@ -20,7 +20,7 @@ def crm_page():
 <!-- ── Stats row ─────────────────────────────────────────── -->
 <div class="cards-row" id="crm-stats-row">
     <div class="stat-card">
-        <div class="label">Pipeline activo</div>
+        <div class="label">Servicios activos</div>
         <div class="value" id="stat-pipeline">—</div>
         <div class="sub" id="stat-open-leads">— oportunidades abiertas</div>
     </div>
@@ -37,13 +37,67 @@ def crm_page():
     <div class="stat-card">
         <div class="label">Clientes</div>
         <div class="value" id="stat-customers">—</div>
-        <div class="sub">registrados en el sistema</div>
+        <div class="sub" id="stat-customers-sub">registrados en el sistema</div>
     </div>
 </div>
 
 <!-- ── Kanban board ───────────────────────────────────────── -->
+<div class="card" style="margin-bottom:1.25rem;padding:1rem 1.25rem;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.85rem;align-items:end;">
+        <div class="form-group" style="margin:0;">
+            <label>Busqueda</label>
+            <input type="text" id="crm-filter-search" placeholder="Proyecto, cliente, etapa o codigo..." oninput="applyCrmFilters()">
+        </div>
+        <div class="form-group" style="margin:0;">
+            <label>Estado</label>
+            <select id="crm-filter-status" onchange="applyCrmFilters()">
+                <option value="open">Solo activas</option>
+                <option value="">Todos los estados</option>
+                <option value="won">Ganadas</option>
+                <option value="lost">Perdidas</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+            <label>Tipo de servicio</label>
+            <select id="crm-filter-service-type" onchange="applyCrmFilters()">
+                <option value="">Todos los tipos</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+            <label>Fecha base</label>
+            <select id="crm-filter-date-field" onchange="applyCrmFilters()">
+                <option value="created_at">Creacion</option>
+                <option value="visit_date">Visita a terreno</option>
+                <option value="quote_deadline">Limite de cotizacion</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+            <label>Periodo</label>
+            <select id="crm-filter-period" onchange="applyCrmQuickPeriod()">
+                <option value="all">Todo</option>
+                <option value="this_month">Este mes</option>
+                <option value="last_30">Ultimos 30 dias</option>
+                <option value="this_year">Este ano</option>
+                <option value="custom">Rango manual</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+            <label>Desde</label>
+            <input type="date" id="crm-filter-from" onchange="syncCrmManualPeriod()">
+        </div>
+        <div class="form-group" style="margin:0;">
+            <label>Hasta</label>
+            <input type="date" id="crm-filter-to" onchange="syncCrmManualPeriod()">
+        </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:0.85rem;">
+        <div id="crm-filter-summary" class="text-muted text-sm">Cargando filtros...</div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="clearCrmFilters()">Limpiar filtros</button>
+    </div>
+</div>
+
 <div class="kanban-board" id="kanban-board">
-    <div class="kanban-loading">Cargando pipeline&hellip;</div>
+    <div class="kanban-loading">Cargando servicios&hellip;</div>
 </div>
 
 
@@ -54,7 +108,7 @@ def crm_page():
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-header">
             <h3 id="lead-modal-title">Nueva Oportunidad</h3>
-            <button class="modal-close" onclick="closeLeadModal()">&#10005;</button>
+            <button class="modal-close" onclick="requestCloseLeadModal()">&#10005;</button>
         </div>
         <div class="modal-body">
             <input type="hidden" id="lead-id">
@@ -238,7 +292,7 @@ def crm_page():
             <button class="btn btn-danger" id="lead-delete-btn" onclick="deleteLead()" style="display:none;margin-right:auto">
                 &#128465; Eliminar
             </button>
-            <button class="btn btn-ghost" onclick="closeLeadModal()">Cancelar</button>
+            <button class="btn btn-ghost" onclick="requestCloseLeadModal()">Cancelar</button>
             <button class="btn btn-primary" onclick="saveLead()">Guardar</button>
         </div>
     </div>

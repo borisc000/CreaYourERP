@@ -4,6 +4,7 @@ import base64
 import io
 import zipfile
 import importlib.util
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import parse_qsl
@@ -11,17 +12,28 @@ from xml.sax.saxutils import escape
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas as reportlab_canvas
 
-sys.path.append(r"C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE")
+sys.path.insert(0, r"C:\Users\PC\Desktop\nuevo erp\YOUR_ERP_CORE")
 
 from core.YOUR_ERP_core_framework import CoreFramework, Request
 from core.YOUR_ERP_orm import BaseModel
+from core.local_persistence import LocalSQLiteStore
 from modules.base.module_base import BaseModule as ERPBaseModule
 from modules.base.module_base import User
+from modules.attendance.module_attendance import AttendanceModule
 from modules.crm.module_crm import CRMModule
 from modules.document_center.module_document_center import DocumentCenterModule
-from modules.hr.module_hr import HRModule, Department, EmployeeProfile, EmployeeContract
+from modules.hr.module_hr import (
+    EmployeeContract,
+    EmployeeProfile,
+    EmployeeTermination,
+    EmploymentStatusEvent,
+    Department,
+    HRModule,
+)
+from modules.job_profiles.module_job_profiles import JobProfilesModule
 from modules.payroll.module_payroll import PayrollModule, PayrollProfile
 from modules.recruitment.module_recruitment import RecruitmentModule, JobApplication
+from modules.safety.module_safety import SafetyModule
 from modules.signature.module_signature import SignatureModule, SignatureRequest
 
 
@@ -77,12 +89,27 @@ class TalentFlowTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         BaseModel._store.clear()
         BaseModel._id_counters.clear()
+        BaseModel._loaded_tables.clear()
+
+        self.test_db_path = Path(__file__).resolve().parent / f".talent_flow_test_{uuid.uuid4().hex}.db"
+        BaseModel._persistence_backend = LocalSQLiteStore(self.test_db_path)
 
         self.framework = CoreFramework(
             {
                 "database_url": "sqlite:///memory",
                 "debug": False,
-                "modules_to_load": ["base", "signature", "document_center", "crm", "hr", "payroll", "recruitment"],
+                "modules_to_load": [
+                    "base",
+                    "signature",
+                    "document_center",
+                    "crm",
+                    "hr",
+                    "safety",
+                    "attendance",
+                    "payroll",
+                    "recruitment",
+                    "job_profiles",
+                ],
             }
         )
         self.framework.register_module_class(ERPBaseModule)
@@ -90,9 +117,27 @@ class TalentFlowTest(unittest.IsolatedAsyncioTestCase):
         self.framework.register_module_class(DocumentCenterModule)
         self.framework.register_module_class(CRMModule)
         self.framework.register_module_class(HRModule)
+        self.framework.register_module_class(SafetyModule)
+        self.framework.register_module_class(AttendanceModule)
         self.framework.register_module_class(PayrollModule)
         self.framework.register_module_class(RecruitmentModule)
+        self.framework.register_module_class(JobProfilesModule)
         self.framework.initialize()
+
+    async def asyncTearDown(self):
+        BaseModel._store.clear()
+        BaseModel._id_counters.clear()
+        BaseModel._loaded_tables.clear()
+        BaseModel._persistence_backend = None
+
+        for suffix in ("", "-wal", "-shm"):
+            db_file = Path(f"{self.test_db_path}{suffix}")
+            if not db_file.exists():
+                continue
+            try:
+                db_file.unlink()
+            except OSError:
+                pass
 
     async def dispatch(self, path, method="GET", data=None, user=None, params=None):
         raw_path, _, query_string = path.partition("?")
@@ -125,11 +170,28 @@ class TalentFlowTest(unittest.IsolatedAsyncioTestCase):
         departments = Department.search([("company_id", "=", admin.company_id)])
         self.assertGreaterEqual(len(departments), 1)
 
+        profile_res = await self.dispatch(
+            "/job-profiles/profiles",
+            method="POST",
+            user=admin,
+            data={
+                "name": "Analista RRHH",
+                "code": "AN-RRHH",
+                "department_id": departments[0].id,
+                "objective": "Gestionar reclutamiento, seleccion y soporte laboral.",
+                "scope": "Ciclo laboral completo de cargos administrativos.",
+                "risk_level": "medium",
+            },
+        )
+        self.assertEqual(profile_res.status, 201)
+        job_profile_id = profile_res.data["id"]
+
         job_res = await self.dispatch(
             "/recruitment/jobs",
             method="POST",
             user=admin,
             data={
+                "job_profile_id": job_profile_id,
                 "title": "Analista RRHH",
                 "department_id": departments[0].id,
                 "status": "published",
@@ -249,6 +311,13 @@ class TalentFlowTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(employee.city, "Santiago")
         self.assertEqual(employee.criminal_record_status, "clear")
         self.assertIn("Trabajo en altura", employee.courses or [])
+        self.assertEqual(employee.job_profile_id, job_profile_id)
+        self.assertGreaterEqual(EmploymentStatusEvent.count([("employee_id", "=", employee.id)]), 1)
+
+        employee_detail_res = await self.dispatch(f"/hr/employees/{employee.id}", user=admin)
+        self.assertEqual(employee_detail_res.status, 200)
+        self.assertEqual(employee_detail_res.data["job_profile_id"], job_profile_id)
+        self.assertGreaterEqual(len(employee_detail_res.data["status_history"]), 1)
 
         payroll_profile = PayrollProfile.search([("employee_id", "=", employee.id)])[0]
         self.assertEqual(payroll_profile.national_id, "12345678-5")
@@ -259,6 +328,41 @@ class TalentFlowTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(hr_stats.status, 200)
         self.assertEqual(hr_stats.data["employees_total"], 1)
         self.assertEqual(hr_stats.data["contracts_active"], 1)
+
+        termination_res = await self.dispatch(
+            "/hr/terminations",
+            method="POST",
+            user=admin,
+            data={
+                "employee_id": employee.id,
+                "status": "completed",
+                "cause": "project_completion",
+                "notice_date": "2026-04-20",
+                "termination_date": "2026-04-30",
+                "reason_detail": "Cierre de proyecto piloto.",
+                "document_name": "Carta termino Analista RRHH",
+                "document_pack_status": "ready",
+            },
+        )
+        self.assertEqual(termination_res.status, 201)
+        self.assertEqual(EmployeeTermination.count([("employee_id", "=", employee.id)]), 1)
+
+        employee_after_termination = EmployeeProfile.find_by_id(employee.id)
+        self.assertEqual(employee_after_termination.status, "inactive")
+
+        punch_res = await self.dispatch(
+            "/attendance/records/punch",
+            method="POST",
+            user=admin,
+            data={
+                "employee_id": employee.id,
+                "event_type": "entry",
+                "statement_accepted": True,
+                "signature_name": "Talent Admin",
+                "device_fingerprint": "qa-device",
+            },
+        )
+        self.assertEqual(punch_res.status, 400)
 
     async def test_accreditation_matrix_combines_global_and_customer_specific_requirements(self):
         register_res = await self.dispatch(
@@ -276,23 +380,6 @@ class TalentFlowTest(unittest.IsolatedAsyncioTestCase):
         admin = User.search([("email", "=", "accreditation.admin@example.com")])[0]
         department = Department.search([("company_id", "=", admin.company_id)])[0]
 
-        employee_res = await self.dispatch(
-            "/hr/employees",
-            method="POST",
-            user=admin,
-            data={
-                "full_name": "Carlos Operador",
-                "department_id": department.id,
-                "position_title": "Operador Planta",
-                "work_email": "carlos.operador@example.com",
-                "status": "active",
-                "hire_date": "2026-03-01",
-                "create_user_account": False,
-            },
-        )
-        self.assertEqual(employee_res.status, 201)
-        employee_id = employee_res.data["employee"]["id"]
-
         customer_res = await self.dispatch(
             "/crm/customers",
             method="POST",
@@ -304,6 +391,24 @@ class TalentFlowTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(customer_res.status, 201)
         customer_id = customer_res.data["id"]
+
+        employee_res = await self.dispatch(
+            "/hr/employees",
+            method="POST",
+            user=admin,
+            data={
+                "full_name": "Carlos Operador",
+                "department_id": department.id,
+                "assigned_customer_ids": [customer_id],
+                "position_title": "Operador Planta",
+                "work_email": "carlos.operador@example.com",
+                "status": "active",
+                "hire_date": "2026-03-01",
+                "create_user_account": False,
+            },
+        )
+        self.assertEqual(employee_res.status, 201)
+        employee_id = employee_res.data["employee"]["id"]
 
         requirement_res = await self.dispatch(
             "/hr/accreditation/requirements",

@@ -1,7 +1,21 @@
 const SAFETY_STATE = {
     folders: [],
     filtered: [],
-    lookups: { leads: [], employees: [], service_profiles: [] },
+    lookups: {
+        leads: [],
+        employees: [],
+        service_profiles: [],
+        procedures: [],
+        job_profiles: [],
+        client_areas: [],
+        equipment_blocks: [],
+    },
+    scopeDraft: {
+        procedure_ids: [],
+        job_profile_ids: [],
+        client_area_ids: [],
+        equipment_block_ids: [],
+    },
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -23,11 +37,11 @@ async function loadSafetyLookups() {
 
 async function loadSafetyFolders() {
     const tbody = document.getElementById('safety-folders-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="empty">Cargando carpetas...</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="empty">Cargando carpetas...</td></tr>';
 
     const res = await API.get('/safety/folders');
     if (!res || res.success === false) {
-        if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="empty" style="color:#ef4444;">Error al cargar carpetas.</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="empty" style="color:#ef4444;">Error al cargar carpetas.</td></tr>';
         return;
     }
     SAFETY_STATE.folders = res.data?.results || [];
@@ -39,7 +53,6 @@ function fillFolderModalSelects() {
     const profileSel = document.getElementById('folder-profile');
     const empSel = document.getElementById('folder-assigned-employees');
     const siteSel = document.getElementById('folder-client-site');
-    const areaSel = document.getElementById('folder-client-area');
     if (leadSel) {
         const options = ['<option value="">Selecciona una oportunidad</option>'];
         (SAFETY_STATE.lookups.leads || []).forEach((lead) => {
@@ -49,7 +62,8 @@ function fillFolderModalSelects() {
         leadSel.innerHTML = options.join('');
         leadSel.onchange = () => {
             refreshFolderSiteOptions();
-            refreshFolderAreaOptions();
+            pruneScopeByCurrentContext();
+            renderScopeBuilder();
         };
     }
     if (profileSel) {
@@ -58,6 +72,7 @@ function fillFolderModalSelects() {
             options.push(`<option value="${profile.id}">${esc(profile.name)}</option>`);
         });
         profileSel.innerHTML = options.join('');
+        profileSel.onchange = () => renderScopeBuilder();
     }
     if (empSel) {
         empSel.innerHTML = (SAFETY_STATE.lookups.employees || [])
@@ -65,10 +80,13 @@ function fillFolderModalSelects() {
             .join('');
     }
     if (siteSel) {
-        siteSel.onchange = () => refreshFolderAreaOptions();
+        siteSel.onchange = () => {
+            pruneScopeByCurrentContext();
+            renderScopeBuilder();
+        };
     }
     refreshFolderSiteOptions();
-    refreshFolderAreaOptions();
+    renderScopeBuilder();
 }
 
 function selectedLead() {
@@ -86,8 +104,179 @@ function refreshFolderSiteOptions() {
         .filter((site) => !customerId || Number(site.customer_id) === customerId)
         .forEach((site) => {
             options.push(`<option value="${site.id}">${esc(site.name)}</option>`);
-        });
+    });
     siteSel.innerHTML = options.join('');
+}
+
+function resetScopeDraft() {
+    SAFETY_STATE.scopeDraft = {
+        procedure_ids: [],
+        job_profile_ids: [],
+        client_area_ids: [],
+        equipment_block_ids: [],
+    };
+}
+
+function scopeKeyForGroup(group) {
+    return ({
+        procedures: 'procedure_ids',
+        job_profiles: 'job_profile_ids',
+        client_areas: 'client_area_ids',
+        equipment_blocks: 'equipment_block_ids',
+    })[group];
+}
+
+function scopeDomKey(group) {
+    return ({
+        procedures: 'procedures',
+        job_profiles: 'job-profiles',
+        client_areas: 'client-areas',
+        equipment_blocks: 'equipment-blocks',
+    })[group];
+}
+
+function scopeItems(group) {
+    const lookups = SAFETY_STATE.lookups || {};
+    const lead = selectedLead();
+    const customerId = Number(lead?.customer_id || 0);
+    const profileId = Number(document.getElementById('folder-profile')?.value || 0);
+    const siteId = Number(document.getElementById('folder-client-site')?.value || 0);
+    if (group === 'procedures') {
+        return (lookups.procedures || []).filter((item) => {
+            if (!profileId) return true;
+            return !item.service_profile_id || Number(item.service_profile_id) === profileId;
+        });
+    }
+    if (group === 'job_profiles') return lookups.job_profiles || [];
+    if (group === 'client_areas') {
+        return (lookups.client_areas || []).filter((area) => {
+            if (siteId && Number(area.site_id) !== siteId) return false;
+            if (customerId && Number(area.customer_id) !== customerId) return false;
+            return true;
+        });
+    }
+    if (group === 'equipment_blocks') return lookups.equipment_blocks || [];
+    return [];
+}
+
+function scopeLabel(group, item) {
+    if (group === 'procedures') {
+        return [item.procedure_code || 'PTS', item.name].filter(Boolean).join(' - ');
+    }
+    if (group === 'job_profiles') {
+        return [item.code || 'Cargo', item.name].filter(Boolean).join(' - ');
+    }
+    if (group === 'client_areas') {
+        return [item.site_name, item.name].filter(Boolean).join(' / ');
+    }
+    if (group === 'equipment_blocks') {
+        return [item.code || 'Equipo', item.name].filter(Boolean).join(' - ');
+    }
+    return item.name || String(item.id || '');
+}
+
+function scopeMeta(group, item) {
+    if (group === 'procedures') return item.service_profile_name || item.procedure_type || 'Procedimiento operativo';
+    if (group === 'job_profiles') return item.department_name || item.risk_level || 'Perfil de cargo';
+    if (group === 'client_areas') return item.risk_notes || item.site_name || 'Area/sector del cliente';
+    if (group === 'equipment_blocks') {
+        const risks = (item.master_risks || []).map((risk) => risk.code || risk.name).filter(Boolean).slice(0, 3);
+        return risks.length ? risks.join(', ') : (item.description || 'Equipo preventivo');
+    }
+    return '';
+}
+
+function toggleScopeItem(group, id) {
+    const key = scopeKeyForGroup(group);
+    if (!key) return;
+    const value = Number(id);
+    const current = new Set((SAFETY_STATE.scopeDraft[key] || []).map(Number));
+    if (current.has(value)) current.delete(value);
+    else current.add(value);
+    SAFETY_STATE.scopeDraft[key] = Array.from(current);
+    renderScopeBuilder();
+}
+
+function pruneScopeByCurrentContext() {
+    ['procedures', 'client_areas'].forEach((group) => {
+        const key = scopeKeyForGroup(group);
+        const allowed = new Set(scopeItems(group).map((item) => Number(item.id)));
+        SAFETY_STATE.scopeDraft[key] = (SAFETY_STATE.scopeDraft[key] || []).filter((id) => allowed.has(Number(id)));
+    });
+}
+
+function renderScopeGroup(group) {
+    const domKey = scopeDomKey(group);
+    const list = document.getElementById(`folder-${domKey}-list`);
+    const chips = document.getElementById(`folder-${domKey}-selected`);
+    const count = document.getElementById(`folder-${domKey}-count`);
+    if (!list || !chips || !count) return;
+    const key = scopeKeyForGroup(group);
+    const selected = new Set((SAFETY_STATE.scopeDraft[key] || []).map(Number));
+    const search = (document.getElementById(`folder-${domKey}-search`)?.value || '').trim().toLowerCase();
+    const items = scopeItems(group);
+    const selectedItems = items.filter((item) => selected.has(Number(item.id)));
+    count.textContent = String(selectedItems.length);
+    chips.innerHTML = selectedItems.length
+        ? selectedItems.map((item) => `
+            <span class="miper-chip">
+                ${esc(scopeLabel(group, item))}
+                <button type="button" title="Quitar" onclick="toggleScopeItem('${group}', ${Number(item.id)})">x</button>
+            </span>
+        `).join('')
+        : '<span class="field-hint">Sin seleccion</span>';
+    const filtered = items.filter((item) => {
+        if (!search) return true;
+        return [scopeLabel(group, item), scopeMeta(group, item), item.code, item.name, item.procedure_code]
+            .join(' ')
+            .toLowerCase()
+            .includes(search);
+    }).slice(0, 80);
+    if (!filtered.length) {
+        list.innerHTML = '<div class="empty">No hay opciones para el contexto actual.</div>';
+        return;
+    }
+    list.innerHTML = filtered.map((item) => {
+        const active = selected.has(Number(item.id));
+        return `
+            <button type="button" class="miper-option ${active ? 'selected' : ''}" onclick="toggleScopeItem('${group}', ${Number(item.id)})">
+                <strong>${esc(scopeLabel(group, item))}</strong>
+                <small>${esc(scopeMeta(group, item))}</small>
+            </button>
+        `;
+    }).join('');
+}
+
+function renderScopeBuilder() {
+    ['procedures', 'job_profiles', 'client_areas', 'equipment_blocks'].forEach(renderScopeGroup);
+    updateScopePreview();
+}
+
+function updateScopePreview() {
+    const preview = document.getElementById('folder-scope-preview');
+    if (!preview) return;
+    const counts = {
+        procedimientos: SAFETY_STATE.scopeDraft.procedure_ids.length,
+        cargos: SAFETY_STATE.scopeDraft.job_profile_ids.length,
+        sectores: SAFETY_STATE.scopeDraft.client_area_ids.length,
+        equipos: SAFETY_STATE.scopeDraft.equipment_block_ids.length,
+    };
+    const selectedSources = Object.entries(counts).filter(([, value]) => Number(value) > 0);
+    const estimated = (
+        counts.procedimientos * 4
+        + counts.cargos * 3
+        + counts.sectores * 2
+        + counts.equipos * 2
+    );
+    const warning = selectedSources.length
+        ? ''
+        : '<div style="color:#fde68a;margin-top:0.35rem;">Selecciona al menos una fuente para una matriz de mejor calidad. Si no seleccionas nada, el backend usara el fallback legacy.</div>';
+    preview.innerHTML = `
+        <strong>Vista previa:</strong>
+        ${selectedSources.map(([name, value]) => `${value} ${name}`).join(' · ') || 'sin fuentes seleccionadas'}
+        <span style="color:#bbf7d0;"> · filas estimadas: ${Math.max(estimated, selectedSources.length ? 1 : 0)}</span>
+        ${warning}
+    `;
 }
 
 function refreshFolderAreaOptions() {
@@ -104,6 +293,27 @@ function refreshFolderAreaOptions() {
     areaSel.innerHTML = options.join('');
 }
 
+function refreshFolderProcedureOptions(selectedProcedureId = '') {
+    const procedureSel = document.getElementById('folder-procedure');
+    if (!procedureSel) return;
+    const profileId = Number(document.getElementById('folder-profile')?.value || 0);
+    const options = ['<option value="">Automatico segun perfil/proyecto</option>'];
+    const procedures = (SAFETY_STATE.lookups.procedures || []).filter((procedure) => {
+        if (!profileId) return true;
+        return !procedure.service_profile_id || Number(procedure.service_profile_id) === profileId;
+    });
+    procedures.forEach((procedure) => {
+        const label = [procedure.procedure_code || 'PTS', procedure.name, procedure.service_profile_name].filter(Boolean).join(' - ');
+        options.push(`<option value="${procedure.id}">${esc(label)}</option>`);
+    });
+    procedureSel.innerHTML = options.join('');
+    if (selectedProcedureId) {
+        procedureSel.value = String(selectedProcedureId);
+    } else if (!procedureSel.value && procedures.length === 1) {
+        procedureSel.value = String(procedures[0].id);
+    }
+}
+
 function applyFolderFilters() {
     const search = (document.getElementById('filter-search')?.value || '').trim().toLowerCase();
     const traffic = (document.getElementById('filter-traffic')?.value || '').trim().toLowerCase();
@@ -114,6 +324,12 @@ function applyFolderFilters() {
             folder.lead_title,
             folder.customer_name,
             folder.service_profile_name,
+            folder.procedure_code,
+            folder.procedure_name,
+            (folder.procedure_names || []).join(' '),
+            (folder.job_profile_names || []).join(' '),
+            (folder.client_area_names || []).join(' '),
+            (folder.equipment_block_names || []).join(' '),
         ].join(' ').toLowerCase();
         if (search && !haystack.includes(search)) return false;
         if (traffic && folder.traffic_light !== traffic) return false;
@@ -140,7 +356,7 @@ function renderFolderTable() {
     const tbody = document.getElementById('safety-folders-tbody');
     if (!tbody) return;
     if (!SAFETY_STATE.filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty">No hay carpetas para mostrar.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="empty">No hay carpetas para mostrar.</td></tr>';
         return;
     }
     tbody.innerHTML = SAFETY_STATE.filtered.map((folder) => {
@@ -153,6 +369,12 @@ function renderFolderTable() {
                 </td>
                 <td>${esc(folder.customer_name || '-')}</td>
                 <td>${esc(folder.service_profile_name || 'Automatico')}</td>
+                <td>
+                    <div style="font-weight:700;color:#f8fafc;">${esc((folder.procedure_names || [folder.procedure_name || folder.procedure_code || 'Auto']).slice(0, 2).join(', '))}</div>
+                    <div style="color:#94a3b8;font-size:0.78rem;">
+                        ${Number(folder.job_profile_count || 0)} cargos · ${Number(folder.client_area_count || 0)} sectores · ${Number(folder.equipment_block_count || 0)} equipos
+                    </div>
+                </td>
                 <td>${trafficChip(folder.traffic_light)}</td>
                 <td>
                     <div class="readiness-wrap">
@@ -175,6 +397,7 @@ function trafficChip(color) {
 }
 
 function openFolderModal() {
+    resetScopeDraft();
     fillFolderModalSelects();
     const modal = document.getElementById('folder-modal');
     if (modal) modal.classList.add('open');
@@ -194,11 +417,11 @@ function closeFolderModal() {
     if (date) date.value = '';
     const miperNotes = document.getElementById('folder-miper-scope-notes');
     const site = document.getElementById('folder-client-site');
-    const area = document.getElementById('folder-client-area');
     if (miperNotes) miperNotes.value = '';
     if (site) site.value = '';
-    if (area) area.value = '';
     if (employees) Array.from(employees.options).forEach((option) => { option.selected = false; });
+    resetScopeDraft();
+    renderScopeBuilder();
 }
 
 async function saveFolder(evt) {
@@ -207,9 +430,14 @@ async function saveFolder(evt) {
     const payload = {
         lead_id: document.getElementById('folder-lead')?.value,
         service_profile_id: document.getElementById('folder-profile')?.value || null,
+        procedure_id: SAFETY_STATE.scopeDraft.procedure_ids[0] || null,
+        procedure_ids: SAFETY_STATE.scopeDraft.procedure_ids,
+        job_profile_ids: SAFETY_STATE.scopeDraft.job_profile_ids,
+        equipment_block_ids: SAFETY_STATE.scopeDraft.equipment_block_ids,
         planned_start_date: document.getElementById('folder-planned-date')?.value || '',
         client_site_id: document.getElementById('folder-client-site')?.value || null,
-        client_area_id: document.getElementById('folder-client-area')?.value || null,
+        client_area_id: SAFETY_STATE.scopeDraft.client_area_ids[0] || null,
+        client_area_ids: SAFETY_STATE.scopeDraft.client_area_ids,
         notes: document.getElementById('folder-notes')?.value || '',
         miper_scope_notes: document.getElementById('folder-miper-scope-notes')?.value || '',
         assigned_employee_ids: selectedValues('folder-assigned-employees'),
@@ -264,7 +492,7 @@ function renderFolderTable() {
     const tbody = document.getElementById('safety-folders-tbody');
     if (!tbody) return;
     if (!SAFETY_STATE.filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty">No hay carpetas para mostrar.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="empty">No hay carpetas para mostrar.</td></tr>';
         return;
     }
     tbody.innerHTML = SAFETY_STATE.filtered.map((folder) => {
@@ -277,6 +505,10 @@ function renderFolderTable() {
                 </td>
                 <td>${esc(folder.customer_name || '-')}</td>
                 <td>${esc(folder.service_profile_name || 'Automatico')}</td>
+                <td>
+                    <div style="font-weight:700;color:#f8fafc;">${esc(folder.procedure_code || 'Auto')}</div>
+                    <div style="color:#94a3b8;font-size:0.78rem;">${esc(folder.procedure_name || 'Segun perfil')}</div>
+                </td>
                 <td>${trafficChip(folder.traffic_light)}</td>
                 <td>
                     <div class="readiness-wrap">

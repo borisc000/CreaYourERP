@@ -281,6 +281,13 @@ def _safe_int(value: Any, default: Optional[int] = None) -> Optional[int]:
         return default
 
 
+def _safe_str(value: Any, default: str = '') -> str:
+    if value is None:
+        return default
+    text = str(value).strip()
+    return text if text else default
+
+
 def _photo_relative_path(file_path: Optional[str]) -> str:
     """Normalizar ruta de foto al formato relativo dentro de uploads/."""
     normalized = str(file_path or '').replace('\\', '/').strip().lstrip('/')
@@ -618,6 +625,122 @@ class ReportsModule(BaseModule):
         mods = getattr(user, 'modules', None) or []
         return mod in mods
 
+    def _area_record(self, area_id: Optional[int]) -> Optional[AreaFaena]:
+        area = AreaFaena.find_by_id(_safe_int(area_id)) if area_id else None
+        if not area:
+            return None
+        if area.company_id != self._company_id():
+            return None
+        return area
+
+    def _sector_record(self, sector_id: Optional[int]) -> Optional[SectorFaena]:
+        sector = SectorFaena.find_by_id(_safe_int(sector_id)) if sector_id else None
+        if not sector:
+            return None
+        if sector.company_id != self._company_id():
+            return None
+        return sector
+
+    def _match_service_type(self, name: str):
+        target = _safe_str(name).lower()
+        if not target:
+            return None
+        try:
+            from modules.crm.module_crm import ServiceType
+            for service_type in ServiceType.search([('company_id', '=', self._company_id())]):
+                if _safe_str(getattr(service_type, 'name', '')).lower() == target:
+                    return service_type
+        except Exception:
+            return None
+        return None
+
+    def _match_mandante(self, customer_id: Optional[int], name: str):
+        target = _safe_str(name).lower()
+        if not target:
+            return None
+        try:
+            from modules.crm.module_crm import Mandante
+            filters = [('company_id', '=', self._company_id())]
+            if customer_id:
+                filters.append(('customer_id', '=', customer_id))
+            for mandante in Mandante.search(filters):
+                if _safe_str(getattr(mandante, 'name', '')).lower() == target:
+                    return mandante
+        except Exception:
+            return None
+        return None
+
+    def _resolve_report_defaults(self, lead, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        from modules.crm.module_crm import Customer, Mandante, ServiceType
+
+        customer = Customer.find_by_id(lead.customer_id) if getattr(lead, 'customer_id', None) else None
+        if customer and customer.company_id != self._company_id():
+            customer = None
+
+        mandante = Mandante.find_by_id(getattr(lead, 'mandante_id', None)) if getattr(lead, 'mandante_id', None) else None
+        if mandante and mandante.company_id != self._company_id():
+            mandante = None
+
+        service_type = ServiceType.find_by_id(getattr(lead, 'service_type_id', None)) if getattr(lead, 'service_type_id', None) else None
+        if service_type and service_type.company_id != self._company_id():
+            service_type = None
+
+        requested_area_id = _safe_int(raw_data.get('area_id'))
+        requested_sector_id = _safe_int(raw_data.get('sector_id'))
+        area_id = requested_area_id if 'area_id' in raw_data else _safe_int(getattr(lead, 'report_area_id', None))
+        sector_id = requested_sector_id if 'sector_id' in raw_data else _safe_int(getattr(lead, 'report_sector_id', None))
+
+        area = self._area_record(area_id)
+        sector = self._sector_record(sector_id)
+        if sector and area and sector.area_id != area.id:
+            sector = None
+            sector_id = None
+        if sector and not area:
+            area = self._area_record(getattr(sector, 'area_id', None))
+            area_id = area.id if area else None
+
+        final_servicio = _safe_str(raw_data.get('servicio')) or _safe_str(getattr(lead, 'service_name', None)) or _safe_str(getattr(lead, 'title', None))
+        final_empresa = _safe_str(raw_data.get('empresa')) or _safe_str(getattr(lead, 'empresa_faena', None)) or _safe_str(getattr(customer, 'name', None))
+        final_apr = _safe_str(raw_data.get('apr')) or _safe_str(getattr(lead, 'apr_name', None))
+        final_supervisor = _safe_str(raw_data.get('supervisor')) or _safe_str(getattr(lead, 'supervisor_name', None))
+        final_adm = _safe_str(raw_data.get('adm')) or _safe_str(getattr(lead, 'contract_admin_name', None))
+        final_area = _safe_str(raw_data.get('area')) or _safe_str(getattr(area, 'nombre', None))
+        final_sector = _safe_str(raw_data.get('sector')) or _safe_str(getattr(sector, 'nombre', None))
+        final_mandante = _safe_str(raw_data.get('mandante')) or _safe_str(getattr(mandante, 'name', None))
+        final_service_type = _safe_str(raw_data.get('tiposervicio')) or _safe_str(getattr(service_type, 'name', None))
+
+        matched_mandante = self._match_mandante(getattr(lead, 'customer_id', None), final_mandante) if final_mandante else None
+        matched_service_type = self._match_service_type(final_service_type) if final_service_type else None
+
+        lead_updates = {
+            'service_name': final_servicio,
+            'empresa_faena': final_empresa,
+            'report_area_id': area.id if area else None,
+            'report_sector_id': sector.id if sector else None,
+            'apr_name': final_apr,
+            'supervisor_name': final_supervisor,
+            'contract_admin_name': final_adm,
+        }
+        if matched_mandante:
+            lead_updates['mandante_id'] = matched_mandante.id
+        if matched_service_type:
+            lead_updates['service_type_id'] = matched_service_type.id
+
+        return {
+            'servicio': final_servicio,
+            'empresa': final_empresa,
+            'apr': final_apr,
+            'supervisor': final_supervisor,
+            'adm': final_adm,
+            'mandante': final_mandante,
+            'tiposervicio': final_service_type,
+            'area': final_area,
+            'sector': final_sector,
+            'area_id': area.id if area else None,
+            'sector_id': sector.id if sector else None,
+            'lead_updates': lead_updates,
+        }
+
     def _sync_lead_report_reference(self, lead, report: Report) -> None:
         """Mantener visible el último folio de reporte dentro del lead."""
         if not lead or not report:
@@ -626,7 +749,7 @@ class ReportsModule(BaseModule):
         try:
             dirty = False
             report_number = _format_report_number(report.id)
-            if getattr(lead, 'report_number', None) != report_number:
+            if not _safe_str(getattr(lead, 'report_number', None)):
                 lead.report_number = report_number
                 dirty = True
 
@@ -699,12 +822,10 @@ class ReportsModule(BaseModule):
             return Response.unauthorized("Authentication required")
 
         lead_id = request.get_data('lead_id')
-        servicio = request.get_data('servicio')
+        raw_data = request.data or {}
 
         if not lead_id:
             return Response.bad_request("lead_id es requerido")
-        if not servicio or not str(servicio).strip():
-            return Response.bad_request("servicio es requerido")
 
         # Validar Lead existe y es del mismo company
         from modules.crm.module_crm import Lead
@@ -715,6 +836,18 @@ class ReportsModule(BaseModule):
             return Response.forbidden("No tienes acceso a esta oportunidad")
 
         try:
+            resolved = self._resolve_report_defaults(lead, raw_data)
+            if not _safe_str(resolved.get('servicio')):
+                return Response.bad_request("servicio es requerido")
+
+            lead_dirty = False
+            for field, value in (resolved.get('lead_updates') or {}).items():
+                if getattr(lead, field, None) != value:
+                    setattr(lead, field, value)
+                    lead_dirty = True
+            if lead_dirty:
+                lead.save()
+
             report = Report.create({
                 'company_id':   self._company_id(),
                 'lead_id':      int(lead_id),
@@ -722,15 +855,15 @@ class ReportsModule(BaseModule):
                 'active':       True,
                 'public_token': _generate_report_public_token(),
                 'emision':      request.get_data('emision') or utc_now_iso(),
-                'apr':          request.get_data('apr', ''),
-                'supervisor':   request.get_data('supervisor', ''),
-                'adm':          request.get_data('adm', ''),
-                'mandante':     request.get_data('mandante', ''),
-                'empresa':      request.get_data('empresa', ''),
-                'area':         request.get_data('area', ''),
-                'sector':       request.get_data('sector', ''),
-                'servicio':     str(servicio).strip().upper(),
-                'tiposervicio': request.get_data('tiposervicio', ''),
+                'apr':          resolved.get('apr', ''),
+                'supervisor':   resolved.get('supervisor', ''),
+                'adm':          resolved.get('adm', ''),
+                'mandante':     resolved.get('mandante', ''),
+                'empresa':      resolved.get('empresa', ''),
+                'area':         resolved.get('area', ''),
+                'sector':       resolved.get('sector', ''),
+                'servicio':     _safe_str(resolved.get('servicio')).upper(),
+                'tiposervicio': resolved.get('tiposervicio', ''),
             })
 
             # Log en el Lead

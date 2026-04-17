@@ -167,6 +167,28 @@ def notify_employee_onboarding(request: EmployeeOnboardingRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class AccreditationAlertRequest(BaseModel):
+    employee_email: str
+    employee_name: str
+    service_order_title: str
+    missing_count: int
+
+
+@router.post("/accreditation-alert")
+def notify_accreditation_alert(request: AccreditationAlertRequest):
+    """Send accreditation alert"""
+    try:
+        result = NotificationService.send_accreditation_alert(
+            employee_email=request.employee_email,
+            employee_name=request.employee_name,
+            service_order_title=request.service_order_title,
+            missing_count=request.missing_count
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/reminder/signature")
 def send_signature_reminder(request: SignatureReminderRequest):
     """

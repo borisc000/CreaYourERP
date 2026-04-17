@@ -179,7 +179,7 @@ def signatures_page():
     </div>
 
     <div class="modal-overlay" id="new-modal">
-        <div class="modal">
+        <div class="modal" style="max-width:min(1360px,98vw);width:min(1360px,98vw);">
             <h2>Nueva solicitud de firma</h2>
             <p class="text-sm text-muted" style="margin-bottom:1rem;">
                 Para documentos masivos o con plantillas Word usa Correspondencia Cruzada; aqui puedes emitir solicitudes manuales rapidas.
@@ -212,7 +212,7 @@ def signatures_page():
                 </div>
                 <div class="form-group">
                     <label>Ubicacion visual de firma</label>
-                    <div id="sig-new-workspace" class="workspace-empty">Carga un PDF para arrastrar la caja de firma al lugar exacto.</div>
+                    <div id="sig-new-workspace" class="workspace-empty" style="min-height:420px;">Carga un PDF para arrastrar la caja de firma al lugar exacto.</div>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-ghost" onclick="closeNewModal()">Cancelar</button>
@@ -235,7 +235,7 @@ def signatures_page():
     </div>
 
     <div class="modal-overlay" id="sig-detail-modal">
-        <div class="modal" style="max-width:980px;">
+        <div class="modal" style="max-width:min(1360px,98vw);width:min(1360px,98vw);">
             <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;">
                 <div>
                     <h2 id="sig-detail-title">Detalle de firma</h2>

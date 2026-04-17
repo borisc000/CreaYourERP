@@ -569,6 +569,7 @@ class BaseModule(BaseModule):
                     "recruitment",
                     "hr",
                     "payroll",
+                    "assets",
                     "inventory",
                     "rentals",
                     "safety",

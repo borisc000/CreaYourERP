@@ -13,6 +13,7 @@ Depende de:
 """
 
 import json
+import logging
 import secrets
 from datetime import timedelta
 from email.message import EmailMessage
@@ -40,6 +41,72 @@ from modules.signature.signature_support import (
 
 PDF_MIME = "application/pdf"
 JSON_MIME = "application/json"
+SIGNER_STATUSES = ("pending", "sent", "viewed", "signed", "declined", "expired")
+
+
+def _safe_int(value: Any, default: Optional[int] = 0) -> Optional[int]:
+    try:
+        if value in (None, ""):
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_signers_payload(value: Any, fallback_email: str = "") -> List[Dict[str, Any]]:
+    if value is None:
+        value = []
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            value = parsed if isinstance(parsed, list) else []
+        except Exception:
+            value = []
+    if not isinstance(value, list):
+        value = []
+
+    signers: List[Dict[str, Any]] = []
+    seen = set()
+    for index, raw_item in enumerate(value, start=1):
+        if isinstance(raw_item, str):
+            raw_item = {"signer_email": raw_item, "role_key": f"firmante_{index}"}
+        if not isinstance(raw_item, dict):
+            continue
+        role_key = str(raw_item.get("role_key") or raw_item.get("key") or f"firmante_{index}").strip()
+        signer_email = str(raw_item.get("signer_email") or raw_item.get("email") or fallback_email or "").strip()
+        dedupe_key = f"{role_key}|{signer_email.lower()}"
+        if not signer_email or dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        signers.append(
+            {
+                "role_key": role_key,
+                "signer_name": str(
+                    raw_item.get("signer_name") or raw_item.get("name") or signer_email
+                ).strip(),
+                "signer_email": signer_email,
+                "signing_order": _safe_int(
+                    raw_item.get("signing_order") or raw_item.get("order"), index
+                )
+                or index,
+                "status": str(raw_item.get("status") or "pending").strip().lower() or "pending",
+                "access_token": str(raw_item.get("access_token") or "").strip(),
+            }
+        )
+
+    if not signers and fallback_email:
+        signers.append(
+            {
+                "role_key": "firmante_1",
+                "signer_name": fallback_email,
+                "signer_email": fallback_email,
+                "signing_order": 1,
+                "status": "pending",
+                "access_token": "",
+            }
+        )
+    signers.sort(key=lambda item: (_safe_int(item.get("signing_order"), 0) or 0, item.get("role_key") or ""))
+    return signers
 
 
 # ============================================================================
@@ -267,15 +334,128 @@ class SignatureRequest(BaseModel, AuditMixin):
             self.signature_positions = self.signature_positions or []
             return
         document_bytes = b64decode_bytes(self.document_data)
+        document_hash = sha256_hex(document_bytes)
         self.document_data = b64encode_bytes(document_bytes)
-        self.document_hash = sha256_hex(document_bytes)
-        self.pdf_layout = extract_pdf_layout(document_bytes)
+        if document_hash != self.document_hash or not self.pdf_layout:
+            self.pdf_layout = extract_pdf_layout(document_bytes)
+        self.document_hash = document_hash
         positions = self.signature_positions or default_signature_positions(self.pdf_layout)
         self.signature_positions = normalize_signature_positions(positions, self.pdf_layout)
 
     def requires_visual_layout_confirmation(self) -> bool:
         source_module = str(self.source_module or 'manual').strip().lower()
         return bool(self.document_data and source_module in ('', 'manual', 'document_center'))
+
+    def get_signers(self) -> List["SignatureRequestSigner"]:
+        if not self.id:
+            return []
+        signers = SignatureRequestSigner.search([("signature_request_id", "=", self.id)])
+        signers.sort(
+            key=lambda item: (
+                _safe_int(item.signing_order, 0) or 0,
+                item.id or 0,
+            )
+        )
+        return signers
+
+    def sync_signers(self, signers_payload: Any = None) -> List["SignatureRequestSigner"]:
+        current = self.get_signers()
+        if signers_payload in (None, "") and current:
+            return current
+
+        if signers_payload not in (None, ""):
+            for signer in current:
+                signer.delete()
+            normalized = _normalize_signers_payload(signers_payload, self.request_to_email)
+        else:
+            role_keys = []
+            for position in self.signature_positions or []:
+                role_key = str(position.get("role_key") or position.get("signer_role") or "").strip()
+                if role_key and role_key not in role_keys:
+                    role_keys.append(role_key)
+            normalized = _normalize_signers_payload(
+                [
+                    {
+                        "role_key": role_key or f"firmante_{index + 1}",
+                        "signer_name": self.request_to_email,
+                        "signer_email": self.request_to_email,
+                        "signing_order": index + 1,
+                    }
+                    for index, role_key in enumerate(role_keys or ["firmante_1"])
+                ],
+                self.request_to_email,
+            )
+
+        created: List["SignatureRequestSigner"] = []
+        for index, item in enumerate(normalized, start=1):
+            created.append(
+                SignatureRequestSigner.create(
+                    {
+                        "signature_request_id": self.id,
+                        "role_key": item.get("role_key") or f"firmante_{index}",
+                        "signer_name": item.get("signer_name") or item.get("signer_email"),
+                        "signer_email": item.get("signer_email") or self.request_to_email,
+                        "signing_order": _safe_int(item.get("signing_order"), index) or index,
+                        "status": item.get("status") or "pending",
+                        "access_token": item.get("access_token") or "",
+                        "evidence_payload": item.get("evidence_payload") or {},
+                    }
+                )
+            )
+
+        first_signer = created[0] if created else None
+        if first_signer and first_signer.signer_email and not self.request_to_email:
+            self.request_to_email = first_signer.signer_email
+            self.save()
+        return created
+
+    def signer_public_token(self) -> str:
+        first_pending = next(
+            (signer for signer in self.get_signers() if signer.status in ("pending", "sent", "viewed")),
+            None,
+        )
+        return first_pending.access_token if first_pending and first_pending.access_token else self.access_token
+
+    def _resolve_signer(self, signer_email: str = "", signer_token: str = "") -> Optional["SignatureRequestSigner"]:
+        signers = self.get_signers()
+        if not signers:
+            return None
+        clean_token = str(signer_token or "").strip()
+        clean_email = str(signer_email or "").strip().lower()
+        if clean_token:
+            signer = next((item for item in signers if item.access_token == clean_token), None)
+            if signer:
+                return signer
+        if clean_email:
+            signer = next(
+                (
+                    item
+                    for item in signers
+                    if str(item.signer_email or "").strip().lower() == clean_email
+                    and item.status != "signed"
+                ),
+                None,
+            )
+            if signer:
+                return signer
+        return next((item for item in signers if item.status != "signed"), signers[0] if signers else None)
+
+    def _positions_for_signer(self, signer: Optional["SignatureRequestSigner"]) -> List[Dict[str, Any]]:
+        positions = normalize_signature_positions(
+            self.signature_positions or default_signature_positions(self.pdf_layout),
+            self.pdf_layout,
+        )
+        if not signer:
+            return positions
+        role_key = str(signer.role_key or "").strip()
+        if not role_key:
+            return positions
+        role_positions = [
+            item
+            for item in positions
+            if str(item.get("role_key") or item.get("signer_role") or "").strip() == role_key
+        ]
+        return role_positions or positions
     
     def send_request(self) -> bool:
         """Enviar solicitud de firma por email"""
@@ -285,6 +465,10 @@ class SignatureRequest(BaseModel, AuditMixin):
         if self.requires_visual_layout_confirmation() and not self.layout_confirmed:
             raise ValidationError("You must confirm the signature position visually before sending this PDF")
         self.status = 'sent'
+        signers = self.sync_signers()
+        for index, signer in enumerate(signers):
+            signer.status = "sent" if index == 0 else "pending"
+            signer.save()
         self.save()
         return True
     
@@ -295,7 +479,13 @@ class SignatureRequest(BaseModel, AuditMixin):
         expires_at = ensure_utc_datetime(self.expires_at)
         return bool(expires_at and utc_now() > expires_at)
     
-    def add_signature(self, signature_image_base64: str, signer_email: str, ip_address: str) -> bool:
+    def add_signature(
+        self,
+        signature_image_base64: str,
+        signer_email: str,
+        ip_address: str,
+        signer_token: str = "",
+    ) -> bool:
         """
         Agregar firma al documento.
         
@@ -316,22 +506,38 @@ class SignatureRequest(BaseModel, AuditMixin):
         self._refresh_pdf_metadata()
         if self.requires_visual_layout_confirmation() and not self.layout_confirmed:
             raise ValidationError("The signature position has not been confirmed visually for this PDF")
-        document_bytes = b64decode_bytes(self.document_data)
+        signer = self._resolve_signer(signer_email=signer_email, signer_token=signer_token)
+        if signer:
+            if (
+                signer_email
+                and str(signer.signer_email or "").strip().lower()
+                != str(signer_email or "").strip().lower()
+            ):
+                raise ValidationError("Signer email does not match the active signer")
+            previous_pending = [
+                item
+                for item in self.get_signers()
+                if (_safe_int(item.signing_order, 0) or 0) < (_safe_int(signer.signing_order, 0) or 0)
+                and item.status != "signed"
+            ]
+            if previous_pending:
+                raise ValidationError("A previous signer must sign this document first")
+        source_document = self.signed_document or self.document_data
+        document_bytes = b64decode_bytes(source_document)
         signature_hash = sha256_hex(signature_bytes)
         signed_at = utc_now()
         signed_at_iso = signed_at.isoformat()
-        positions = normalize_signature_positions(
-            self.signature_positions or default_signature_positions(self.pdf_layout),
-            self.pdf_layout,
-        )
+        positions = self._positions_for_signer(signer)
 
         self.signature_data = b64encode_bytes(signature_bytes)
         self.signature_hash = signature_hash
         self.signed_at = signed_at
         self.signed_by_email = signer_email
         self.signed_by_ip = ip_address
-        self.status = 'signed'
-        self.signature_positions = positions
+        self.signature_positions = normalize_signature_positions(
+            self.signature_positions or default_signature_positions(self.pdf_layout),
+            self.pdf_layout,
+        )
 
         key_material = generate_integrity_key_material()
         signed_bytes = b''
@@ -347,10 +553,13 @@ class SignatureRequest(BaseModel, AuditMixin):
                     key_material['digital_key_fingerprint'],
                 )
             except Exception as exc:
-                # In lightweight environments we still persist the signature workflow even if
-                # the PDF stamping dependency is unavailable.
-                signed_bytes = document_bytes
-                self.logger.warning(f"Falling back to original PDF bytes during signature merge: {exc}")
+                logging.getLogger(__name__).error(
+                    f"Signature PDF merge failed for request #{self.id}: {exc}"
+                )
+                raise ValidationError(f"No se pudo incrustar la firma en el PDF final: {exc}")
+
+        if document_bytes and signed_bytes == document_bytes:
+            raise ValidationError("No se pudo generar un PDF firmado distinto del original")
         self.signed_document = b64encode_bytes(signed_bytes) if signed_bytes else self.document_data
         self.signed_document_hash = sha256_hex(signed_bytes) if signed_bytes else self.document_hash
         self.integrity_payload = build_integrity_payload(
@@ -364,6 +573,24 @@ class SignatureRequest(BaseModel, AuditMixin):
         self.digital_key_fingerprint = self.integrity_payload.get('digital_key_fingerprint')
         self.digital_signature = self.integrity_payload.get('digital_signature')
         self.public_key_pem = self.integrity_payload.get('public_key_pem')
+        if signer:
+            signer.status = "signed"
+            signer.signed_at = signed_at
+            signer.signature_hash = signature_hash
+            signer.evidence_payload = {
+                **(self.integrity_payload or {}),
+                "role_key": signer.role_key,
+                "signer_name": signer.signer_name,
+                "signer_email": signer.signer_email,
+            }
+            signer.save()
+            pending_signers = [item for item in self.get_signers() if item.status != "signed"]
+            self.status = "signed" if not pending_signers else "viewed"
+            if pending_signers:
+                pending_signers[0].status = "sent"
+                pending_signers[0].save()
+        else:
+            self.status = "signed"
         self.save()
         return {
             'signed_at': signed_at_iso,
@@ -425,9 +652,10 @@ class SignatureRequest(BaseModel, AuditMixin):
             'source_model': self.source_model,
             'source_record_id': self.source_record_id,
             'generated_document_id': self.generated_document_id,
+            'signers': [signer.to_dict(include_sensitive=include_sensitive) for signer in self.get_signers()],
             'created_at': self._data.get('created_at').isoformat() if self._data.get('created_at') else None,
             'updated_at': self._data.get('updated_at').isoformat() if self._data.get('updated_at') else None,
-            'public_url': f"/app/sign/{self.access_token}" if self.access_token else None,
+            'public_url': f"/app/sign/{self.signer_public_token()}" if self.signer_public_token() else None,
         }
         
         if include_sensitive:
@@ -478,6 +706,94 @@ class SignatureLog(BaseModel, AuditMixin):
     )
 
 
+class SignatureRequestSigner(BaseModel, AuditMixin):
+    __tablename__ = "signature_request_signers"
+    __displayname__ = "signer_email"
+
+    signature_request_id = Column(
+        ColumnType.INTEGER,
+        required=True,
+        label="Signature Request",
+    )
+    role_key = Column(
+        ColumnType.STRING,
+        default="firmante_1",
+        label="Role Key",
+    )
+    signer_name = Column(
+        ColumnType.STRING,
+        label="Signer Name",
+    )
+    signer_email = Column(
+        ColumnType.STRING,
+        required=True,
+        label="Signer Email",
+    )
+    signing_order = Column(
+        ColumnType.INTEGER,
+        default=1,
+        label="Signing Order",
+    )
+    status = Column(
+        ColumnType.STRING,
+        default="pending",
+        label="Status",
+    )
+    access_token = Column(
+        ColumnType.STRING,
+        unique=True,
+        label="Access Token",
+    )
+    signed_at = Column(
+        ColumnType.DATETIME,
+        label="Signed At",
+    )
+    signature_hash = Column(
+        ColumnType.STRING,
+        label="Signature Hash",
+    )
+    evidence_payload = Column(
+        ColumnType.JSON,
+        default={},
+        label="Evidence Payload",
+    )
+
+    def before_create(self):
+        if not self.access_token:
+            self.access_token = secrets.token_urlsafe(32)
+        if not self.status:
+            self.status = "pending"
+        if not self.role_key:
+            self.role_key = "firmante_1"
+
+    def validate(self):
+        super().validate()
+        if self.signer_email and "@" not in self.signer_email:
+            raise ValidationError("Invalid signer email")
+        if self.status not in SIGNER_STATUSES:
+            raise ValidationError(
+                "Signer status must be one of: " + ", ".join(SIGNER_STATUSES)
+            )
+
+    def to_dict(self, include_sensitive: bool = False) -> Dict[str, Any]:
+        data = {
+            "id": self.id,
+            "signature_request_id": self.signature_request_id,
+            "role_key": self.role_key or "firmante_1",
+            "signer_name": self.signer_name or "",
+            "signer_email": self.signer_email or "",
+            "signing_order": _safe_int(self.signing_order, 1) or 1,
+            "status": self.status or "pending",
+            "signed_at": self.signed_at.isoformat() if self.signed_at else None,
+            "signature_hash": self.signature_hash or "",
+            "public_url": f"/app/sign/{self.access_token}" if self.access_token else None,
+        }
+        if include_sensitive:
+            data["access_token"] = self.access_token or ""
+            data["evidence_payload"] = self.evidence_payload or {}
+        return data
+
+
 # ============================================================================
 # MÓDULO SIGNATURE
 # ============================================================================
@@ -513,6 +829,7 @@ class SignatureModule(BaseModule):
         """Inicializar módulo de firmas"""
         # Registrar modelos
         self.register_model('signature.request', SignatureRequest)
+        self.register_model('signature.request_signer', SignatureRequestSigner)
         self.register_model('signature.log', SignatureLog)
         
         # Registrar rutas
@@ -596,7 +913,12 @@ class SignatureModule(BaseModule):
 
     def _find_request_by_token(self, token: str) -> Optional[SignatureRequest]:
         requests = SignatureRequest.search([('access_token', '=', token)])
-        return requests[0] if requests else None
+        if requests:
+            return requests[0]
+        signer_rows = SignatureRequestSigner.search([('access_token', '=', token)])
+        if signer_rows:
+            return SignatureRequest.find_by_id(signer_rows[0].signature_request_id)
+        return None
 
     def _smtp_ready(self) -> bool:
         host = str(settings.smtp_host or '').strip().lower()
@@ -695,7 +1017,30 @@ class SignatureModule(BaseModule):
             return {'status': 'error', 'reason': str(exc), 'recipients': cleaned}
 
     async def _send_signature_request_email(self, signature_request: SignatureRequest, request: Optional[Request]) -> Dict[str, Any]:
-        public_url = f"{self._public_base_url(request)}/app/sign/{signature_request.access_token}"
+        signers = signature_request.get_signers()
+        active_signer = next(
+            (item for item in signers if item.status in ("sent", "viewed", "pending")),
+            None,
+        )
+        public_token = (
+            active_signer.access_token
+            if active_signer and active_signer.access_token
+            else signature_request.access_token
+        )
+        recipient_email = (
+            active_signer.signer_email
+            if active_signer and active_signer.signer_email
+            else signature_request.request_to_email
+        )
+        recipient_email = str(recipient_email or "").strip()
+        public_url = f"{self._public_base_url(request)}/app/sign/{public_token}"
+        if not recipient_email or recipient_email.lower().endswith("@firma-local.invalid"):
+            return {
+                'status': 'skipped',
+                'reason': 'manual_link_only',
+                'public_url': public_url,
+                'recipients': [recipient_email] if recipient_email else [],
+            }
         document_name = signature_request.document_name or signature_request.name or 'Documento'
         text = (
             f"Hola,\n\n"
@@ -712,7 +1057,7 @@ class SignatureModule(BaseModule):
         )
         return await self._send_email(
             f"Solicitud de firma: {document_name}",
-            [signature_request.request_to_email],
+            [recipient_email],
             text,
             html,
         )
@@ -777,14 +1122,28 @@ class SignatureModule(BaseModule):
                 ('company_id', '=', current_user.company_id),
             ])
 
-        # Pendientes de firmar por email del usuario actual
+        # Pendientes de firmar por email del usuario actual, incluyendo firmantes hijo
+        pending = []
         pending_domain = [('request_to_email', '=', current_user.email)]
         if current_user.role != 'superadmin':
             pending_domain.append(('company_id', '=', current_user.company_id))
-        pending = [
+        pending.extend(
             item for item in SignatureRequest.search(pending_domain)
             if item.status in ('sent', 'viewed')
+        )
+        child_signers = [
+            item
+            for item in SignatureRequestSigner.search([('signer_email', '=', current_user.email)])
+            if item.status in ('pending', 'sent', 'viewed')
         ]
+        for signer in child_signers:
+            parent = SignatureRequest.find_by_id(signer.signature_request_id)
+            if not parent or parent.status not in ('sent', 'viewed'):
+                continue
+            if current_user.role != 'superadmin' and parent.company_id != current_user.company_id:
+                continue
+            if not any(item.id == parent.id for item in pending):
+                pending.append(parent)
 
         company_requests = []
         if current_user.role in ('superadmin', 'company_admin'):
@@ -845,13 +1204,29 @@ class SignatureModule(BaseModule):
             creator = UserModel.find_by_id(request.user_id)
             company_id = creator.company_id if creator else None
             auto_send = str(request.get_data('auto_send', 'false')).lower() in ('1', 'true', 'yes', 'on')
+            signers_payload = request.get_data('signers') or []
+            recipient_email = str(
+                request.get_data('request_to_email')
+                or request.get_data('signer_email')
+                or ''
+            ).strip()
+            if not recipient_email and isinstance(signers_payload, list) and signers_payload:
+                first_signer = signers_payload[0]
+                if isinstance(first_signer, dict):
+                    recipient_email = str(
+                        first_signer.get('signer_email')
+                        or first_signer.get('email')
+                        or ''
+                    ).strip()
+                elif isinstance(first_signer, str):
+                    recipient_email = first_signer.strip()
 
             # Crear solicitud
             sig_req = SignatureRequest.create({
                 'name': request.get_data('name'),
                 'description': request.get_data('description'),
                 'request_from': request.user_id,
-                'request_to_email': request.get_data('request_to_email'),
+                'request_to_email': recipient_email,
                 'document_name': request.get_data('document_name') or request.get_data('name') or 'documento.pdf',
                 'document_data': request.get_data('document_data'),
                 'signature_positions': request.get_data('signature_positions', []),
@@ -862,6 +1237,7 @@ class SignatureModule(BaseModule):
                 'source_record_id': request.get_data('source_record_id'),
                 'generated_document_id': request.get_data('generated_document_id'),
             })
+            sig_req.sync_signers(signers_payload)
             
             self._log_event(sig_req.id, 'created', request.remote_addr, request.user_agent, notes='Signature request created')
 
@@ -877,9 +1253,10 @@ class SignatureModule(BaseModule):
                 "id": sig_req.id,
                 "access_token": sig_req.access_token,
                 "status": sig_req.status,
-                "public_url": f"/app/sign/{sig_req.access_token}",
+                "public_url": f"/app/sign/{sig_req.signer_public_token()}",
                 "pdf_layout": sig_req.pdf_layout or [],
                 "signature_positions": sig_req.signature_positions or [],
+                "signers": [signer.to_dict() for signer in sig_req.get_signers()],
                 "layout_confirmed": bool(sig_req.layout_confirmed),
                 "requires_layout_confirmation": bool(sig_req.requires_visual_layout_confirmation() and not sig_req.layout_confirmed),
                 "message": "Signature request created"
@@ -926,6 +1303,7 @@ class SignatureModule(BaseModule):
         sig_req.signature_positions = normalize_signature_positions(positions, sig_req.pdf_layout)
         sig_req.layout_confirmed = True
         sig_req.save()
+        sig_req.sync_signers(request.get_data('signers') or request.get_data('signature_roles'))
         self._log_event(
             sig_req.id,
             'layout_updated',
@@ -939,6 +1317,7 @@ class SignatureModule(BaseModule):
                 'status': sig_req.status,
                 'pdf_layout': sig_req.pdf_layout or [],
                 'signature_positions': sig_req.signature_positions or [],
+                'signers': [signer.to_dict() for signer in sig_req.get_signers()],
                 'layout_confirmed': bool(sig_req.layout_confirmed),
             }
         )
@@ -1065,6 +1444,8 @@ class SignatureModule(BaseModule):
         sig_req = self._find_request_by_token(token)
         if not sig_req:
             return Response.not_found("Signature request not found")
+        signer_rows = SignatureRequestSigner.search([('access_token', '=', token)])
+        active_signer = signer_rows[0] if signer_rows else sig_req._resolve_signer(signer_token=token)
         
         # Verificar expiración
         if sig_req.is_expired():
@@ -1078,6 +1459,9 @@ class SignatureModule(BaseModule):
         if sig_req.status in ('draft', 'sent'):
             sig_req.status = 'viewed'
             sig_req.save()
+        if active_signer and active_signer.status in ("pending", "sent"):
+            active_signer.status = "viewed"
+            active_signer.save()
 
         # Log
         self._log_event(sig_req.id, 'viewed', request.remote_addr, request.user_agent, notes='Public document viewed')
@@ -1093,6 +1477,8 @@ class SignatureModule(BaseModule):
             "signed_document": sig_req.signed_document,
             "signature_positions": sig_req.signature_positions or [],
             "pdf_layout": sig_req.pdf_layout or [],
+            "signers": [signer.to_dict() for signer in sig_req.get_signers()],
+            "current_signer": active_signer.to_dict() if active_signer else None,
             "status": sig_req.status,
             "expires_at": sig_req.expires_at.isoformat() if sig_req.expires_at else None,
             "signed_at": sig_req.signed_at.isoformat() if sig_req.signed_at else None,
@@ -1116,6 +1502,8 @@ class SignatureModule(BaseModule):
         sig_req = self._find_request_by_token(token)
         if not sig_req:
             return Response.not_found("Signature request not found")
+        signer_rows = SignatureRequestSigner.search([('access_token', '=', token)])
+        active_signer = signer_rows[0] if signer_rows else sig_req._resolve_signer(signer_token=token)
         
         # Verificar expiración
         if sig_req.is_expired():
@@ -1137,9 +1525,14 @@ class SignatureModule(BaseModule):
             result = sig_req.add_signature(
                 signature_image,
                 signer_email,
-                request.remote_addr
+                request.remote_addr,
+                signer_token=(active_signer.access_token if active_signer else token),
             )
-            backup_status = await self._send_signed_backups(sig_req)
+            backup_status = (
+                await self._send_signed_backups(sig_req)
+                if sig_req.status == "signed"
+                else await self._send_signature_request_email(sig_req, request)
+            )
             sig_req.delivery_status = {**(sig_req.delivery_status or {}), 'backup_email': backup_status}
             sig_req.save()
             

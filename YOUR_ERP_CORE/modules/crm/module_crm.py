@@ -44,6 +44,30 @@ LEAD_PRIORITIES  = ('low', 'medium', 'high')
 LEAD_STATUSES    = ('open', 'won', 'lost')
 
 
+def _crm_safe_int(value: Any) -> Optional[int]:
+    try:
+        if value in (None, ''):
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _crm_safe_str(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _crm_safe_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value in (None, '', 0, '0'):
+        return False
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'si', 'sí', 'on')
+
+
 # ============================================================================
 # MODELOS
 # ============================================================================
@@ -163,6 +187,13 @@ class Lead(BaseModel, AuditMixin):
     hes_number       = Column(ColumnType.STRING,  label="HES Number", default=None)
     invoice_number   = Column(ColumnType.STRING,  label="Invoice Number", default=None)
     is_paid          = Column(ColumnType.BOOLEAN, default=False, label="Paid?")
+    service_name     = Column(ColumnType.STRING,  label="Service Name", default=None)
+    empresa_faena    = Column(ColumnType.STRING,  label="Empresa / Faena", default=None)
+    report_area_id   = Column(ColumnType.INTEGER, label="Report Area")
+    report_sector_id = Column(ColumnType.INTEGER, label="Report Sector")
+    apr_name         = Column(ColumnType.STRING,  label="APR Name", default=None)
+    supervisor_name  = Column(ColumnType.STRING,  label="Supervisor Name", default=None)
+    contract_admin_name = Column(ColumnType.STRING, label="Contract Administrator", default=None)
 
     # Relaciones (FK simuladas como INTEGER)
     customer_id     = Column(ColumnType.INTEGER, label="Customer")
@@ -218,6 +249,18 @@ class Lead(BaseModel, AuditMixin):
             'project_code':     self.project_code or '',
             'title':            self.title,
             'description':      self.description or '',
+            'po_number':        self.po_number or '',
+            'report_number':    self.report_number or '',
+            'hes_number':       self.hes_number or '',
+            'invoice_number':   self.invoice_number or '',
+            'is_paid':          bool(self.is_paid),
+            'service_name':     self.service_name or '',
+            'empresa_faena':    self.empresa_faena or '',
+            'report_area_id':   self.report_area_id,
+            'report_sector_id': self.report_sector_id,
+            'apr_name':         self.apr_name or '',
+            'supervisor_name':  self.supervisor_name or '',
+            'contract_admin_name': self.contract_admin_name or '',
             'customer_id':      self.customer_id,
             'mandante_id':      self.mandante_id,
             'stage_id':         self.stage_id,
@@ -860,10 +903,43 @@ class CRMModule(BaseModule):
         if not st or (self.env.user.role != 'superadmin' and st.company_id != self._company_id()):
             return Response.not_found("Tipo de servicio no encontrado")
             
-        # Optional safeguard: check if being used
-        leads_using = Lead.search([('service_type_id', '=', st.id)])
+        usage_messages = []
+
+        leads_using = Lead.search([
+            ('service_type_id', '=', st.id),
+            ('company_id', '=', st.company_id),
+        ])
         if leads_using:
-            return Response.bad_request(f"En uso por {len(leads_using)} oportunidad(es)")
+            usage_messages.append(f"{len(leads_using)} oportunidad(es) del CRM")
+
+        try:
+            from modules.quotes.module_quotes import ServiceCatalog, WorkerCatalog, ItemCatalog
+
+            services_using = ServiceCatalog.search([
+                ('service_type_id', '=', st.id),
+                ('company_id', '=', st.company_id),
+            ])
+            workers_using = WorkerCatalog.search([
+                ('service_type_id', '=', st.id),
+                ('company_id', '=', st.company_id),
+            ])
+            items_using = ItemCatalog.search([
+                ('service_type_id', '=', st.id),
+                ('company_id', '=', st.company_id),
+            ])
+
+            if services_using:
+                usage_messages.append(f"{len(services_using)} servicio(s) del catálogo")
+            if workers_using:
+                usage_messages.append(f"{len(workers_using)} cargo(s) del catálogo")
+            if items_using:
+                usage_messages.append(f"{len(items_using)} insumo(s) del catálogo")
+        except Exception as exc:
+            self.logger.warning(f"Service type usage check against quotes catalogs failed: {exc}")
+
+        if usage_messages:
+            joined = ", ".join(usage_messages)
+            return Response.bad_request(f"Este tipo de servicio está en uso por {joined}. Elimínalo o reasígnalo antes de borrarlo.")
             
         try:
             st.delete()
@@ -966,6 +1042,12 @@ class CRMModule(BaseModule):
         project_code = self._next_project_code()
 
         try:
+            po_number = _crm_safe_str(request.get_data('po_number'))
+            if po_number is None:
+                po_number = _crm_safe_str(request.get_data('oc_number'))
+            report_number = _crm_safe_str(request.get_data('report_number'))
+            if report_number is None:
+                report_number = _crm_safe_str(request.get_data('technical_report'))
             lead = Lead.create({
                 'title':            title,
                 'description':      request.get_data('description', ''),
@@ -982,11 +1064,18 @@ class CRMModule(BaseModule):
                 'visit_date':       request.get_data('visit_date', ''),
                 'quote_deadline':   request.get_data('quote_deadline', ''),
                 'source':           request.get_data('source', ''),
-                'po_number':        request.get_data('po_number', ''),
-                'report_number':    request.get_data('report_number', ''),
-                'hes_number':       request.get_data('hes_number', ''),
-                'invoice_number':   request.get_data('invoice_number', ''),
-                'is_paid':          bool(request.get_data('is_paid', False)),
+                'po_number':        po_number,
+                'report_number':    report_number,
+                'hes_number':       _crm_safe_str(request.get_data('hes_number')),
+                'invoice_number':   _crm_safe_str(request.get_data('invoice_number')),
+                'is_paid':          _crm_safe_bool(request.get_data('is_paid', False)),
+                'service_name':     _crm_safe_str(request.get_data('service_name')),
+                'empresa_faena':    _crm_safe_str(request.get_data('empresa_faena')),
+                'report_area_id':   _crm_safe_int(request.get_data('report_area_id')),
+                'report_sector_id': _crm_safe_int(request.get_data('report_sector_id')),
+                'apr_name':         _crm_safe_str(request.get_data('apr_name')),
+                'supervisor_name':  _crm_safe_str(request.get_data('supervisor_name')),
+                'contract_admin_name': _crm_safe_str(request.get_data('contract_admin_name')),
                 'service_type_id':  int(request.get_data('service_type_id')) if request.get_data('service_type_id') else None,
             })
 
@@ -1032,12 +1121,36 @@ class CRMModule(BaseModule):
         _old_customer  = lead.customer_id
         _old_mandante  = getattr(lead, 'mandante_id', None)
         _old_title     = lead.title
+        _old_po_number = lead.po_number
+        _old_report_number = lead.report_number
+        _old_hes_number = lead.hes_number
+        _old_invoice_number = lead.invoice_number
+        _old_is_paid = bool(lead.is_paid)
+        _old_service_name = lead.service_name
+        _old_empresa_faena = lead.empresa_faena
+        _old_report_area_id = lead.report_area_id
+        _old_report_sector_id = lead.report_sector_id
+        _old_apr_name = lead.apr_name
+        _old_supervisor_name = lead.supervisor_name
+        _old_contract_admin_name = lead.contract_admin_name
 
         # ── Aplicar cambios ───────────────────────────────────
         simple_fields = ('title', 'description', 'priority', 'status', 'visit_date', 'quote_deadline', 'source', 'service_type_id')
         for field in simple_fields:
             if field in data:
                 setattr(lead, field, data[field])
+
+        if 'technical_report' in data and 'report_number' not in data:
+            data['report_number'] = data.get('technical_report')
+
+        for field in ('po_number', 'report_number', 'hes_number', 'invoice_number', 'service_name', 'empresa_faena', 'apr_name', 'supervisor_name', 'contract_admin_name'):
+            if field in data:
+                setattr(lead, field, _crm_safe_str(data.get(field)))
+        for field in ('report_area_id', 'report_sector_id'):
+            if field in data:
+                setattr(lead, field, _crm_safe_int(data.get(field)))
+        if 'is_paid' in data:
+            lead.is_paid = _crm_safe_bool(data.get('is_paid'))
 
         if 'expected_revenue' in data:
             lead.expected_revenue = float(data['expected_revenue'] or 0)
@@ -1117,6 +1230,18 @@ class CRMModule(BaseModule):
                 'customer_id':      'Cliente',
                 'mandante_id':      'Contacto',
                 'description':      'Descripción',
+                'po_number':        'OC',
+                'report_number':    'N° reporte',
+                'hes_number':       'HES',
+                'invoice_number':   'Factura',
+                'is_paid':          'Pago',
+                'service_name':     'Servicio',
+                'empresa_faena':    'Empresa/Faena',
+                'report_area_id':   'Área',
+                'report_sector_id': 'Sector',
+                'apr_name':         'APR',
+                'supervisor_name':  'Supervisor',
+                'contract_admin_name': 'ADM contrato',
             }
             for _f, _label in _fl.items():
                 if _f not in data:
@@ -1128,6 +1253,18 @@ class CRMModule(BaseModule):
                 if _f == 'assigned_to'      and _old_assigned != lead.assigned_to:      _changed.append(_label)
                 if _f == 'customer_id'      and _old_customer != lead.customer_id:      _changed.append(_label)
                 if _f == 'mandante_id'      and _old_mandante != getattr(lead, 'mandante_id', None): _changed.append(_label)
+                if _f == 'po_number'        and _old_po_number != lead.po_number: _changed.append(_label)
+                if _f == 'report_number'    and _old_report_number != lead.report_number: _changed.append(_label)
+                if _f == 'hes_number'       and _old_hes_number != lead.hes_number: _changed.append(_label)
+                if _f == 'invoice_number'   and _old_invoice_number != lead.invoice_number: _changed.append(_label)
+                if _f == 'is_paid'          and _old_is_paid != bool(lead.is_paid): _changed.append(_label)
+                if _f == 'service_name'     and _old_service_name != lead.service_name: _changed.append(_label)
+                if _f == 'empresa_faena'    and _old_empresa_faena != lead.empresa_faena: _changed.append(_label)
+                if _f == 'report_area_id'   and _old_report_area_id != lead.report_area_id: _changed.append(_label)
+                if _f == 'report_sector_id' and _old_report_sector_id != lead.report_sector_id: _changed.append(_label)
+                if _f == 'apr_name'         and _old_apr_name != lead.apr_name: _changed.append(_label)
+                if _f == 'supervisor_name'  and _old_supervisor_name != lead.supervisor_name: _changed.append(_label)
+                if _f == 'contract_admin_name' and _old_contract_admin_name != lead.contract_admin_name: _changed.append(_label)
                 if _f == 'description':
                     # Only note if description was explicitly sent and changed
                     pass  # skip verbose desc logging
@@ -1249,6 +1386,13 @@ class CRMModule(BaseModule):
             'hes_number':     getattr(lead, 'hes_number',     None),
             'invoice_number': getattr(lead, 'invoice_number', None),
             'is_paid':        getattr(lead, 'is_paid',        False),
+            'service_name':   getattr(lead, 'service_name',   None),
+            'empresa_faena':  getattr(lead, 'empresa_faena',  None),
+            'report_area_id': getattr(lead, 'report_area_id', None),
+            'report_sector_id': getattr(lead, 'report_sector_id', None),
+            'apr_name':       getattr(lead, 'apr_name',       None),
+            'supervisor_name': getattr(lead, 'supervisor_name', None),
+            'contract_admin_name': getattr(lead, 'contract_admin_name', None),
         })
 
         # ── Customer ─────────────────────────────────────────────
@@ -1334,6 +1478,109 @@ class CRMModule(BaseModule):
             })
         docs_data.sort(key=lambda x: x['created_at'] or '', reverse=True)
 
+        # ── Expenses folder for this opportunity ─────────────────
+        expenses_data = []
+        expenses_summary = {
+            'count': 0,
+            'total_amount': 0.0,
+            'supported_count': 0,
+            'pending_support_count': 0,
+            'reconciled_count': 0,
+            'observed_count': 0,
+            'margin_vs_expected': lead.expected_revenue or 0.0,
+            'margin_vs_accepted_quote': 0.0,
+        }
+        try:
+            from modules.expenses.module_expenses import ExpenseRecord
+
+            _expenses = ExpenseRecord.search([
+                ('lead_id', '=', lead_id),
+                ('company_id', '=', lead.company_id),
+            ])
+            _expenses.sort(
+                key=lambda item: (
+                    str(item.expense_date or ''),
+                    str(item._data.get('created_at') or ''),
+                    item.id or 0,
+                ),
+                reverse=True,
+            )
+            expenses_data = [item.to_dict() for item in _expenses]
+            expenses_summary['count'] = len(expenses_data)
+            expenses_summary['total_amount'] = round(
+                sum(float(item.get('total_amount') or 0) for item in expenses_data),
+                0,
+            )
+            expenses_summary['supported_count'] = len([
+                item for item in expenses_data if item.get('status') in ('supported', 'reconciled')
+            ])
+            expenses_summary['pending_support_count'] = len([
+                item for item in expenses_data if item.get('status') == 'pending_support' or not item.get('has_support')
+            ])
+            expenses_summary['reconciled_count'] = len([
+                item for item in expenses_data if item.get('status') == 'reconciled'
+            ])
+            expenses_summary['observed_count'] = len([
+                item for item in expenses_data if item.get('status') == 'observed'
+            ])
+        except Exception as exc:
+            self.logger.warning("Lead dossier expense loading failed for %s: %s", lead_id, exc)
+
+        rentals_data = []
+        rentals_summary = {
+            'count': 0,
+            'active_count': 0,
+            'closed_count': 0,
+            'pipeline_count': 0,
+            'contract_value_total': 0.0,
+            'pending_return_count': 0,
+        }
+        try:
+            from modules.rentals.module_rentals import RentalContract, RentalContractLine
+
+            _rentals = RentalContract.search([
+                ('lead_id', '=', lead_id),
+                ('company_id', '=', lead.company_id),
+            ])
+            _rentals.sort(
+                key=lambda item: (
+                    item.last_event_at or '',
+                    Lead._fmt_dt(item._data.get('created_at')) or '',
+                    item.id or 0,
+                ),
+                reverse=True,
+            )
+            rentals_data = []
+            for contract in _rentals:
+                contract_payload = contract.to_dict(include_relations=True)
+                lines = RentalContractLine.search([('contract_id', '=', contract.id)])
+                contract_payload['lines_count'] = len(lines)
+                contract_payload['pending_return_quantity'] = round(sum(
+                    max(float((line.delivered_quantity or 0) - (line.returned_quantity or 0)), 0.0)
+                    for line in lines
+                ), 2)
+                rentals_data.append(contract_payload)
+
+            rentals_summary['count'] = len(rentals_data)
+            rentals_summary['active_count'] = len([
+                item for item in rentals_data if item.get('status') in ('reserved', 'contracted', 'dispatched', 'active', 'returned')
+            ])
+            rentals_summary['closed_count'] = len([
+                item for item in rentals_data if item.get('status') == 'closed'
+            ])
+            rentals_summary['pipeline_count'] = len([
+                item for item in rentals_data if item.get('status') in ('draft', 'precheck', 'quoted', 'approved')
+            ])
+            rentals_summary['pending_return_count'] = len([
+                item for item in rentals_data if float(item.get('pending_return_quantity') or 0) > 0
+            ])
+            rentals_summary['contract_value_total'] = round(
+                sum(float(item.get('contract_value') or 0) for item in rentals_data),
+                0,
+            )
+        except Exception as exc:
+            self.logger.warning("Lead dossier rentals loading failed for %s: %s", lead_id, exc)
+
         # ── Activity Log ─────────────────────────────────────────
         _logs = ActivityLog.search([('lead_id', '=', lead_id)])
         _logs.sort(key=lambda a: a.id or 0, reverse=True)
@@ -1367,6 +1614,12 @@ class CRMModule(BaseModule):
         summary = {
             'quotes_count':          len(quotes_data),
             'documents_count':       len(docs_data),
+            'expenses_count':        len(expenses_data),
+            'expenses_total':        expenses_summary['total_amount'],
+            'expenses_pending_support': expenses_summary['pending_support_count'],
+            'rentals_count':         rentals_summary['count'],
+            'rentals_contract_value_total': rentals_summary['contract_value_total'],
+            'rentals_active_count':  rentals_summary['active_count'],
             'activity_count':        len(_logs),
             'latest_quote_status':   latest_quote['status']      if latest_quote else None,
             'latest_quote_number':   latest_quote['quote_number'] if latest_quote else None,
@@ -1379,6 +1632,18 @@ class CRMModule(BaseModule):
             'reports_open':          len([r for r in reports_data if r.get('estado') == 'ABIERTO']),
         }
 
+        accepted_total = round(sum(float(q.get('gross_total') or 0) for q in accepted_q), 0)
+        expenses_summary['margin_vs_expected'] = round(
+            float(lead.expected_revenue or 0) - expenses_summary['total_amount'],
+            0,
+        )
+        expenses_summary['margin_vs_accepted_quote'] = round(
+            (accepted_total or float(lead.expected_revenue or 0)) - expenses_summary['total_amount'],
+            0,
+        )
+        summary['expense_margin_vs_expected'] = expenses_summary['margin_vs_expected']
+        summary['expense_margin_vs_accepted_quote'] = expenses_summary['margin_vs_accepted_quote']
+
         return Response.ok({
             'lead':         lead_data,
             'customer':     customer_data,
@@ -1387,6 +1652,10 @@ class CRMModule(BaseModule):
             'service_type': stype_data,
             'quotes':       quotes_data,
             'reports':      reports_data,
+            'expenses':     expenses_data,
+            'expenses_summary': expenses_summary,
+            'rentals':      rentals_data,
+            'rentals_summary': rentals_summary,
             'documents':    docs_data,
             'activity':     activity_data,
             'summary':      summary,

@@ -26,6 +26,7 @@ const accreditationOverallStyles = {
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!API.requireAuth()) return;
+    document.getElementById('acc-document-file')?.addEventListener('change', updateAccreditationFileLabel);
 
     const params = new URLSearchParams(window.location.search);
     accreditationState.selectedCustomerId = params.get('customer_id') || '';
@@ -70,6 +71,36 @@ function accreditationOverallPill(status) {
             ${style.label}
         </span>
     `;
+}
+
+function accreditationFulfillmentLabel(mode) {
+    const map = {
+        upload_only: 'Cargar archivo',
+        template_generated: 'Generar',
+        hybrid: 'Ambos',
+    };
+    return map[mode] || map.upload_only;
+}
+
+function updateAccreditationFileLabel() {
+    const file = document.getElementById('acc-document-file')?.files?.[0];
+    const label = document.getElementById('acc-document-file-label');
+    if (!label) return;
+    label.textContent = file
+        ? `${file.name} · ${(file.size / 1024).toFixed(1)} KB`
+        : 'Opcional si ya tienes una URL externa.';
+}
+
+function accreditationReadFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = String(reader.result || '');
+            resolve(result.includes(',') ? result.split(',')[1] : result);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 }
 
 function accreditationRequirementChip(item) {
@@ -196,6 +227,10 @@ function renderRequirementList() {
         const expiration = item.tracks_expiration
             ? `<span class="text-sm text-muted">Vence y avisa ${item.warning_days || 0} dias antes</span>`
             : '<span class="text-sm text-muted">Sin control de vencimiento</span>';
+        const fulfillmentChip = `<span class="acc-chip" style="background:#172554;color:#93c5fd;border-color:#1d4ed8;">${accreditationEscape(accreditationFulfillmentLabel(item.fulfillment_mode))}</span>`;
+        const signatureChip = item.requires_signature
+            ? '<span class="acc-chip" style="background:#422006;color:#fde68a;border-color:#ca8a04;">Requiere firma</span>'
+            : '<span class="acc-chip" style="background:#0f172a;color:#94a3b8;border-color:#334155;">Sin firma</span>';
         return `
             <div class="acc-item">
                 <div style="display:flex;justify-content:space-between;gap:0.75rem;align-items:flex-start;">
@@ -212,6 +247,8 @@ function renderRequirementList() {
                 <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:0.75rem;">
                     <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
                         <span class="acc-chip" style="background:#0f172a;color:#94a3b8;border-color:#334155;">${accreditationEscape(item.category || 'other')}</span>
+                        ${fulfillmentChip}
+                        ${signatureChip}
                         ${expiration}
                     </div>
                     <div style="display:flex;gap:0.45rem;">
@@ -362,8 +399,13 @@ function openRequirementModal(requirementId = null) {
     document.getElementById('acc-requirement-customer').value = requirement?.customer_id || selectedCustomerId();
     document.getElementById('acc-requirement-mandatory').checked = requirement ? !!requirement.is_mandatory : true;
     document.getElementById('acc-requirement-expiration').checked = requirement ? !!requirement.tracks_expiration : false;
+    document.getElementById('acc-requirement-fulfillment').value = requirement?.fulfillment_mode || 'upload_only';
+    document.getElementById('acc-requirement-requires-signature').checked = requirement ? !!requirement.requires_signature : false;
     document.getElementById('acc-requirement-warning').value = requirement?.warning_days ?? 30;
+    document.getElementById('acc-requirement-validity-days').value = requirement?.default_validity_days ?? 0;
+    document.getElementById('acc-requirement-expiration-required').checked = requirement ? !!requirement.expiration_required : false;
     document.getElementById('acc-requirement-order').value = requirement?.display_order ?? 0;
+    document.getElementById('acc-requirement-file-types').value = (requirement?.accepted_file_types || ['pdf', 'jpg', 'jpeg', 'png']).join(',');
     document.getElementById('acc-requirement-description').value = requirement?.description || '';
 
     title.textContent = requirement ? 'Editar requisito' : 'Nuevo requisito';
@@ -380,6 +422,14 @@ async function saveRequirement(event) {
         customer_id: document.getElementById('acc-requirement-customer').value || null,
         is_mandatory: document.getElementById('acc-requirement-mandatory').checked,
         tracks_expiration: document.getElementById('acc-requirement-expiration').checked,
+        fulfillment_mode: document.getElementById('acc-requirement-fulfillment').value || 'upload_only',
+        requires_signature: document.getElementById('acc-requirement-requires-signature').checked,
+        default_validity_days: document.getElementById('acc-requirement-validity-days').value,
+        expiration_required: document.getElementById('acc-requirement-expiration-required').checked,
+        accepted_file_types: (document.getElementById('acc-requirement-file-types').value || '')
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean),
         warning_days: document.getElementById('acc-requirement-warning').value,
         display_order: document.getElementById('acc-requirement-order').value,
         description: document.getElementById('acc-requirement-description').value,
@@ -470,6 +520,7 @@ function renderEmployeeAccreditationDetail() {
                     ${detail.items.map((item) => {
                         const requirement = item.requirement || {};
                         const document = item.document;
+                        const mode = requirement.fulfillment_mode || 'upload_only';
                         const scope = requirement.customer_id ? requirement.customer_name || 'Cliente' : 'Comun';
                         const validityText = item.expires_on
                             ? `${item.expires_on}${typeof item.days_until_expiration === 'number' ? ` (${item.days_until_expiration} dias)` : ''}`
@@ -480,9 +531,13 @@ function renderEmployeeAccreditationDetail() {
                                     <strong style="color:#f8fafc;">${accreditationEscape(document.document_name || 'Documento')}</strong>
                                     <span class="text-sm text-muted">${accreditationEscape(document.document_number || '')}</span>
                                     ${document.document_url ? `<a href="${accreditationEscape(document.document_url)}" target="_blank" rel="noopener" style="color:#38bdf8;">Abrir documento</a>` : ''}
+                                    ${document.signed_document_url ? `<a href="${accreditationEscape(document.signed_document_url)}" target="_blank" rel="noopener" style="color:#86efac;">Abrir firmado</a>` : ''}
+                                    <span class="text-sm text-muted">${accreditationEscape(document.document_origin || mode)} · ${accreditationEscape(document.signature_status || 'not_required')}</span>
                                 </div>
                             `
                             : '<span class="text-sm text-muted">Sin documento cargado</span>';
+                        const canUpload = ['upload_only', 'hybrid'].includes(mode);
+                        const canGenerate = ['template_generated', 'hybrid'].includes(mode);
                         return `
                             <tr>
                                 <td>
@@ -491,6 +546,8 @@ function renderEmployeeAccreditationDetail() {
                                         <div class="acc-chip-wrap">
                                             <span class="acc-chip" style="background:#0f172a;color:#94a3b8;border-color:#334155;">${accreditationEscape(requirement.code || 'REQ')}</span>
                                             <span class="acc-chip" style="background:${requirement.customer_id ? '#172554' : '#0f2b1e'};color:${requirement.customer_id ? '#93c5fd' : '#86efac'};border-color:${requirement.customer_id ? '#1d4ed8' : '#166534'};">${accreditationEscape(scope)}</span>
+                                            <span class="acc-chip" style="background:#1e293b;color:#e2e8f0;border-color:#334155;">${accreditationEscape(accreditationFulfillmentLabel(mode))}</span>
+                                            ${requirement.requires_signature ? '<span class="acc-chip" style="background:#422006;color:#fde68a;border-color:#ca8a04;">Firma</span>' : ''}
                                         </div>
                                     </div>
                                 </td>
@@ -498,7 +555,9 @@ function renderEmployeeAccreditationDetail() {
                                 <td>${documentText}</td>
                                 <td>${accreditationEscape(validityText)}</td>
                                 <td style="white-space:nowrap;">
-                                    <button class="btn btn-primary btn-sm" onclick="openDocumentModal(${employee.id}, ${requirement.id})">${document ? 'Actualizar' : 'Cargar'}</button>
+                                    ${canUpload ? `<button class="btn btn-primary btn-sm" onclick="openDocumentModal(${employee.id}, ${requirement.id})">${document ? 'Actualizar' : 'Cargar'}</button>` : ''}
+                                    ${canGenerate ? `<button class="btn btn-ghost btn-sm" onclick="openRequirementGeneration(${employee.id}, ${requirement.id || 0})">Generar</button>` : ''}
+                                    ${document?.generated_document_id ? `<a class="btn btn-ghost btn-sm" href="/app/cross-correspondence?generated_document_id=${document.generated_document_id}">Workspace</a>` : ''}
                                     ${document ? `<button class="btn btn-ghost btn-sm" onclick="deleteAccreditationDocument(${document.id}, ${employee.id})">Eliminar</button>` : ''}
                                 </td>
                             </tr>
@@ -544,6 +603,19 @@ function renderEmployeeAccreditationDetail() {
     `;
 }
 
+function openRequirementGeneration(employeeId, requirementId) {
+    const requirement = (accreditationState.detail?.items || [])
+        .map((item) => item.requirement || {})
+        .find((item) => Number(item.id) === Number(requirementId)) || {};
+    const params = new URLSearchParams();
+    params.set('employee_id', String(employeeId));
+    if (selectedCustomerId()) params.set('customer_id', selectedCustomerId());
+    if (requirement.code) params.set('requirement_code', requirement.code);
+    params.set('source_module', 'accreditation');
+    params.set('target_module', 'hr');
+    window.location.href = `/app/cross-correspondence?${params.toString()}`;
+}
+
 function openDocumentModal(employeeId, requirementId) {
     const detail = accreditationState.detail;
     const item = detail?.items?.find((entry) => entry.requirement?.id === requirementId);
@@ -559,11 +631,25 @@ function openDocumentModal(employeeId, requirementId) {
     document.getElementById('acc-document-name').value = currentDocument?.document_name || item?.requirement?.name || '';
     document.getElementById('acc-document-number').value = currentDocument?.document_number || '';
     document.getElementById('acc-document-url').value = currentDocument?.document_url || '';
+    document.getElementById('acc-document-origin').value = currentDocument?.document_origin || item?.requirement?.fulfillment_mode || 'upload_only';
     document.getElementById('acc-document-issued').value = currentDocument?.issued_on || '';
     document.getElementById('acc-document-expires').value = currentDocument?.expires_on || '';
     document.getElementById('acc-document-status').value = currentDocument?.verification_status || 'pending_review';
     document.getElementById('acc-document-source').value = currentDocument?.source_module || 'accreditation';
+    document.getElementById('acc-document-signature-status').value = currentDocument?.signature_status || (item?.requirement?.requires_signature ? 'pending' : 'not_required');
     document.getElementById('acc-document-notes').value = currentDocument?.notes || '';
+    const fileInput = document.getElementById('acc-document-file');
+    if (fileInput) {
+        fileInput.value = '';
+        const acceptedTypes = item?.requirement?.accepted_file_types || ['pdf', 'jpg', 'jpeg', 'png'];
+        fileInput.accept = acceptedTypes.map((entry) => `.${String(entry || '').replace(/^\./, '')}`).join(',');
+    }
+    const fileLabel = document.getElementById('acc-document-file-label');
+    if (fileLabel) {
+        fileLabel.textContent = currentDocument?.file_name
+            ? `Archivo actual: ${currentDocument.file_name}`
+            : 'Opcional si ya tienes una URL externa.';
+    }
     modal.classList.add('open');
 }
 
@@ -571,18 +657,29 @@ async function saveAccreditationDocument(event) {
     event.preventDefault();
     const documentId = document.getElementById('acc-document-id').value;
     const employeeId = document.getElementById('acc-document-employee-id').value;
+    const file = document.getElementById('acc-document-file')?.files?.[0];
     const payload = {
         employee_id: employeeId,
         requirement_id: document.getElementById('acc-document-requirement-id').value,
         document_name: document.getElementById('acc-document-name').value,
         document_number: document.getElementById('acc-document-number').value,
         document_url: document.getElementById('acc-document-url').value,
+        document_origin: document.getElementById('acc-document-origin').value || 'upload_only',
         issued_on: document.getElementById('acc-document-issued').value,
         expires_on: document.getElementById('acc-document-expires').value,
         verification_status: document.getElementById('acc-document-status').value,
+        signature_status: document.getElementById('acc-document-signature-status').value || 'not_required',
         source_module: document.getElementById('acc-document-source').value,
         notes: document.getElementById('acc-document-notes').value,
     };
+    if (file) {
+        payload.file_name = file.name;
+        payload.file_mime = file.type || 'application/octet-stream';
+        payload.file_data = await accreditationReadFileAsBase64(file);
+        if (!payload.document_url) {
+            payload.document_url = `data:${payload.file_mime};base64,${payload.file_data}`;
+        }
+    }
 
     const response = documentId
         ? await API.put(`/hr/accreditation/documents/${documentId}`, payload)

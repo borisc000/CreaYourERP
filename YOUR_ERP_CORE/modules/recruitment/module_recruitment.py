@@ -13,6 +13,7 @@ from core.YOUR_ERP_orm import BaseModel, Column, ColumnType, AuditMixin
 from core.time_utils import utc_strftime
 from modules.hr.module_hr import (
     Department,
+    EmploymentStatusEvent,
     EmployeeProfile,
     EmployeeContract,
     provision_user_account,
@@ -22,6 +23,12 @@ from modules.hr.module_hr import (
     _safe_int,
     _normalize_bool,
     _fmt_dt,
+)
+from modules.job_profiles.module_job_profiles import (
+    JobFunction,
+    JobProfile,
+    JobResponsibility,
+    JobRisk,
 )
 
 
@@ -159,6 +166,7 @@ class JobOpening(BaseModel, AuditMixin):
 
     code = Column(ColumnType.STRING, label="Code")
     title = Column(ColumnType.STRING, required=True, label="Title")
+    job_profile_id = Column(ColumnType.INTEGER, label="Job Profile")
     department_id = Column(ColumnType.INTEGER, label="Department")
     recruiter_user_id = Column(ColumnType.INTEGER, label="Recruiter")
     hiring_manager_user_id = Column(ColumnType.INTEGER, label="Hiring Manager")
@@ -448,6 +456,16 @@ class RecruitmentModule(BaseModule):
             return None, Response.not_found("Job not found")
         return job, None
 
+    def _job_profile_or_404(self, profile_id: Any) -> Tuple[Optional[JobProfile], Optional[Response]]:
+        profile = JobProfile.find_by_id(_safe_int(profile_id))
+        if not profile or (
+            self.env.user.role != "superadmin" and profile.company_id != self._company_id()
+        ):
+            return None, Response.not_found("Job profile not found")
+        if not profile.active:
+            return None, Response.bad_request("Selected job profile is archived")
+        return profile, None
+
     def _candidate_or_404(self, candidate_id: Any) -> Tuple[Optional[Candidate], Optional[Response]]:
         candidate = Candidate.find_by_id(_safe_int(candidate_id))
         if not candidate or (
@@ -556,6 +574,130 @@ class RecruitmentModule(BaseModule):
     def _payload_lines(self, data: Dict[str, Any], key: str) -> List[str]:
         return _normalize_text_list(data.get(key))
 
+    def _profile_hiring_snapshot(self, profile: Optional[JobProfile]) -> Dict[str, Any]:
+        if not profile:
+            return {"title": "", "department_id": None, "description": "", "requirements": ""}
+
+        functions = JobFunction.search([("job_profile_id", "=", profile.id)])
+        responsibilities = JobResponsibility.search([("job_profile_id", "=", profile.id)])
+        risks = [item for item in JobRisk.search([("job_profile_id", "=", profile.id)]) if item.active]
+
+        description_lines = [
+            (profile.objective or "").strip(),
+            (profile.scope or "").strip(),
+            "",
+            "Funciones principales:",
+        ]
+        description_lines.extend([f"- {item.title}" for item in functions if (item.title or "").strip()])
+        description_lines.extend(["", "Responsabilidades:"])
+        description_lines.extend([f"- {item.title}" for item in responsibilities if (item.title or "").strip()])
+        description_text = "\n".join([line for line in description_lines if line is not None]).strip()
+
+        requirements_lines = ["Requisitos preventivos / riesgos del cargo:"]
+        for risk in risks:
+            label = " - ".join(
+                [
+                    str(risk.task_name or "").strip(),
+                    str(risk.hazard_factor or "").strip(),
+                    str(risk.risk_name or "").strip(),
+                ]
+            ).strip(" -")
+            if label:
+                requirements_lines.append(f"- {label}")
+        requirements_text = "\n".join(requirements_lines).strip() if len(requirements_lines) > 1 else ""
+
+        return {
+            "title": profile.name or "",
+            "department_id": profile.department_id,
+            "description": description_text,
+            "requirements": requirements_text,
+        }
+
+    def _create_inline_job_profile(self, data: Dict[str, Any]) -> Tuple[Optional[JobProfile], Optional[Response]]:
+        payload = data.get("inline_job_profile") if isinstance(data.get("inline_job_profile"), dict) else None
+        if not payload:
+            return None, None
+
+        department_id = _safe_int(payload.get("department_id") or data.get("department_id"), None)
+        if department_id:
+            department = Department.find_by_id(department_id)
+            if not department or department.company_id != self._company_id():
+                return None, Response.bad_request("Department not found for inline job profile")
+
+        profile_code = str(payload.get("code") or "").strip()
+        if profile_code:
+            existing = JobProfile.search(
+                [("company_id", "=", self._company_id()), ("code", "=", profile_code)]
+            )
+            existing = [item for item in existing if item.active]
+            if existing:
+                return existing[0], None
+
+        try:
+            profile = JobProfile.create(
+                {
+                    "name": payload.get("name") or data.get("title"),
+                    "code": profile_code
+                    or str(data.get("title") or "cargo").strip().upper().replace(" ", "_")[:40],
+                    "department_id": department_id,
+                    "objective": payload.get("objective") or data.get("description"),
+                    "scope": payload.get("scope") or data.get("requirements"),
+                    "risk_level": payload.get("risk_level") or "medium",
+                    "active": True,
+                    "company_id": self._company_id(),
+                }
+            )
+
+            for title in _normalize_text_list(payload.get("functions")):
+                JobFunction.create(
+                    {
+                        "job_profile_id": profile.id,
+                        "title": title,
+                        "description": "",
+                        "display_order": 10,
+                        "company_id": self._company_id(),
+                    }
+                )
+
+            for title in _normalize_text_list(payload.get("responsibilities")):
+                JobResponsibility.create(
+                    {
+                        "job_profile_id": profile.id,
+                        "title": title,
+                        "description": "",
+                        "category": "general",
+                        "display_order": 10,
+                        "company_id": self._company_id(),
+                    }
+                )
+
+            for line in _normalize_text_list(payload.get("risks")):
+                JobRisk.create(
+                    {
+                        "job_profile_id": profile.id,
+                        "process_name": profile.name or "",
+                        "task_name": line,
+                        "hazard_factor": line,
+                        "risk_name": line,
+                        "consequence": "",
+                        "controls_summary": "",
+                        "required_ppe": [],
+                        "protocol_codes": [],
+                        "master_risk_code": "",
+                        "probability": 2,
+                        "severity": 2,
+                        "owner_name": "",
+                        "source_note": "Creado desde vacante de reclutamiento",
+                        "display_order": 10,
+                        "active": True,
+                        "company_id": self._company_id(),
+                    }
+                )
+
+            return profile, None
+        except ValidationError as exc:
+            return None, Response.bad_request(str(exc))
+
     def _sync_payroll_profile(
         self,
         employee: EmployeeProfile,
@@ -594,6 +736,7 @@ class RecruitmentModule(BaseModule):
 
     def _job_dict(self, job: JobOpening) -> Dict[str, Any]:
         department = Department.find_by_id(job.department_id) if job.department_id else None
+        job_profile = JobProfile.find_by_id(job.job_profile_id) if job.job_profile_id else None
         applications = JobApplication.search([("job_id", "=", job.id)])
         active_count = len([item for item in applications if item.status == "active"])
         hired_count = len([item for item in applications if item.status == "hired"])
@@ -601,6 +744,10 @@ class RecruitmentModule(BaseModule):
             "id": job.id,
             "code": job.code or "",
             "title": job.title or "",
+            "job_profile_id": job.job_profile_id,
+            "job_profile_name": job_profile.name if job_profile else None,
+            "job_profile_code": job_profile.code if job_profile else None,
+            "job_profile_risk_level": job_profile.risk_level if job_profile else None,
             "department_id": job.department_id,
             "department_name": department.name if department else None,
             "recruiter_user_id": job.recruiter_user_id,
@@ -795,7 +942,18 @@ class RecruitmentModule(BaseModule):
             return err
 
         data = request.data or {}
-        department_id = _safe_int(data.get("department_id"), None)
+        job_profile, profile_error = self._create_inline_job_profile(data)
+        if profile_error:
+            return profile_error
+
+        profile_id = _safe_int(data.get("job_profile_id"), None) or (job_profile.id if job_profile else None)
+        if profile_id and not job_profile:
+            job_profile, profile_error = self._job_profile_or_404(profile_id)
+            if profile_error:
+                return profile_error
+
+        profile_snapshot = self._profile_hiring_snapshot(job_profile)
+        department_id = _safe_int(data.get("department_id"), profile_snapshot["department_id"])
         if department_id:
             department = Department.find_by_id(department_id)
             if not department or department.company_id != self._company_id():
@@ -804,7 +962,8 @@ class RecruitmentModule(BaseModule):
         try:
             job = JobOpening.create(
                 {
-                    "title": data.get("title"),
+                    "title": data.get("title") or profile_snapshot["title"],
+                    "job_profile_id": profile_id,
                     "department_id": department_id,
                     "recruiter_user_id": _safe_int(data.get("recruiter_user_id"), self.env.user.id),
                     "hiring_manager_user_id": _safe_int(data.get("hiring_manager_user_id"), None),
@@ -816,8 +975,8 @@ class RecruitmentModule(BaseModule):
                     "salary_min": _safe_float(data.get("salary_min"), 0.0),
                     "salary_max": _safe_float(data.get("salary_max"), 0.0),
                     "target_start_date": data.get("target_start_date"),
-                    "description": data.get("description"),
-                    "requirements": data.get("requirements"),
+                    "description": data.get("description") or profile_snapshot["description"],
+                    "requirements": data.get("requirements") or profile_snapshot["requirements"],
                     "company_id": self._company_id(),
                 }
             )
@@ -844,8 +1003,15 @@ class RecruitmentModule(BaseModule):
             return error
 
         data = request.data or {}
+        if "inline_job_profile" in data:
+            job_profile, profile_error = self._create_inline_job_profile(data)
+            if profile_error:
+                return profile_error
+            if job_profile:
+                data["job_profile_id"] = job_profile.id
         editable = {
             "title": "title",
+            "job_profile_id": "job_profile_id",
             "department_id": "department_id",
             "recruiter_user_id": "recruiter_user_id",
             "hiring_manager_user_id": "hiring_manager_user_id",
@@ -863,10 +1029,29 @@ class RecruitmentModule(BaseModule):
         for incoming, field_name in editable.items():
             if incoming in data:
                 value = data[incoming]
-                if incoming in ("department_id", "recruiter_user_id", "hiring_manager_user_id", "openings_count"):
+                if incoming in (
+                    "job_profile_id",
+                    "department_id",
+                    "recruiter_user_id",
+                    "hiring_manager_user_id",
+                    "openings_count",
+                ):
                     value = _safe_int(value, None if incoming != "openings_count" else 1)
                 if incoming in ("salary_min", "salary_max"):
                     value = _safe_float(value, 0.0)
+                if incoming == "job_profile_id" and value:
+                    profile, profile_error = self._job_profile_or_404(value)
+                    if profile_error:
+                        return profile_error
+                    snapshot = self._profile_hiring_snapshot(profile)
+                    if not data.get("title"):
+                        job.title = snapshot["title"] or job.title
+                    if "department_id" not in data:
+                        job.department_id = snapshot["department_id"] or job.department_id
+                    if not data.get("description"):
+                        job.description = snapshot["description"] or job.description
+                    if not data.get("requirements"):
+                        job.requirements = snapshot["requirements"] or job.requirements
                 setattr(job, field_name, value)
 
         try:
@@ -1274,6 +1459,7 @@ class RecruitmentModule(BaseModule):
                     "company_id": self._company_id(),
                     "application_id": application.id,
                     "candidate_id": candidate.id,
+                    "job_profile_id": _safe_int(data.get("job_profile_id"), job.job_profile_id),
                     "position_title": data.get("position_title") or job.title,
                     "work_email": data.get("work_email") or candidate.email,
                     "personal_email": candidate_email,
@@ -1376,6 +1562,24 @@ class RecruitmentModule(BaseModule):
             if hired_count >= (job.openings_count or 1):
                 job.status = "closed"
                 job.save()
+
+            try:
+                EmploymentStatusEvent.create(
+                    {
+                        "employee_id": employee.id,
+                        "company_id": employee.company_id,
+                        "contract_id": contract.id,
+                        "previous_status": None,
+                        "new_status": employee.status or "active",
+                        "effective_date": hire_date,
+                        "reason": f"Contratacion desde postulacion #{application.id}",
+                        "source_module": "recruitment",
+                        "source_record_id": application.id,
+                        "notes": application.hiring_notes or application.notes or "",
+                    }
+                )
+            except ValidationError:
+                pass
 
             response = {
                 "application": self._application_dict(application),

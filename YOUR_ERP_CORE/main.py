@@ -11,7 +11,6 @@ Este archivo muestra:
 4. Manejo de requests
 """
 
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List, Tuple
@@ -27,16 +26,24 @@ from core.YOUR_ERP_core_framework import (
 from modules.base.module_base import BaseModule
 from modules.signature.module_signature import SignatureModule
 from modules.document_center.module_document_center import DocumentCenterModule
+from modules.pdf_workspace.module_pdf_workspace import PdfWorkspaceModule
 from modules.crm.module_crm import CRMModule
 from modules.quotes.module_quotes import QuotesModule
 from modules.billing.module_billing import BillingModule
+from modules.expenses.module_expenses import ExpensesModule
+from modules.gantt.module_gantt import GanttModule
+from modules.planning.module_planning import PlanningModule
 from modules.reports.module_reports import ReportsModule
 from modules.hr.module_hr import HRModule
 from modules.attendance.module_attendance import AttendanceModule
 from modules.payroll.module_payroll import PayrollModule
 from modules.recruitment.module_recruitment import RecruitmentModule
 from modules.safety.module_safety import SafetyModule
+from modules.safety_activities.module_safety_activities import SafetyActivitiesModule
+from modules.safety_procedures.module_safety_procedures import SafetyProceduresModule
+from modules.assets.module_assets import AssetsModule
 from modules.inventory.module_inventory import InventoryModule
+from modules.suppliers.module_suppliers import SuppliersModule
 from modules.rentals.module_rentals import RentalsModule
 from modules.riohs.module_riohs import RiohsModule
 from modules.mail.module_mail import MailModule
@@ -44,7 +51,14 @@ from modules.google_workspace.module_google_workspace import GoogleWorkspaceModu
 from modules.job_profiles.module_job_profiles import JobProfilesModule
 from modules.ai.module_ai import AIModule
 from modules.accreditation.module_accreditation import AccreditationModule
+from modules.tasks.module_tasks import TasksModule
 from core.config import settings, validate_config
+from core.mvp import (
+    MVP_V2_MESSAGE,
+    filter_mvp_modules,
+    get_mvp_disabled_api_module,
+)
+from core.YOUR_ERP_orm import BaseModel
 from config.database import init_db, SessionLocal
 from core.time_utils import utc_now, utc_strftime
 from modules.base.api.config_routes import router as config_router
@@ -53,9 +67,7 @@ from modules.hr.api.contract_routes import router as contract_router
 from modules.hr.api.employee_routes import router as employee_router
 from modules.hr.api.dashboard_routes import router as dashboard_router
 from modules.recruitment.api.vacancy_routes import router as vacancy_router
-from modules.cross_correspondence.api.hiring_routes import router as hiring_router
 from modules.crm.api.customer_documents_routes import router as customer_documents_router
-from modules.signature.api.signature_routes import router as signature_router
 from modules.frontend.routes import router as frontend_template_router
 from modules.notifications.api.notification_routes import router as notification_router
 from modules.accreditation.api.service_order_routes import router as service_order_router
@@ -76,32 +88,41 @@ ALL_MODULE_CLASSES = [
     BaseModule,
     SignatureModule,
     DocumentCenterModule,
+    PdfWorkspaceModule,
     CRMModule,
     QuotesModule,
     BillingModule,
+    ExpensesModule,
+    GanttModule,
+    PlanningModule,
     ReportsModule,
     HRModule,
     AttendanceModule,
     PayrollModule,
     RecruitmentModule,
     SafetyModule,
+    SafetyActivitiesModule,
+    SafetyProceduresModule,
     JobProfilesModule,
     InventoryModule,
+    AssetsModule,
+    SuppliersModule,
     RentalsModule,
     RiohsModule,
     MailModule,
     GoogleWorkspaceModule,
     AIModule,
     AccreditationModule,
+    TasksModule,
 ]
 AVAILABLE_MODULE_CLASSES = {
     getattr(module_class, "name", module_class.__name__).lower(): module_class
     for module_class in ALL_MODULE_CLASSES
 }
 DEFAULT_MODULES_TO_LOAD = list(AVAILABLE_MODULE_CLASSES.keys())
-FRAMEWORK_STORAGE_MODE = "in_memory_demo"
+FRAMEWORK_STORAGE_MODE = "local_sqlite_persistent"
 FRAMEWORK_STORAGE_WARNING = (
-    "Database settings are configured, but the current ORM and adapter still persist data in memory only."
+    "Local development data is persisted to SQLite so records survive restarts in this workspace."
 )
 
 
@@ -120,7 +141,58 @@ def resolve_modules_to_load(raw_modules: List[str]) -> Tuple[List[str], List[str
             continue
         unknown.append(module_name)
 
-    return resolved or DEFAULT_MODULES_TO_LOAD, unknown
+    resolved = resolved or DEFAULT_MODULES_TO_LOAD
+    if "crm" in resolved and "gantt" in AVAILABLE_MODULE_CLASSES and "gantt" not in resolved:
+        insert_at = resolved.index("crm") + 1
+        resolved.insert(insert_at, "gantt")
+    if (
+        {"gantt", "safety"} & set(resolved)
+        and "safety_activities" in AVAILABLE_MODULE_CLASSES
+        and "safety_activities" not in resolved
+    ):
+        anchor = "safety" if "safety" in resolved else "gantt"
+        insert_at = resolved.index(anchor) + 1
+        resolved.insert(insert_at, "safety_activities")
+    if (
+        {"gantt", "safety", "safety_activities"} & set(resolved)
+        and "safety_procedures" in AVAILABLE_MODULE_CLASSES
+        and "safety_procedures" not in resolved
+    ):
+        if "safety_activities" in resolved:
+            insert_at = resolved.index("safety_activities") + 1
+        elif "safety" in resolved:
+            insert_at = resolved.index("safety") + 1
+        else:
+            insert_at = resolved.index("gantt") + 1
+        resolved.insert(insert_at, "safety_procedures")
+    if "document_center" in resolved and "pdf_workspace" in AVAILABLE_MODULE_CLASSES and "pdf_workspace" not in resolved:
+        insert_at = resolved.index("document_center") + 1
+        resolved.insert(insert_at, "pdf_workspace")
+    if (
+        {"inventory", "rentals", "suppliers"} & set(resolved)
+        and "assets" in AVAILABLE_MODULE_CLASSES
+        and "assets" not in resolved
+    ):
+        if "inventory" in resolved:
+            insert_at = resolved.index("inventory") + 1
+        elif "rentals" in resolved:
+            insert_at = resolved.index("rentals")
+        else:
+            insert_at = resolved.index("suppliers")
+        resolved.insert(insert_at, "assets")
+    if (
+        {"inventory", "assets", "expenses"} & set(resolved)
+        and "suppliers" in AVAILABLE_MODULE_CLASSES
+        and "suppliers" not in resolved
+    ):
+        if "assets" in resolved:
+            insert_at = resolved.index("assets") + 1
+        elif "inventory" in resolved:
+            insert_at = resolved.index("inventory") + 1
+        else:
+            insert_at = resolved.index("expenses") + 1
+        resolved.insert(insert_at, "suppliers")
+    return resolved, unknown
 
 
 CONFIGURED_MODULES_TO_LOAD, UNKNOWN_MODULES = resolve_modules_to_load(settings.modules_to_load)
@@ -158,16 +230,25 @@ def get_default_demo_modules() -> List[str]:
     demo_modules = ['settings', 'users']
     module_access_map = {
         'crm': 'crm',
+        'gantt': 'crm',
         'reports': 'operations',
         'billing': 'finance',
+        'expenses': 'finance',
+        'planning': 'finance',
         'recruitment': 'recruitment',
         'hr': 'hr',
         'attendance': 'hr',
         'payroll': 'payroll',
+        'tasks': 'tasks',
+        'assets': 'assets',
         'inventory': 'inventory',
+        'suppliers': 'suppliers',
         'rentals': 'rentals',
         'safety': 'safety',
+        'safety_activities': 'safety',
+        'safety_procedures': 'safety',
         'document_center': 'document_center',
+        'pdf_workspace': 'document_center',
         'signature': 'signature',
         'mail': 'mail',
         'google_workspace': 'google_workspace',
@@ -182,7 +263,7 @@ def get_default_demo_modules() -> List[str]:
     if {'document_center', 'signature', 'reports'} & loaded_modules and 'operations' not in demo_modules:
         demo_modules.append('operations')
 
-    return demo_modules
+    return filter_mvp_modules(demo_modules)
 
 
 # ============================================================================
@@ -281,6 +362,7 @@ async def startup_seed():
 @asynccontextmanager
 async def app_lifespan(_: FastAPI):
     """Lifespan hook used instead of deprecated startup events."""
+    BaseModel.initialize_persistence()
     await startup_seed()
     init_db()
     setup_notification_listeners()
@@ -310,6 +392,8 @@ app.add_middleware(
 )
 
 # Frontend routes and static files (MUST be before catch-all)
+import mimetypes
+
 from fastapi.staticfiles import StaticFiles
 from frontend.routes import router as frontend_router
 app.include_router(frontend_router)
@@ -330,13 +414,11 @@ app.include_router(dashboard_router)
 app.include_router(vacancy_router)
 
 # Cross-Correspondence API routes (hiring workflow)
-app.include_router(hiring_router)
 
 # CRM API routes - Customer Documents
 app.include_router(customer_documents_router)
 
 # Signature API routes
-app.include_router(signature_router)
 
 # Notification API routes
 app.include_router(notification_router)
@@ -347,6 +429,7 @@ app.include_router(crew_router)
 app.include_router(check_router)
 
 import os as _os
+mimetypes.add_type("text/javascript", ".mjs")
 _static_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "frontend", "static")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
@@ -409,6 +492,18 @@ async def debug_users():
 # CONVERTIR FASTAPI REQUEST A REQUEST UNIVERSAL
 # ============================================================================
 
+def _resolve_fastapi_user(fastapi_request: FastAPIRequest):
+    auth_header = fastapi_request.headers.get('authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None
+
+    token = auth_header[7:]
+    from modules.base.module_base import User
+
+    users = User.search([('auth_token', '=', token)])
+    return users[0] if users else None
+
+
 async def convert_fastapi_request(fastapi_request: FastAPIRequest) -> Request:
     """
     Convertir FastAPI Request a nuestro Request universal.
@@ -435,17 +530,11 @@ async def convert_fastapi_request(fastapi_request: FastAPIRequest) -> Request:
     )
     
     # Obtener usuario del header Authorization (si existe token)
-    auth_header = fastapi_request.headers.get('authorization', '')
-    if auth_header.startswith('Bearer '):
-        token = auth_header[7:]
-        # Buscar usuario por token en el store en memoria
-        from modules.base.module_base import User
-        users = User.search([('auth_token', '=', token)])
-        if users:
-            user = users[0]
-            request.user_id = user.id
-            request.user_email = user.email
-            request.company_id = user.company_id
+    user = _resolve_fastapi_user(fastapi_request)
+    if user:
+        request.user_id = user.id
+        request.user_email = user.email
+        request.company_id = user.company_id
 
     return request
 
@@ -742,11 +831,12 @@ async def health():
         "modules_configured": ERP_CONFIG['modules_to_load'],
         "modules_loaded": modules_loaded,
         "storage_mode": FRAMEWORK_STORAGE_MODE,
-        "persistence_ready": False,
+        "persistence_ready": BaseModel.persistence_ready(),
         "database_configured_type": settings.database_type.value,
         "database_configured_host": settings.database_host if settings.database_type.value != "sqlite" else None,
-        "database_configured_name": settings.database_name if settings.database_type.value != "sqlite" else "db.sqlite3",
+        "database_configured_name": settings.database_name,
         "warnings": [FRAMEWORK_STORAGE_WARNING],
+        "database_file": BaseModel.persistence_database_path(),
     }
 
 
@@ -861,6 +951,17 @@ async def catch_all(fastapi_request: FastAPIRequest, path: str):
     correspondientes segun la ruta.
     """
     try:
+        disabled_module = get_mvp_disabled_api_module(path)
+        if disabled_module:
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "success": False,
+                    "errors": [MVP_V2_MESSAGE],
+                    "module": disabled_module,
+                },
+            )
+
         # Convertir a request universal
         request = await convert_fastapi_request(fastapi_request)
         request.path = f"/{path}"
@@ -912,7 +1013,7 @@ if __name__ == "__main__":
     
     # Iniciar servidor
     uvicorn.run(
-        "main:app",
+        app,
         host=settings.host,
         port=settings.port,
         reload=False,

@@ -47,7 +47,12 @@ function renderSafetyDossier() {
     setText('folder-breadcrumb', folder.project_code || 'Carpeta');
     setText('folder-project-badge', folder.project_code || 'PRJ');
     setText('folder-title', folder.lead_title || 'Carpeta de seguridad');
-    setText('folder-subtitle', [folder.customer_name, folder.client_site_name, folder.client_area_name, folder.service_profile_name, folder.service_type_name].filter(Boolean).join(' - ') || '-');
+    setText(
+        'folder-subtitle',
+        [folder.customer_name, folder.client_site_name, folder.client_area_name, folder.service_profile_name, folder.procedure_name || folder.procedure_code, folder.service_type_name]
+            .filter(Boolean)
+            .join(' - ') || '-'
+    );
 
     const traffic = document.getElementById('folder-traffic-chip');
     if (traffic) {
@@ -96,7 +101,9 @@ function renderConfigSection(folder, lookups) {
     if (profileSel) {
         const firstOption = profileSel.querySelector('option[value=""]');
         if (firstOption) firstOption.textContent = 'Sin perfil';
+        profileSel.onchange = () => fillProcedureSelect(lookups, Number(profileSel.value || 0), []);
     }
+    fillProcedureSelect(lookups, Number(folder.service_profile_id || 0), folder.procedure_ids || (folder.procedure_id ? [folder.procedure_id] : []));
     const dateInput = document.getElementById('cfg-planned-date');
     if (dateInput) dateInput.value = folder.planned_start_date || '';
     const statusSel = document.getElementById('cfg-status');
@@ -117,9 +124,23 @@ function renderConfigSection(folder, lookups) {
     );
     const siteSel = document.getElementById('cfg-client-site');
     if (siteSel) {
-        siteSel.onchange = () => fillAreaSelect(lookups, Number(siteSel.value || 0), null);
+        siteSel.onchange = () => fillAreaSelect(lookups, Number(siteSel.value || 0), []);
     }
-    fillAreaSelect(lookups, Number(folder.client_site_id || 0), folder.client_area_id);
+    fillAreaSelect(lookups, Number(folder.client_site_id || 0), folder.client_area_ids || (folder.client_area_id ? [folder.client_area_id] : []));
+    fillMultiSelect(
+        'cfg-job-profile-ids',
+        lookups.job_profiles || [],
+        folder.job_profile_ids || [],
+        (item) => item.id,
+        (item) => [item.code || 'Cargo', item.name, item.department_name].filter(Boolean).join(' - ')
+    );
+    fillMultiSelect(
+        'cfg-equipment-block-ids',
+        lookups.equipment_blocks || [],
+        folder.equipment_block_ids || [],
+        (item) => item.id,
+        (item) => [item.code || 'Equipo', item.name].filter(Boolean).join(' - ')
+    );
 
     const employeeSel = document.getElementById('cfg-assigned-employees');
     if (employeeSel) {
@@ -162,24 +183,43 @@ function renderConfigSection(folder, lookups) {
     }
 }
 
-function fillAreaSelect(lookups, siteId, selectedAreaId) {
-    fillSelect(
-        'cfg-client-area',
+function fillAreaSelect(lookups, siteId, selectedAreaIds) {
+    fillMultiSelect(
+        'cfg-client-area-ids',
         (lookups.client_areas || []).filter((area) => !siteId || Number(area.site_id) === Number(siteId)),
-        selectedAreaId,
+        selectedAreaIds || [],
         (item) => item.id,
-        (item) => item.name,
-        true,
-        'Sin area'
+        (item) => [item.site_name, item.name].filter(Boolean).join(' / ')
+    );
+}
+
+function fillProcedureSelect(lookups, profileId, selectedProcedureIds) {
+    const items = (lookups.procedures || []).filter((procedure) => {
+        if (!profileId) return true;
+        return !procedure.service_profile_id || Number(procedure.service_profile_id) === Number(profileId);
+    });
+    fillMultiSelect(
+        'cfg-procedure-ids',
+        items,
+        selectedProcedureIds || [],
+        (item) => item.id,
+        (item) => [item.procedure_code || 'PTS', item.name, item.service_profile_name].filter(Boolean).join(' - ')
     );
 }
 
 async function saveFolderConfig() {
     const folderId = window._SAFETY_FOLDER_ID;
+    const procedureIds = selectedValues('cfg-procedure-ids');
+    const areaIds = selectedValues('cfg-client-area-ids');
     const payload = {
         service_profile_id: emptyToNull(document.getElementById('cfg-profile')?.value),
+        procedure_id: emptyToNull(procedureIds[0]),
+        procedure_ids: procedureIds,
         client_site_id: emptyToNull(document.getElementById('cfg-client-site')?.value),
-        client_area_id: emptyToNull(document.getElementById('cfg-client-area')?.value),
+        client_area_id: emptyToNull(areaIds[0]),
+        client_area_ids: areaIds,
+        job_profile_ids: selectedValues('cfg-job-profile-ids'),
+        equipment_block_ids: selectedValues('cfg-equipment-block-ids'),
         planned_start_date: document.getElementById('cfg-planned-date')?.value || '',
         status: document.getElementById('cfg-status')?.value || 'draft',
         notes: document.getElementById('cfg-notes')?.value || '',
@@ -561,14 +601,14 @@ function renderMatrix() {
     const generationSummary = document.getElementById('matrix-generation-summary');
     if (generationSummary) {
         const meta = matrix.generation_summary || {};
-        const blockMeta = meta.matched_by_block || {};
+        const blockMeta = meta.source_counts || meta.matched_by_block || {};
         const blockText = Object.entries(blockMeta)
             .filter(([, value]) => Number(value) > 0)
             .map(([key, value]) => `${humanizeScope(key)}: ${value}`)
             .join(' - ');
         generationSummary.textContent = meta.row_count
-            ? `${meta.row_count} filas - ${meta.matched_rule_count || 0} reglas - ${blockText || 'sin bloques heredados'}`
-            : 'El generador MIPER combina bloques transversales, servicio y entorno del cliente.';
+            ? `${meta.row_count} filas - ${blockText || 'sin fuentes'}`
+            : 'El constructor MIPER combina procedimientos, cargos, sectores, equipos y reglas fallback.';
     }
     const finalNote = document.getElementById('matrix-final-note');
     if (finalNote) {
@@ -620,7 +660,7 @@ function renderMatrix() {
             </td>
             <td>
                 <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">${renderTagPills(row.protocol_codes || [], 'protocol')}</div>
-                <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.35rem;">${renderTagPills(row.origin_blocks || row.source_labels || [], 'origin')}</div>
+                <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.35rem;">${renderTagPills(row.source_labels || row.source_titles || row.origin_blocks || [], 'origin')}</div>
             </td>
             <td>
                 <div>${esc((row.restriction_alerts || []).join(' | ') || '-')}</div>
@@ -723,7 +763,7 @@ function getFilteredMatrixRows(rows) {
         const row = entry.row;
         if (level && String(row.risk_level || '') !== level) return false;
         if (source) {
-            const sources = [...(row.origin_blocks || []), ...(row.source_labels || [])].map((item) => String(item || '').toLowerCase());
+            const sources = [...(row.source_groups || []), ...(row.source_labels || []), ...(row.source_titles || []), ...(row.origin_blocks || [])].map((item) => String(item || '').toLowerCase());
             if (!sources.includes(source.toLowerCase())) return false;
         }
         if (alertsOnly && !(row.restriction_alerts || []).length) return false;
@@ -741,6 +781,8 @@ function getFilteredMatrixRows(rows) {
             row.master_risk_code,
             (row.protocol_codes || []).join(' '),
             (row.origin_blocks || []).join(' '),
+            (row.source_labels || []).join(' '),
+            (row.source_titles || []).join(' '),
             row.owner_name,
         ].join(' ').toLowerCase();
         return haystack.includes(search);
@@ -795,11 +837,11 @@ function renderMatrixMetrics(rows, filteredRows) {
 function renderMatrixBlockChips(summary) {
     const root = document.getElementById('matrix-block-chips');
     if (!root) return;
-    const blockMeta = summary.matched_by_block || {};
+    const blockMeta = summary.source_counts || summary.matched_by_block || {};
     const chips = Object.entries(blockMeta)
         .filter(([, value]) => Number(value) > 0)
         .map(([key, value]) => `<span class="mini-chip draft">${esc(humanizeScope(key))}: ${esc(String(value))}</span>`);
-    root.innerHTML = chips.length ? chips.join('') : '<span class="mini-chip draft">Sin bloques heredados activos</span>';
+    root.innerHTML = chips.length ? chips.join('') : '<span class="mini-chip draft">Sin fuentes activas</span>';
 }
 
 function updateMatrixSourceFilter(rows) {
@@ -808,7 +850,7 @@ function updateMatrixSourceFilter(rows) {
     const currentValue = select.value || '';
     const sources = new Set();
     (rows || []).forEach((row) => {
-        [...(row.origin_blocks || []), ...(row.source_labels || [])].forEach((item) => {
+        [...(row.source_groups || []), ...(row.source_labels || []), ...(row.source_titles || []), ...(row.origin_blocks || [])].forEach((item) => {
             const normalized = String(item || '').trim();
             if (normalized) sources.add(normalized);
         });
@@ -1274,6 +1316,18 @@ function fillSelect(id, items, selectedValue, getValue, getLabel, includeEmpty, 
     }
 }
 
+function fillMultiSelect(id, items, selectedValuesList, getValue, getLabel) {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const selected = new Set((selectedValuesList || []).map((value) => String(value)));
+    select.innerHTML = (items || [])
+        .map((item) => {
+            const value = String(getValue(item));
+            return `<option value="${esc(value)}" ${selected.has(value) ? 'selected' : ''}>${esc(getLabel(item))}</option>`;
+        })
+        .join('');
+}
+
 function statusChip(status) {
     const current = status || 'draft';
     return `<span class="mini-chip ${esc(current)}">${esc(current)}</span>`;
@@ -1290,6 +1344,12 @@ function humanizeScope(scope) {
         customer: 'Cliente',
         client_site: 'Instalacion',
         client_area: 'Area',
+        procedure: 'Procedimiento',
+        cargo_profile: 'Cargo',
+        shared_place: 'Sector',
+        equipment: 'Equipo',
+        fallback: 'Fallback',
+        manual: 'Manual',
     })[scope] || scope;
 }
 

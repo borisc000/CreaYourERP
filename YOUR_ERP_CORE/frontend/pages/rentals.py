@@ -17,7 +17,9 @@ def rentals_page():
             <button class="btn btn-secondary" onclick="openRentalAssetModal()">+ Activo</button>
             <button class="btn btn-primary" onclick="openRentalContractModal()">+ Expediente</button>
         </div>
-    </div>
+</div>
+
+    <div id="rentals-context-banner" class="card" style="display:none;padding:1rem 1.15rem;margin-bottom:1.25rem;"></div>
 
     <div class="cards-row" style="margin-bottom:1.5rem;">
         <div class="stat-card">

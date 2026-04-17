@@ -280,6 +280,7 @@ async function loadExistingQuote(quoteId) {
     } else {
         console.log('[QF] Status is', q.status, '→ form remains editable');
     }
+    syncAcceptButtonState();
 
     // ── Recalculate and update totals ──
     console.log('[QF] Calling recalculate() to update totals...');
@@ -298,6 +299,25 @@ function disableForm() {
     if (btnSend)  btnSend.style.display = 'none';
     document.querySelectorAll('.line-remove-btn').forEach(b => b.style.display = 'none');
     document.querySelectorAll('[onclick^="addLine"]').forEach(b => b.style.display = 'none');
+}
+
+function syncAcceptButtonState() {
+    const btnAccept = document.getElementById('btn-accept-quote');
+    if (!btnAccept) return;
+    const status = QF.quote?.status || 'draft';
+    if (status === 'sent') {
+        btnAccept.style.display = '';
+        btnAccept.disabled = false;
+        btnAccept.textContent = 'Aceptar y crear arriendo';
+        return;
+    }
+    if (status === 'accepted') {
+        btnAccept.style.display = '';
+        btnAccept.disabled = true;
+        btnAccept.textContent = 'Cotizacion aceptada';
+        return;
+    }
+    btnAccept.style.display = 'none';
 }
 
 // ── Build catalog data for Searchable Dropdown ───────────────────
@@ -570,6 +590,34 @@ async function saveQuote(action) {
     }
 }
 
+async function acceptQuote() {
+    if (!QF.quote?.id) {
+        showToast('Guarda la cotizacion antes de aceptarla.', 'error');
+        return;
+    }
+    if (!window.confirm('Aceptar esta cotizacion y crear el expediente en Arriendos?')) {
+        return;
+    }
+    const btnAccept = document.getElementById('btn-accept-quote');
+    if (btnAccept) {
+        btnAccept.disabled = true;
+        btnAccept.textContent = 'Aceptando...';
+    }
+    const res = await API.post('/quotes/' + QF.quote.id + '/accept', {});
+    if (res && res.success !== false) {
+        QF.quote = res.data || res;
+        syncAcceptButtonState();
+        showToast('Cotizacion aceptada. Expediente de arriendo creado.', 'success');
+        setTimeout(() => { window.location.href = '/app/rentals'; }, 700);
+        return;
+    }
+    if (btnAccept) {
+        btnAccept.disabled = false;
+        btnAccept.textContent = 'Aceptar y crear arriendo';
+    }
+    showToast((res?.errors || ['No se pudo aceptar la cotizacion']).join(', '), 'error');
+}
+
 function resetButtons() {
     const btnDraft = document.getElementById('btn-save-draft');
     const btnSend  = document.getElementById('btn-save-send');
@@ -733,4 +781,3 @@ async function applyTemplate(templateId) {
     recalculate();
     showToast(`Plantilla "${template.name}" carda con ${count} lineas`, 'success');
 }
-

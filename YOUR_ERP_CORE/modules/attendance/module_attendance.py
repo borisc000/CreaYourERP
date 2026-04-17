@@ -600,7 +600,7 @@ class AttendanceModule(BaseModule):
                 "user_id": item.user_id,
             }
             for item in employees
-            if item.status != "inactive"
+            if item.status == "active"
         ]
         return Response.ok({"results": sorted(results, key=lambda item: (item.get("full_name") or "").lower())})
 
@@ -701,6 +701,10 @@ class AttendanceModule(BaseModule):
         employee, employee_error = self._resolve_employee_for_request(data)
         if employee_error:
             return employee_error
+        if (employee.status or "") != "active":
+            return Response.bad_request(
+                f"Attendance can only be registered for active employees. Current status: {employee.status or 'Sin estado'}"
+            )
 
         policy = self._active_policy()
         timezone_name = _tz_name(data.get("timezone") or policy.timezone)

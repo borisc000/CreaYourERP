@@ -250,8 +250,24 @@ def accreditation_page():
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label>Dias de aviso</label><input id="acc-requirement-warning" type="number" min="0" step="1" value="30"></div>
+                    <div class="form-group"><label>Vigencia por defecto (dias)</label><input id="acc-requirement-validity-days" type="number" min="0" step="1" value="0"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Modo de cumplimiento</label>
+                        <select id="acc-requirement-fulfillment">
+                            <option value="upload_only">Solo carga de archivo</option>
+                            <option value="template_generated">Generado desde plantilla</option>
+                            <option value="hybrid">Carga o plantilla</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label><input id="acc-requirement-requires-signature" type="checkbox"> Requiere firma</label></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label><input id="acc-requirement-expiration-required" type="checkbox"> Vencimiento obligatorio</label></div>
                     <div class="form-group"><label>Orden</label><input id="acc-requirement-order" type="number" min="0" step="1" value="0"></div>
                 </div>
+                <div class="form-group"><label>Tipos de archivo permitidos</label><input id="acc-requirement-file-types" placeholder="pdf,jpg,png"></div>
                 <div class="form-group"><label>Descripcion</label><textarea id="acc-requirement-description"></textarea></div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-ghost" onclick="closeAccreditationModal('acc-requirement-modal')">Cancelar</button>
@@ -288,6 +304,11 @@ def accreditation_page():
                     <div class="form-group"><label>Numero / folio</label><input id="acc-document-number"></div>
                 </div>
                 <div class="form-group"><label>URL o ruta del documento</label><input id="acc-document-url" placeholder="https://... o /ruta/interna"></div>
+                <div class="form-group">
+                    <label>Archivo local</label>
+                    <input id="acc-document-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                    <div class="text-sm text-muted" id="acc-document-file-label" style="margin-top:0.35rem;">Opcional si ya tienes una URL externa.</div>
+                </div>
                 <div class="form-row">
                     <div class="form-group"><label>Emitido el</label><input id="acc-document-issued" type="date"></div>
                     <div class="form-group"><label>Vence el</label><input id="acc-document-expires" type="date"></div>
@@ -302,6 +323,24 @@ def accreditation_page():
                         </select>
                     </div>
                     <div class="form-group"><label>Origen</label><input id="acc-document-source" value="accreditation"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Origen documental</label>
+                        <select id="acc-document-origin">
+                            <option value="upload_only">Solo carga</option>
+                            <option value="template_generated">Generado desde plantilla</option>
+                            <option value="hybrid">Mixto</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado de firma</label>
+                        <select id="acc-document-signature-status">
+                            <option value="not_required">No requiere</option>
+                            <option value="pending">Pendiente firma</option>
+                            <option value="signed">Firmado</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group"><label>Notas</label><textarea id="acc-document-notes"></textarea></div>
                 <div class="modal-actions">

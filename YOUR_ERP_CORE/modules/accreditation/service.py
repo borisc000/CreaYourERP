@@ -58,10 +58,12 @@ class AccreditationService:
         ])
 
         # --- Level B: customer-specific + explicit requirement ids ---
-        level_b_reqs = AccreditationRequirement.search([
-            ("company_id", "=", company_id),
-            ("customer_id", "=", customer_id),
-        ])
+        level_b_reqs = []
+        if customer_id not in (None, ""):
+            level_b_reqs = AccreditationRequirement.search([
+                ("company_id", "=", company_id),
+                ("customer_id", "=", customer_id),
+            ])
 
         # Add any extra requirements from the service order
         extra_ids = service_order.required_requirement_ids or []

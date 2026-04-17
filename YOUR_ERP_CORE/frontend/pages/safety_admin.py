@@ -213,13 +213,15 @@ def safety_admin_page():
             <div class="card">
                 <h3 style="margin-top:0;">Catalogos disponibles</h3>
                 <div class="mini-grid">
-                    <div class="mini-stat"><span>Riesgos maestros</span><strong id="count-master-risks">0</strong></div>
-                    <div class="mini-stat"><span>Protocolos</span><strong id="count-protocols">0</strong></div>
-                    <div class="mini-stat"><span>Clientes</span><strong id="count-customers">0</strong></div>
-                    <div class="mini-stat"><span>Instalaciones</span><strong id="count-sites">0</strong></div>
-                    <div class="mini-stat"><span>Areas</span><strong id="count-areas">0</strong></div>
-                    <div class="mini-stat"><span>Perfiles</span><strong id="count-profiles">0</strong></div>
-                </div>
+                <div class="mini-stat"><span>Riesgos maestros</span><strong id="count-master-risks">0</strong></div>
+                <div class="mini-stat"><span>Protocolos</span><strong id="count-protocols">0</strong></div>
+                <div class="mini-stat"><span>EPP maestro</span><strong id="count-ppe">0</strong></div>
+                <div class="mini-stat"><span>Equipos prev.</span><strong id="count-equipment">0</strong></div>
+                <div class="mini-stat"><span>Clientes</span><strong id="count-customers">0</strong></div>
+                <div class="mini-stat"><span>Instalaciones</span><strong id="count-sites">0</strong></div>
+                <div class="mini-stat"><span>Areas</span><strong id="count-areas">0</strong></div>
+                <div class="mini-stat"><span>Perfiles</span><strong id="count-profiles">0</strong></div>
+            </div>
             </div>
 
             <div class="card" style="padding:0;overflow:hidden;">
@@ -261,6 +263,20 @@ def safety_admin_page():
             <div class="mini-table-card">
                 <div class="mini-table-title">Protocolos</div>
                 <div id="protocols-list" class="mini-list">Cargando...</div>
+            </div>
+            <div class="mini-table-card">
+                <div style="display:flex;justify-content:space-between;gap:0.75rem;align-items:center;margin-bottom:0.7rem;">
+                    <div class="mini-table-title" style="margin:0;">EPP maestro</div>
+                    <button class="btn btn-secondary btn-sm" onclick="openPPECatalogPrompt()">+ EPP</button>
+                </div>
+                <div id="ppe-list" class="mini-list">Cargando...</div>
+            </div>
+            <div class="mini-table-card">
+                <div style="display:flex;justify-content:space-between;gap:0.75rem;align-items:center;margin-bottom:0.7rem;">
+                    <div class="mini-table-title" style="margin:0;">Equipos / herramientas</div>
+                    <button class="btn btn-secondary btn-sm" onclick="openEquipmentBlockPrompt()">+ Equipo</button>
+                </div>
+                <div id="equipment-list" class="mini-list">Cargando...</div>
             </div>
             <div class="mini-table-card">
                 <div class="mini-table-title">Clientes</div>

@@ -6,6 +6,7 @@ const inventoryState = {
     categories: [],
     alerts: [],
     selectedItemId: null,
+    routeContext: {},
 };
 
 let inventorySignatureCanvas = null;
@@ -18,9 +19,22 @@ let inventoryEvidencePhotoData = '';
 document.addEventListener('DOMContentLoaded', async () => {
     if (!API.requireAuth()) return;
     highlightNav('/app/inventory');
+    inventoryState.routeContext = getInventoryRouteContext();
     setupInventorySignaturePad();
     await loadInventoryWorkspace();
 });
+
+function getInventoryRouteContext() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        supplierName: String(params.get('supplier_name') || params.get('supplier') || '').trim(),
+        supplierCode: String(params.get('supplier_code') || '').trim(),
+        itemId: Number(params.get('item_id') || 0) || null,
+        openNew: params.get('open_new') === '1',
+        modalOpened: false,
+        filterApplied: false,
+    };
+}
 
 function invEscape(value) {
     return String(value ?? '')
@@ -190,8 +204,11 @@ async function loadInventoryWorkspace() {
     inventoryState.movements = movementsRes?.data?.results || [];
     inventoryState.backups = backupsRes?.data?.results || [];
 
+    applyInventoryRouteContext();
+
     if (!inventoryState.selectedItemId || !inventoryState.items.some(item => item.id === inventoryState.selectedItemId)) {
-        inventoryState.selectedItemId = inventoryState.items[0]?.id || null;
+        const filteredItems = getFilteredInventoryItems();
+        inventoryState.selectedItemId = filteredItems[0]?.id || inventoryState.items[0]?.id || null;
     }
 
     renderInventoryDashboard();
@@ -202,6 +219,64 @@ async function loadInventoryWorkspace() {
     renderInventoryFocus();
     renderInventoryMovements();
     renderInventoryBackups();
+
+    if (inventoryState.routeContext?.openNew && !inventoryState.routeContext.modalOpened) {
+        inventoryState.routeContext.modalOpened = true;
+        openInventoryItemModal(null, inventoryState.routeContext.supplierName || inventoryState.routeContext.supplierCode || '');
+    }
+}
+
+function getInventorySearchTerms(searchValue) {
+    const search = String(searchValue || '').trim().toLowerCase();
+    if (!search) return [];
+    const aliases = [
+        inventoryState.routeContext?.supplierName,
+        inventoryState.routeContext?.supplierCode,
+    ].map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+    if (!aliases.length || !aliases.includes(search)) return [search];
+    return Array.from(new Set([search, ...aliases]));
+}
+
+function inventoryMatchesSearch(item, searchTerms) {
+    if (!searchTerms.length) return true;
+    const haystack = [
+        item.name || '',
+        item.code || '',
+        item.supplier || '',
+        item.location || '',
+    ].join(' ').toLowerCase();
+    return searchTerms.some(term => haystack.includes(term));
+}
+
+function applyInventoryRouteContext() {
+    const context = inventoryState.routeContext || {};
+    const searchInput = document.getElementById('inventory-search');
+    if (searchInput && !context.filterApplied) {
+        const preferredSearch = context.supplierName || context.supplierCode || '';
+        if (preferredSearch && !searchInput.value) {
+            searchInput.value = preferredSearch;
+        }
+        context.filterApplied = true;
+    }
+
+    if (context.itemId && inventoryState.items.some(item => item.id === context.itemId)) {
+        inventoryState.selectedItemId = context.itemId;
+        return;
+    }
+
+    const aliases = [context.supplierName, context.supplierCode]
+        .map(value => String(value || '').trim().toLowerCase())
+        .filter(Boolean);
+    if (!aliases.length) return;
+
+    const matchedItem = inventoryState.items.find(item => {
+        const supplierValue = String(item.supplier || '').trim().toLowerCase();
+        if (!supplierValue) return false;
+        return aliases.some(alias => supplierValue === alias || supplierValue.includes(alias) || alias.includes(supplierValue));
+    });
+    if (matchedItem) {
+        inventoryState.selectedItemId = matchedItem.id;
+    }
 }
 
 function renderInventoryDashboard() {
@@ -244,16 +319,13 @@ function renderInventoryCategories() {
 
 function getFilteredInventoryItems() {
     const search = (document.getElementById('inventory-search')?.value || '').trim().toLowerCase();
+    const searchTerms = getInventorySearchTerms(search);
     const stockFilter = document.getElementById('inventory-stock-filter')?.value || '';
     const categoryFilter = document.getElementById('inventory-category-filter')?.value || '';
     const sortBy = document.getElementById('inventory-sort')?.value || 'critical';
 
     const results = inventoryState.items.filter(item => {
-        const matchesSearch = !search
-            || (item.name || '').toLowerCase().includes(search)
-            || (item.code || '').toLowerCase().includes(search)
-            || (item.supplier || '').toLowerCase().includes(search)
-            || (item.location || '').toLowerCase().includes(search);
+        const matchesSearch = inventoryMatchesSearch(item, searchTerms);
         const matchesStock = !stockFilter || item.stock_status === stockFilter;
         const matchesCategory = !categoryFilter || item.category === categoryFilter;
         return matchesSearch && matchesStock && matchesCategory;
@@ -517,9 +589,13 @@ function closeInventoryModal(id) {
     document.getElementById(id)?.classList.remove('open');
 }
 
-function openInventoryItemModal(itemId = null) {
+function openInventoryItemModal(itemId = null, supplierPreset = '') {
     const isEdit = !!itemId;
     const item = inventoryState.items.find(row => row.id === itemId);
+    const routeSupplier = supplierPreset
+        || inventoryState.routeContext?.supplierName
+        || inventoryState.routeContext?.supplierCode
+        || '';
     document.getElementById('inventory-item-modal-title').textContent = isEdit ? 'Editar insumo' : 'Nuevo insumo';
     document.getElementById('inventory-item-id').value = item?.id || '';
     document.getElementById('inventory-item-code').value = item?.code || '';
@@ -527,7 +603,7 @@ function openInventoryItemModal(itemId = null) {
     document.getElementById('inventory-item-category').value = item?.category || '';
     document.getElementById('inventory-item-unit').value = item?.unit || 'un';
     document.getElementById('inventory-item-location').value = item?.location || '';
-    document.getElementById('inventory-item-supplier').value = item?.supplier || '';
+    document.getElementById('inventory-item-supplier').value = item?.supplier || routeSupplier;
     document.getElementById('inventory-item-minimum-stock').value = item?.minimum_stock || 0;
     document.getElementById('inventory-item-average-cost').value = item?.average_cost || 0;
     document.getElementById('inventory-item-status').value = item?.status || 'active';

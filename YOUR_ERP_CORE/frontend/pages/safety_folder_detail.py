@@ -103,21 +103,16 @@ def safety_folder_detail_page(folder_id: str):
                 <select id="cfg-profile"></select>
             </div>
             <div class="form-group">
+                <label>Procedimientos PTS</label>
+                <select id="cfg-procedure-ids" multiple size="7"></select>
+                <span class="field-hint">Puedes seleccionar varios procedimientos. La matriz respeta este orden como primera fuente.</span>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
                 <label>Fecha objetivo de arranque</label>
                 <input type="date" id="cfg-planned-date">
             </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Instalacion del cliente</label>
-                <select id="cfg-client-site"></select>
-            </div>
-            <div class="form-group">
-                <label>Area / sector</label>
-                <select id="cfg-client-area"></select>
-            </div>
-        </div>
-        <div class="form-row">
             <div class="form-group">
                 <label>Estado</label>
                 <select id="cfg-status">
@@ -127,6 +122,31 @@ def safety_folder_detail_page(folder_id: str):
                     <option value="closed">Closed</option>
                 </select>
             </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Instalacion del cliente</label>
+                <select id="cfg-client-site"></select>
+            </div>
+            <div class="form-group">
+                <label>Areas / sectores</label>
+                <select id="cfg-client-area-ids" multiple size="7"></select>
+                <span class="field-hint">Sectores y areas aportan riesgos especificos del cliente/faena.</span>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Cargos / perfiles</label>
+                <select id="cfg-job-profile-ids" multiple size="7"></select>
+                <span class="field-hint">Los cargos aportan actividades y riesgos desde Perfiles de Cargo.</span>
+            </div>
+            <div class="form-group">
+                <label>Equipos / herramientas</label>
+                <select id="cfg-equipment-block-ids" multiple size="7"></select>
+                <span class="field-hint">Equipos preventivos agregan riesgos, controles, EPP y protocolos.</span>
+            </div>
+        </div>
+        <div class="form-row">
             <div class="form-group">
                 <label>Personal asignado</label>
                 <select id="cfg-assigned-employees" multiple size="6"></select>

@@ -1470,6 +1470,10 @@ class PayrollModule(BaseModule):
         employee = EmployeeProfile.find_by_id(profile.employee_id)
         if not employee:
             raise ValidationError("Employee linked to payroll profile no longer exists")
+        if (employee.status or "") == "inactive":
+            raise ValidationError(
+                f"Employee {employee.full_name} is inactive/terminated and cannot be included in payroll calculation"
+            )
 
         contract = self._active_contract_for_period(profile.employee_id, period, preferred_contract_id=profile.contract_id)
         if not contract:

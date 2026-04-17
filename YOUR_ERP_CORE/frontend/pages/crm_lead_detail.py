@@ -8,7 +8,7 @@ def crm_lead_detail_page(lead_id: str):
 <!-- ═══ BREADCRUMB + ACTIONS ══════════════════════════════════ -->
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
     <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;color:#64748b;">
-        <a href="/app/crm" style="color:#64748b;text-decoration:none;">&#8592; Pipeline</a>
+        <a href="/app/crm" style="color:#64748b;text-decoration:none;">&#8592; Servicios</a>
         <span>/</span>
         <span id="breadcrumb-title" style="color:#94a3b8;">Cargando&hellip;</span>
     </div>
@@ -139,11 +139,20 @@ def crm_lead_detail_page(lead_id: str):
             <button class="ld360-tab" data-tab="adj" onclick="switchTab('adj')">
                 &#128203; Adjudicaci&oacute;n <span id="tab-badge-adj" class="tab-badge" style="display:none;"></span>
             </button>
+            <button class="ld360-tab" data-tab="preop" onclick="switchTab('preop')">
+                &#128198; Gantt Preoperacional <span id="tab-badge-preop" class="tab-badge" style="display:none;"></span>
+            </button>
             <button class="ld360-tab" data-tab="eje" onclick="switchTab('eje')">
                 &#128736; Ejecuci&oacute;n <span id="tab-badge-eje" class="tab-badge" style="display:none;"></span>
             </button>
             <button class="ld360-tab" data-tab="fin" onclick="switchTab('fin')">
                 &#128200; Finanzas <span id="tab-badge-fin" class="tab-badge" style="display:none;"></span>
+            </button>
+            <button class="ld360-tab" data-tab="egresos" onclick="switchTab('egresos')">
+                &#128176; Egresos <span id="tab-badge-egresos" class="tab-badge" style="display:none;"></span>
+            </button>
+            <button class="ld360-tab" data-tab="arriendos" onclick="switchTab('arriendos')">
+                &#128666; Arriendos <span id="tab-badge-arriendos" class="tab-badge" style="display:none;"></span>
             </button>
             <button class="ld360-tab" data-tab="docs" onclick="switchTab('docs')">
                 &#128194; Documentos <span id="tab-badge-docs" class="tab-badge" style="display:none;"></span>
@@ -190,11 +199,17 @@ def crm_lead_detail_page(lead_id: str):
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
                     <div class="ld360-info-box">
                         <span class="ld360-info-label">N&deg; Orden de Compra (OC)</span>
-                        <span id="adj-po-number" class="ld360-info-value mono">—</span>
+                        <input type="text" id="adj-po-input" placeholder="Ej: OC-45678" autocomplete="off"
+                               style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-family:monospace;font-size:0.85rem;">
                     </div>
                     <div class="ld360-info-box">
                         <span class="ld360-info-label">Asesor Asignado</span>
                         <span id="adj-assigned" class="ld360-info-value">—</span>
+                    </div>
+                    <div style="grid-column:span 2;display:flex;justify-content:flex-end;padding-top:0.2rem;">
+                        <button class="btn btn-primary btn-sm" onclick="saveAdjudicationFields()">
+                            &#128190; Guardar adjudicaci&oacute;n
+                        </button>
                     </div>
                 </div>
             </div>
@@ -212,6 +227,101 @@ def crm_lead_detail_page(lead_id: str):
                 <div id="adj-docs-list" style="display:flex;flex-direction:column;gap:0.5rem;">
                     <div class="text-muted text-sm" style="text-align:center;padding:1rem;">Cargando&hellip;</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- TAB: GANTT PREOPERACIONAL -->
+        <div class="card ld360-tab-panel" id="panel-preop" style="display:none;border-radius:0 12px 12px 12px;padding:0;overflow:hidden;">
+            <div class="preop-gantt-shell">
+                <section class="preop-gantt-hero">
+                    <div class="preop-gantt-hero-copy">
+                        <div class="preop-gantt-kicker">Plan operacional previo</div>
+                        <h3 id="preop-plan-title">Gantt preoperacional</h3>
+                        <p id="preop-plan-subtitle">
+                            Convierte procedimientos y bloques de actividad en un cronograma visual con fechas reales,
+                            duraciones por dia y preparativos antes de ejecuci&oacute;n.
+                        </p>
+                    </div>
+                    <div class="preop-gantt-controls">
+                        <div class="preop-control-grid">
+                            <div class="preop-control-field">
+                                <label>Procedimiento base</label>
+                                <select id="preop-procedure-select"></select>
+                            </div>
+                            <div class="preop-control-field">
+                                <label>Fecha inicio plan</label>
+                                <input type="date" id="preop-plan-start">
+                            </div>
+                        </div>
+                        <div class="preop-control-actions">
+                            <button class="btn btn-ghost btn-sm" id="preop-download-btn" onclick="downloadPreopGanttPdf()">
+                                &#8681; Descargar PDF ejecutivo
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="savePreopPlanSettings()">Guardar fecha</button>
+                            <button class="btn btn-primary btn-sm" onclick="importPreopProcedure()">Importar desde PTS</button>
+                        </div>
+                        <div class="preop-export-note">
+                            Formato ejecutivo adaptativo a hoja A4/A3, con compactacion inteligente por rango operativo y volumen de actividades.
+                        </div>
+                    </div>
+                </section>
+
+                <section class="preop-stat-strip">
+                    <article class="preop-stat-card">
+                        <span>Rango real</span>
+                        <strong id="preop-stat-range">--</strong>
+                    </article>
+                    <article class="preop-stat-card">
+                        <span>Avance promedio</span>
+                        <strong id="preop-stat-progress">0%</strong>
+                    </article>
+                    <article class="preop-stat-card">
+                        <span>Actividades</span>
+                        <strong id="preop-stat-tasks">0</strong>
+                    </article>
+                    <article class="preop-stat-card">
+                        <span>Bloqueadas</span>
+                        <strong id="preop-stat-blocked">0</strong>
+                    </article>
+                </section>
+
+                <div class="preop-timeline-layout">
+                    <section class="preop-gantt-card">
+                        <div class="preop-section-head">
+                            <div>
+                                <h3>Mes del plan</h3>
+                                <p id="preop-month-label">--</p>
+                            </div>
+                        </div>
+                        <div id="preop-month-chart" class="preop-gantt-chart">
+                            <div class="preop-empty">Cargando carta Gantt mensual...</div>
+                        </div>
+                    </section>
+                    <section class="preop-gantt-card">
+                        <div class="preop-section-head">
+                            <div>
+                                <h3>Semana operativa</h3>
+                                <p id="preop-week-label">--</p>
+                            </div>
+                        </div>
+                        <div id="preop-week-chart" class="preop-gantt-chart">
+                            <div class="preop-empty">Cargando carta Gantt semanal...</div>
+                        </div>
+                    </section>
+                </div>
+
+                <section class="preop-gantt-card">
+                    <div class="preop-section-head">
+                        <div>
+                            <h3>Lista editable de actividades y bloques</h3>
+                            <p>Agrega, quita y ajusta cada actividad por fecha inicio, duraci&oacute;n y estado.</p>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="openPreopTaskModal()">+ Agregar actividad</button>
+                    </div>
+                    <div id="preop-task-list" class="preop-task-list">
+                        <div class="preop-empty">Cargando actividades...</div>
+                    </div>
+                </section>
             </div>
         </div>
 
@@ -314,43 +424,71 @@ def crm_lead_detail_page(lead_id: str):
                                     &#9989; Aprobar Despliegue
                                 </button>
                                 <div id="step1-warning" style="margin-top:0.6rem;font-size:0.75rem;color:#f59e0b;text-align:center;display:none;">
-                                    &#9888; Asigna y acredita trabajadores para continuar
+                                    &#9888; Validando estado operativo de la cuadrilla...
                                 </div>
                             </div>
 
                             <!-- Modal: Selección de Empleados -->
-                            <div class="modal fade" id="workerSelectorModal" tabindex="-1">
-                                <div class="modal-dialog modal-lg">
-                                    <div class="modal-content" style="background:#1a1f2e; color:#e0e0e0;">
-                                        <div class="modal-header border-secondary">
-                                            <h5 class="modal-title">Seleccionar Trabajadores</h5>
-                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            <div class="modal-overlay" id="workerSelectorModal" onclick="closeWorkerSelectorBackdrop(event)">
+                                <div class="modal" style="max-width:min(980px,96vw);width:min(980px,96vw);">
+                                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;margin-bottom:1rem;">
+                                        <div>
+                                            <div class="workspace-kicker">Cuadrilla de despliegue</div>
+                                            <h2 style="margin:.35rem 0 0;font-size:1.45rem;">Agregar trabajadores a la oportunidad</h2>
+                                            <p class="text-sm text-muted" style="margin:.45rem 0 0;">Filtra trabajadores activos, asigna un rol operativo y confirma la seleccion para recalcular la acreditacion.</p>
                                         </div>
-                                        <div class="modal-body">
-                                            <div class="mb-3">
-                                                <input type="text" class="form-control form-control-sm"
-                                                       id="worker-search" placeholder="Buscar por nombre, cédula..."
-                                                       oninput="filterWorkers(this.value)">
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label small">Rol:</label>
-                                                <select class="form-select form-select-sm" id="worker-role-select" style="width:auto">
-                                                    <option value="operador">Operador</option>
-                                                    <option value="supervisor">Supervisor</option>
-                                                    <option value="ayudante">Ayudante</option>
-                                                </select>
-                                            </div>
-                                            <div id="worker-selector-list" class="employee-selector" style="max-height:350px; overflow-y:auto">
-                                                <div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i></div>
-                                            </div>
+                                        <button type="button" class="btn btn-ghost btn-sm" onclick="closeWorkerSelectorModal()">Cerrar</button>
+                                    </div>
+                                    <div style="display:grid;grid-template-columns:minmax(280px,1fr) 220px;gap:.85rem;align-items:end;margin-bottom:1rem;">
+                                        <div class="form-group" style="margin:0;">
+                                            <label>Buscar trabajador</label>
+                                            <input type="text"
+                                                   id="worker-search"
+                                                   placeholder="Buscar por nombre, RUT, codigo o correo..."
+                                                   oninput="filterWorkers(this.value)">
                                         </div>
-                                        <div class="modal-footer border-secondary">
-                                            <span id="selected-count-badge" class="text-muted small me-auto">0 seleccionados</span>
-                                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-                                            <button type="button" class="btn btn-primary btn-sm" onclick="addSelectedWorkers(window._LEAD_ID)">
-                                                Agregar a Cuadrilla
+                                        <div class="form-group" style="margin:0;">
+                                            <label>Rol en cuadrilla</label>
+                                            <select id="worker-role-select">
+                                                <option value="operador">Operador</option>
+                                                <option value="supervisor">Supervisor</option>
+                                                <option value="ayudante">Ayudante</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div id="worker-selector-list" class="worker-selector-grid" style="max-height:420px;overflow-y:auto;">
+                                        <div class="empty">Cargando trabajadores activos...</div>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;margin-top:1rem;padding-top:1rem;border-top:1px solid #334155;">
+                                        <span id="selected-count-badge" class="text-muted text-sm">0 seleccionados</span>
+                                        <div style="display:flex;gap:.7rem;flex-wrap:wrap;">
+                                            <button type="button" class="btn btn-ghost" onclick="closeWorkerSelectorModal()">Cancelar</button>
+                                            <button type="button" class="btn btn-primary" onclick="addSelectedWorkers(window._LEAD_ID)">
+                                                Agregar a cuadrilla
                                             </button>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal-overlay" id="step1ApprovalModal" onclick="closeStep1ApprovalModalBackdrop(event)">
+                                <div class="modal" style="max-width:min(640px,92vw);width:min(640px,92vw);">
+                                    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;margin-bottom:1rem;">
+                                        <div>
+                                            <div class="workspace-kicker">Continuidad operativa</div>
+                                            <h2 style="margin:.35rem 0 0;font-size:1.35rem;">Continuar con advertencias</h2>
+                                            <p id="step1-approval-modal-copy" class="text-sm text-muted" style="margin:.45rem 0 0;">
+                                                Se detectaron observaciones en la cuadrilla. Puedes continuar si confirmas esta decisión.
+                                            </p>
+                                        </div>
+                                        <button type="button" class="btn btn-ghost btn-sm" onclick="closeStep1ApprovalModal()">Cerrar</button>
+                                    </div>
+                                    <div id="step1-approval-modal-reasons"
+                                         style="display:grid;gap:.6rem;margin-bottom:1rem;padding:1rem;border:1px solid rgba(245,158,11,.28);border-radius:16px;background:rgba(245,158,11,.08);color:#f8fafc;">
+                                    </div>
+                                    <div style="display:flex;justify-content:flex-end;gap:.7rem;flex-wrap:wrap;">
+                                        <button type="button" class="btn btn-ghost" onclick="closeStep1ApprovalModal()">Cancelar</button>
+                                        <button type="button" class="btn btn-primary" onclick="confirmStep1ApprovalWarning()">Confirmar continuidad</button>
                                     </div>
                                 </div>
                             </div>
@@ -496,7 +634,7 @@ def crm_lead_detail_page(lead_id: str):
                 <h3 style="margin:0 0 0.75rem;font-size:0.82rem;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;">
                     &#128200; Datos Financieros y Cobranza
                 </h3>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.75rem;">
                     <div>
                         <label style="font-size:0.75rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:0.35rem;">
                             N&deg; HES (Hoja de Entrada)
@@ -506,12 +644,19 @@ def crm_lead_detail_page(lead_id: str):
                     </div>
                     <div>
                         <label style="font-size:0.75rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:0.35rem;">
+                            N&deg; Informe / Reporte
+                        </label>
+                        <input type="text" id="fin-report-input" placeholder="Ej: RPT-00001" autocomplete="off"
+                               style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-family:monospace;font-size:0.85rem;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:0.35rem;">
                             N&deg; Factura
                         </label>
                         <input type="text" id="fin-invoice-input" placeholder="Ej: F-9999" autocomplete="off"
                                style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-family:monospace;font-size:0.85rem;">
                     </div>
-                    <div style="grid-column:span 2;display:flex;align-items:center;gap:0.75rem;padding-top:0.25rem;">
+                    <div style="grid-column:span 3;display:flex;align-items:center;gap:0.75rem;padding-top:0.25rem;">
                         <label class="switch" style="flex-shrink:0;">
                             <input type="checkbox" id="fin-paid-input">
                             <span class="slider"></span>
@@ -520,7 +665,7 @@ def crm_lead_detail_page(lead_id: str):
                             <span id="fin-paid-label" style="font-weight:600;color:#f59e0b;">Pendiente</span>
                         </span>
                     </div>
-                    <div style="grid-column:span 2;display:flex;justify-content:flex-end;padding-top:0.25rem;">
+                    <div style="grid-column:span 3;display:flex;justify-content:flex-end;padding-top:0.25rem;">
                         <button class="btn btn-primary btn-sm" onclick="saveFinancialFields()">
                             &#128190; Guardar Datos Financieros
                         </button>
@@ -545,6 +690,92 @@ def crm_lead_detail_page(lead_id: str):
         </div>
 
         <!-- ══ TAB: DOCUMENTOS BASE ════════════════════════════════ -->
+        <div class="card ld360-tab-panel" id="panel-egresos" style="display:none;border-radius:0 12px 12px 12px;padding:0;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:1rem 1.25rem;border-bottom:1px solid #1e293b;background:#0f172a;flex-wrap:wrap;gap:0.8rem;">
+                <div>
+                    <h3 style="margin:0;font-size:0.82rem;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;">
+                        &#128176; Carpeta de Egresos de la Oportunidad
+                    </h3>
+                    <div id="egresos-summary-text" style="margin-top:0.4rem;font-size:0.8rem;color:#94a3b8;">
+                        Cargando presupuesto de egresos...
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.55rem;flex-wrap:wrap;">
+                    <a class="btn btn-secondary btn-sm" id="btn-open-expenses-folder" href="/app/expenses">
+                        Abrir modulo de egresos
+                    </a>
+                    <button class="btn btn-primary btn-sm" onclick="openLeadExpenseFolder()">
+                        &#43; Nuevo egreso vinculado
+                    </button>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px,1fr));gap:0.75rem;padding:1rem 1.25rem;border-bottom:1px solid #1e293b;">
+                <div class="ld360-info-box">
+                    <span class="ld360-info-label">Egresos registrados</span>
+                    <span id="egresos-total-amount" class="ld360-info-value mono">$0</span>
+                </div>
+                <div class="ld360-info-box">
+                    <span class="ld360-info-label">Margen vs esperado</span>
+                    <span id="egresos-margin-expected" class="ld360-info-value mono">$0</span>
+                </div>
+                <div class="ld360-info-box">
+                    <span class="ld360-info-label">Pendientes respaldo</span>
+                    <span id="egresos-pending-support" class="ld360-info-value mono">0</span>
+                </div>
+                <div class="ld360-info-box">
+                    <span class="ld360-info-label">Conciliados / respaldados</span>
+                    <span id="egresos-supported-count" class="ld360-info-value mono">0</span>
+                </div>
+            </div>
+
+            <div id="egresos-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.85rem;padding:1rem 1.25rem;">
+                <div class="text-muted text-sm" style="text-align:center;padding:1rem;">Cargando egresos...</div>
+            </div>
+        </div>
+
+        <div class="card ld360-tab-panel" id="panel-arriendos" style="display:none;border-radius:0 12px 12px 12px;padding:0;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:1rem 1.25rem;border-bottom:1px solid #1e293b;background:#0f172a;flex-wrap:wrap;gap:0.8rem;">
+                <div>
+                    <h3 style="margin:0;font-size:0.82rem;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;">
+                        &#128666; Expedientes de Arriendos vinculados
+                    </h3>
+                    <div id="arriendos-summary-text" style="margin-top:0.4rem;font-size:0.8rem;color:#94a3b8;">
+                        Cargando arriendos...
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.55rem;flex-wrap:wrap;">
+                    <a id="btn-open-rentals-folder" href="/app/rentals" class="btn btn-secondary btn-sm">
+                        Abrir Arriendos
+                    </a>
+                    <button class="btn btn-primary btn-sm" onclick="openLeadRentalsFolder()">
+                        &#43; Nuevo arriendo vinculado
+                    </button>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0.75rem;padding:1rem 1.25rem 0;">
+                <div class="ld360-info-box">
+                    <span class="ld360-info-label">Contratos</span>
+                    <span id="arriendos-total-count" class="ld360-info-value">0</span>
+                </div>
+                <div class="ld360-info-box">
+                    <span class="ld360-info-label">Activos / retorno</span>
+                    <span id="arriendos-active-count" class="ld360-info-value">0</span>
+                </div>
+                <div class="ld360-info-box">
+                    <span class="ld360-info-label">Valor comercial</span>
+                    <span id="arriendos-total-value" class="ld360-info-value mono">$0</span>
+                </div>
+            </div>
+
+            <div id="arriendos-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.85rem;padding:1rem 1.25rem 1.25rem;">
+                <div class="text-muted text-sm" style="text-align:center;padding:1rem;grid-column:1/-1;">Cargando...</div>
+            </div>
+        </div>
+
         <div class="card ld360-tab-panel" id="panel-docs" style="display:none;border-radius:0 12px 12px 12px;padding:1.25rem;">
 
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
@@ -665,6 +896,65 @@ def crm_lead_detail_page(lead_id: str):
     </div>
 </div>
 
+<!-- MODAL: ACTIVIDAD GANTT PREOPERACIONAL -->
+<div id="preop-task-modal" class="modal-backdrop" style="display:none;" onclick="closePreopTaskModalBackdrop(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3 id="preop-task-modal-title">Nueva actividad Gantt</h3>
+            <button class="modal-close" onclick="closePreopTaskModal()">&#10005;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="preop-task-id">
+            <div class="form-row">
+                <div class="form-group" style="flex:1.2;">
+                    <label>Bloque de actividad</label>
+                    <select id="preop-task-block"></select>
+                </div>
+                <div class="form-group" style="flex:0.8;">
+                    <label>Fase</label>
+                    <select id="preop-task-phase"></select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Nombre actividad *</label>
+                <input type="text" id="preop-task-name" placeholder="Preparacion documental, traslado, montaje, inspeccion..." autocomplete="off">
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Responsable</label>
+                    <input type="text" id="preop-task-owner" placeholder="Supervisor, APR, administrador...">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Estado</label>
+                    <select id="preop-task-status"></select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Inicio real planificado</label>
+                    <input type="date" id="preop-task-start">
+                </div>
+                <div class="form-group" style="flex:0.7;">
+                    <label>Dias</label>
+                    <input type="number" id="preop-task-duration" min="1" max="365" value="1">
+                </div>
+                <div class="form-group" style="flex:0.8;">
+                    <label>Avance %</label>
+                    <input type="number" id="preop-task-progress" min="0" max="100" value="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Notas / alcance</label>
+                <textarea id="preop-task-description" rows="3" placeholder="Alcance, restricciones, coordinaciones previas, entregables..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closePreopTaskModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="savePreopTask()">Guardar actividad</button>
+        </div>
+    </div>
+</div>
+
 <!-- ═══ MODAL: NUEVO REPORTE DE TERRENO ════════════════════ -->
 <div id="modal-nuevo-reporte" class="modal-backdrop" style="display:none;" onclick="closeNuevoReporteModalBackdrop(event)">
     <div class="modal-box" style="max-width:560px;width:100%;" onclick="event.stopPropagation()">
@@ -679,44 +969,44 @@ def crm_lead_detail_page(lead_id: str):
                 <input type="text" id="nr-servicio" placeholder="Ej: MONTAJE ANDAMIOS TIPO MULTIDIRECCIONAL" autocomplete="off"
                        style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
             </div>
+            <div class="form-group" style="margin-top:0.75rem;">
+                <label>Empresa / Faena</label>
+                <input type="text" id="nr-empresa" placeholder="Ej: Planta Polpaico" autocomplete="off"
+                       style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
+            </div>
             <!-- Personal (grid 2 cols) — selectores -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem;">
                 <div class="form-group">
                     <label>APR (Prevencionista)</label>
-                    <select id="nr-apr"
-                            style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
-                        <option value="">Cargando&hellip;</option>
-                    </select>
+                    <input type="text" id="nr-apr" list="nr-apr-options" placeholder="Selecciona o escribe un APR"
+                           style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
+                    <datalist id="nr-apr-options"></datalist>
                 </div>
                 <div class="form-group">
                     <label>Supervisor</label>
-                    <select id="nr-supervisor"
-                            style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
-                        <option value="">Cargando&hellip;</option>
-                    </select>
+                    <input type="text" id="nr-supervisor" list="nr-supervisor-options" placeholder="Selecciona o escribe un supervisor"
+                           style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
+                    <datalist id="nr-supervisor-options"></datalist>
                 </div>
                 <div class="form-group">
                     <label>ADM Contrato</label>
-                    <select id="nr-adm"
-                            style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
-                        <option value="">Cargando&hellip;</option>
-                    </select>
+                    <input type="text" id="nr-adm" list="nr-adm-options" placeholder="Selecciona o escribe un administrador"
+                           style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
+                    <datalist id="nr-adm-options"></datalist>
                 </div>
                 <div class="form-group">
                     <label>Mandante</label>
-                    <select id="nr-mandante"
-                            style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
-                        <option value="">-- Sin mandante --</option>
-                    </select>
+                    <input type="text" id="nr-mandante" list="nr-mandante-options" placeholder="Selecciona o escribe un mandante"
+                           style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
+                    <datalist id="nr-mandante-options"></datalist>
                 </div>
             </div>
             <!-- Tipo de Servicio -->
             <div class="form-group" style="margin-top:0.75rem;">
                 <label>Tipo de Servicio</label>
-                <select id="nr-tiposervicio"
-                        style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
-                    <option value="">-- Sin tipo de servicio --</option>
-                </select>
+                <input type="text" id="nr-tiposervicio" list="nr-tiposervicio-options" placeholder="Selecciona o escribe un tipo de servicio"
+                       style="width:100%;padding:0.6rem 0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.9rem;">
+                <datalist id="nr-tiposervicio-options"></datalist>
             </div>
             <!-- Cascading Dropdowns -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem;">
@@ -1253,6 +1543,822 @@ def crm_lead_detail_page(lead_id: str):
     padding: 0.65rem 1rem;
     font-size: 0.83rem;
     font-weight: 600;
+}}
+
+/* Gantt preoperacional */
+.preop-gantt-shell {{
+    padding: 1.25rem;
+    background:
+        radial-gradient(circle at top right, rgba(37,99,235,0.16), transparent 30%),
+        linear-gradient(180deg, rgba(15,23,42,0.98), rgba(2,6,23,0.92));
+}}
+.preop-gantt-hero {{
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(330px, 0.9fr);
+    gap: 1rem;
+    padding: 1.15rem;
+    border-radius: 20px;
+    border: 1px solid rgba(59,130,246,0.22);
+    background: linear-gradient(135deg, rgba(15,23,42,0.94), rgba(30,41,59,0.82));
+}}
+.preop-gantt-kicker {{
+    display: inline-flex;
+    padding: 0.28rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid rgba(96,165,250,0.2);
+    color: #bfdbfe;
+    background: rgba(37,99,235,0.14);
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}}
+.preop-gantt-hero-copy h3 {{
+    margin: 0.8rem 0 0;
+    color: #f8fafc;
+    font-size: 1.35rem;
+}}
+.preop-gantt-hero-copy p {{
+    margin: 0.7rem 0 0;
+    color: #94a3b8;
+    font-size: 0.86rem;
+    line-height: 1.7;
+}}
+.preop-gantt-controls {{
+    border-radius: 18px;
+    border: 1px solid rgba(51,65,85,0.85);
+    background: rgba(15,23,42,0.9);
+    padding: 1rem;
+}}
+.preop-control-grid {{
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(140px, 0.8fr);
+    gap: 0.75rem;
+}}
+.preop-control-field label {{
+    display: block;
+    margin-bottom: 0.4rem;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}}
+.preop-control-field select,
+.preop-control-field input,
+#preop-task-modal select,
+#preop-task-modal input,
+#preop-task-modal textarea {{
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 12px;
+    border: 1px solid #334155;
+    background: #020617;
+    color: #e5e7eb;
+    padding: 0.72rem 0.85rem;
+    font-size: 0.85rem;
+    font-family: inherit;
+}}
+.preop-control-actions {{
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-top: 0.85rem;
+    flex-wrap: wrap;
+}}
+.preop-control-actions .btn[disabled] {{
+    opacity: 0.58;
+    cursor: wait;
+}}
+.preop-export-note {{
+    margin-top: 0.7rem;
+    color: #94a3b8;
+    font-size: 0.74rem;
+    line-height: 1.5;
+    text-align: right;
+}}
+.preop-stat-strip {{
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin: 1rem 0;
+}}
+.preop-stat-card {{
+    padding: 0.95rem 1rem;
+    border-radius: 18px;
+    border: 1px solid rgba(51,65,85,0.85);
+    background: linear-gradient(180deg, rgba(15,23,42,0.9), rgba(15,23,42,0.72));
+}}
+.preop-stat-card span {{
+    display: block;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}}
+.preop-stat-card strong {{
+    display: block;
+    margin-top: 0.45rem;
+    color: #f8fafc;
+    font-size: 1.15rem;
+}}
+.preop-timeline-layout {{
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.9fr);
+    gap: 1rem;
+    align-items: start;
+}}
+.preop-gantt-card {{
+    border-radius: 20px;
+    border: 1px solid rgba(51,65,85,0.85);
+    background: rgba(15,23,42,0.82);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}}
+.preop-section-head {{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.85rem;
+    margin-bottom: 0.9rem;
+}}
+.preop-section-head h3 {{
+    margin: 0;
+    font-size: 0.95rem;
+    color: #f8fafc;
+}}
+.preop-section-head p {{
+    margin: 0.35rem 0 0;
+    color: #64748b;
+    font-size: 0.78rem;
+}}
+.preop-gantt-chart {{
+    border-radius: 16px;
+    border: 1px solid rgba(30,41,59,0.9);
+    overflow: hidden;
+    background: #020617;
+}}
+.preop-day-axis,
+.preop-gantt-row {{
+    display: grid;
+    grid-template-columns: minmax(190px, 0.95fr) minmax(0, 2fr);
+}}
+.preop-axis-left,
+.preop-row-label {{
+    padding: 0.8rem 0.9rem;
+    border-right: 1px solid #1e293b;
+}}
+.preop-axis-left {{
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: #0f172a;
+}}
+.preop-axis-days {{
+    display: grid;
+    background: #0f172a;
+}}
+.preop-axis-day {{
+    padding: 0.55rem 0.25rem;
+    text-align: center;
+    border-left: 1px solid rgba(30,41,59,0.65);
+    color: #94a3b8;
+    font-size: 0.68rem;
+    line-height: 1.1;
+}}
+.preop-axis-day.today {{
+    color: #f8fafc;
+    background: rgba(37,99,235,0.22);
+}}
+.preop-axis-day.weekend {{ color: #475569; }}
+.preop-gantt-row {{ border-top: 1px solid #1e293b; }}
+.preop-row-label strong {{
+    display: block;
+    color: #f8fafc;
+    font-size: 0.82rem;
+    margin-bottom: 0.22rem;
+}}
+.preop-row-label small {{
+    display: block;
+    color: #64748b;
+    font-size: 0.7rem;
+}}
+.preop-row-bars {{
+    position: relative;
+    min-height: 58px;
+    background-image: linear-gradient(to right, rgba(148,163,184,0.08) 1px, transparent 1px);
+}}
+.preop-bar {{
+    position: absolute;
+    top: 12px;
+    height: 34px;
+    min-width: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    padding: 0 0.8rem;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.32);
+    overflow: hidden;
+    white-space: nowrap;
+}}
+.preop-bar small {{
+    font-size: 0.66rem;
+    opacity: 0.95;
+}}
+.preop-task-list {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}}
+.preop-task-card {{
+    border-radius: 18px;
+    border: 1px solid rgba(51,65,85,0.85);
+    background: #020617;
+    padding: 1rem;
+}}
+.preop-task-card-top {{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+}}
+.preop-task-title {{
+    color: #f8fafc;
+    font-size: 0.92rem;
+    font-weight: 700;
+}}
+.preop-task-meta {{
+    margin-top: 0.35rem;
+    color: #94a3b8;
+    font-size: 0.77rem;
+    line-height: 1.55;
+}}
+.preop-task-pill {{
+    display: inline-flex;
+    align-items: center;
+    padding: 0.32rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(37,99,235,0.14);
+    border: 1px solid rgba(96,165,250,0.2);
+    color: #dbeafe;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}}
+.preop-task-actions {{
+    display: flex;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    margin-top: 0.85rem;
+}}
+.preop-empty {{
+    padding: 1.4rem;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.88rem;
+}}
+.worker-selector-grid {{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    padding-right: 0.15rem;
+}}
+.worker-pick-card {{
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.95rem;
+    border-radius: 18px;
+    border: 1px solid rgba(51,65,85,0.9);
+    background: linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.88));
+    cursor: pointer;
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}}
+.worker-pick-card:hover {{
+    border-color: rgba(96,165,250,0.7);
+    transform: translateY(-1px);
+}}
+.worker-pick-card.is-selected {{
+    border-color: rgba(59,130,246,0.95);
+    box-shadow: 0 0 0 1px rgba(59,130,246,0.25), 0 18px 35px rgba(15,23,42,0.45);
+    background: linear-gradient(180deg, rgba(37,99,235,0.16), rgba(15,23,42,0.96));
+}}
+.worker-pick-check {{
+    width: 1rem;
+    height: 1rem;
+    accent-color: #3b82f6;
+    cursor: pointer;
+}}
+.worker-pick-avatar {{
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #2563eb, #38bdf8);
+    color: #eff6ff;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+}}
+.worker-pick-meta {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+    cursor: pointer;
+}}
+.worker-pick-name-row {{
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: center;
+}}
+.worker-pick-name-row strong {{
+    color: #f8fafc;
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}}
+.worker-pick-name-row span {{
+    color: #93c5fd;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}}
+.worker-pick-meta small {{
+    color: #94a3b8;
+    font-size: 0.76rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}}
+@media (max-width: 1000px) {{
+    .preop-gantt-hero,
+    .preop-timeline-layout,
+    .preop-stat-strip,
+    .worker-selector-grid {{
+        grid-template-columns: 1fr;
+    }}
+    .preop-day-axis,
+    .preop-gantt-row {{
+        grid-template-columns: minmax(160px, 0.9fr) minmax(0, 1.6fr);
+    }}
+}}
+
+.section-label {{
+    display:inline-flex;
+    align-items:center;
+    gap:0.35rem;
+    color:#64748b;
+    font-size:0.72rem;
+    font-weight:800;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+}}
+
+.crew-stage-shell {{
+    display:grid;
+    gap:1rem;
+}}
+
+.crew-toolbar {{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:1rem;
+    flex-wrap:wrap;
+    padding:1rem 1.1rem;
+    border-radius:18px;
+    border:1px solid rgba(59,130,246,0.18);
+    background:linear-gradient(180deg, rgba(15,23,42,0.94), rgba(15,23,42,0.84));
+}}
+
+.crew-toolbar h3 {{
+    margin:0.4rem 0 0;
+    color:#f8fafc;
+    font-size:1.05rem;
+}}
+
+.crew-toolbar p,
+.crew-panel-head p,
+.worker-selector-head p {{
+    margin:0.45rem 0 0;
+    color:#94a3b8;
+    font-size:0.82rem;
+    line-height:1.65;
+}}
+
+.crew-toolbar-actions {{
+    display:flex;
+    gap:0.6rem;
+    flex-wrap:wrap;
+}}
+
+.crew-summary-strip {{
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:0.8rem;
+}}
+
+.crew-summary-card {{
+    padding:0.95rem 1rem;
+    border-radius:18px;
+    border:1px solid rgba(51,65,85,0.85);
+    background:linear-gradient(180deg, rgba(15,23,42,0.94), rgba(2,6,23,0.88));
+}}
+
+.crew-summary-card span {{
+    display:block;
+    color:#64748b;
+    font-size:0.72rem;
+    font-weight:800;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+}}
+
+.crew-summary-card strong {{
+    display:block;
+    margin-top:0.45rem;
+    color:#f8fafc;
+    font-size:1.12rem;
+}}
+
+.crew-panels-grid {{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:1rem;
+}}
+
+.crew-panel {{
+    padding:1rem;
+    border-radius:18px;
+    border:1px solid rgba(51,65,85,0.85);
+    background:rgba(2,6,23,0.72);
+}}
+
+.crew-panel-head {{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:0.85rem;
+    margin-bottom:0.85rem;
+}}
+
+.crew-panel-actions {{
+    margin-top:0.85rem;
+}}
+
+.crew-approval-box {{
+    padding-top:0.35rem;
+}}
+
+.crew-empty-state {{
+    padding:1rem;
+    border-radius:16px;
+    border:1px dashed rgba(148,163,184,0.18);
+    background:rgba(15,23,42,0.54);
+}}
+
+.crew-empty-state strong {{
+    display:block;
+    color:#e2e8f0;
+    font-size:0.92rem;
+}}
+
+.crew-empty-state p {{
+    margin:0.45rem 0 0;
+    color:#94a3b8;
+    font-size:0.81rem;
+    line-height:1.6;
+}}
+
+.crew-cards-grid,
+.accred-grid {{
+    display:grid;
+    gap:0.75rem;
+}}
+
+.crew-member-card,
+.accred-card {{
+    padding:0.95rem 1rem;
+    border-radius:18px;
+    border:1px solid rgba(51,65,85,0.85);
+    background:linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.88));
+}}
+
+.crew-member-head,
+.accred-card-head {{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:0.85rem;
+}}
+
+.crew-member-avatar {{
+    width:44px;
+    height:44px;
+    border-radius:14px;
+    display:grid;
+    place-items:center;
+    background:linear-gradient(135deg, #2563eb, #38bdf8);
+    color:#eff6ff;
+    font-size:0.8rem;
+    font-weight:800;
+    letter-spacing:0.06em;
+    flex-shrink:0;
+}}
+
+.crew-member-copy {{
+    flex:1;
+    min-width:0;
+}}
+
+.crew-member-copy strong,
+.accred-card-head strong {{
+    display:block;
+    color:#f8fafc;
+    font-size:0.92rem;
+}}
+
+.crew-member-copy span,
+.accred-card-head span {{
+    display:block;
+    margin-top:0.28rem;
+    color:#94a3b8;
+    font-size:0.78rem;
+    line-height:1.5;
+}}
+
+.crew-member-badges {{
+    display:flex;
+    gap:0.45rem;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+}}
+
+.crew-member-actions,
+.accred-card-actions {{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.7rem;
+    flex-wrap:wrap;
+    margin-top:0.85rem;
+}}
+
+.crew-role-chip,
+.crew-status-chip {{
+    display:inline-flex;
+    align-items:center;
+    gap:0.3rem;
+    padding:0.34rem 0.75rem;
+    border-radius:999px;
+    font-size:0.72rem;
+    font-weight:800;
+    letter-spacing:0.04em;
+    border:1px solid rgba(148,163,184,0.18);
+}}
+
+.crew-role-chip {{
+    background:rgba(37,99,235,0.14);
+    border-color:rgba(96,165,250,0.22);
+    color:#dbeafe;
+}}
+
+.crew-status-chip.tone-secondary,
+.crew-empty-state.tone-secondary,
+.accred-card.tone-secondary {{
+    background:rgba(15,23,42,0.56);
+    border-color:rgba(148,163,184,0.18);
+    color:#cbd5e1;
+}}
+
+.crew-status-chip.tone-success,
+.crew-empty-state.tone-success,
+.accred-card.tone-success {{
+    background:rgba(22,163,74,0.12);
+    border-color:rgba(34,197,94,0.26);
+    color:#bbf7d0;
+}}
+
+.crew-status-chip.tone-warning,
+.crew-empty-state.tone-warning,
+.accred-card.tone-warning {{
+    background:rgba(245,158,11,0.12);
+    border-color:rgba(251,191,36,0.22);
+    color:#fde68a;
+}}
+
+.crew-status-chip.tone-danger,
+.crew-empty-state.tone-danger,
+.accred-card.tone-danger {{
+    background:rgba(239,68,68,0.1);
+    border-color:rgba(248,113,113,0.2);
+    color:#fecaca;
+}}
+
+.accred-progress-grid {{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:0.75rem;
+    margin-top:0.9rem;
+}}
+
+.accred-progress-card {{
+    padding:0.8rem 0.85rem;
+    border-radius:14px;
+    border:1px solid rgba(51,65,85,0.72);
+    background:rgba(15,23,42,0.62);
+}}
+
+.accred-progress-top {{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.6rem;
+    margin-bottom:0.55rem;
+}}
+
+.accred-progress-top span {{
+    color:#94a3b8;
+    font-size:0.76rem;
+}}
+
+.accred-progress-top strong {{
+    color:#f8fafc;
+    font-size:0.8rem;
+}}
+
+.accred-progress-track {{
+    height:8px;
+    border-radius:999px;
+    background:#0f172a;
+    overflow:hidden;
+}}
+
+.accred-progress-bar {{
+    height:100%;
+    border-radius:999px;
+}}
+
+.accred-progress-bar.tone-success {{ background:#22c55e; }}
+.accred-progress-bar.tone-warning {{ background:#f59e0b; }}
+.accred-progress-bar.tone-danger {{ background:#ef4444; }}
+
+.accred-card-note {{
+    color:#94a3b8;
+    font-size:0.8rem;
+}}
+
+.accred-detail-panel {{
+    margin-top:0.85rem;
+    padding-top:0.85rem;
+    border-top:1px solid rgba(51,65,85,0.72);
+}}
+
+.accred-doc-group + .accred-doc-group {{
+    margin-top:0.8rem;
+}}
+
+.accred-doc-group strong {{
+    display:block;
+    color:#e2e8f0;
+    font-size:0.82rem;
+    margin-bottom:0.55rem;
+}}
+
+.accred-doc-list {{
+    display:grid;
+    gap:0.45rem;
+}}
+
+.accred-doc-item {{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.7rem;
+    padding:0.65rem 0.8rem;
+    border-radius:12px;
+    border:1px solid rgba(51,65,85,0.65);
+    background:rgba(15,23,42,0.45);
+    color:#cbd5e1;
+    font-size:0.78rem;
+}}
+
+.worker-selector-shell {{
+    border-radius:22px;
+}}
+
+.worker-selector-head {{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:1rem;
+    margin-bottom:1rem;
+}}
+
+.worker-selector-head h2 {{
+    margin:0.35rem 0 0;
+    color:#f8fafc;
+    font-size:1.45rem;
+}}
+
+.worker-selector-toolbar {{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) 220px;
+    gap:0.85rem;
+    align-items:end;
+    margin-bottom:0.9rem;
+}}
+
+.worker-selected-preview {{
+    display:flex;
+    gap:0.55rem;
+    flex-wrap:wrap;
+    min-height:44px;
+    margin-bottom:0.9rem;
+    padding:0.75rem 0.9rem;
+    border-radius:14px;
+    border:1px solid rgba(51,65,85,0.72);
+    background:rgba(15,23,42,0.62);
+}}
+
+.worker-selected-empty {{
+    color:#94a3b8;
+    font-size:0.8rem;
+}}
+
+.worker-selected-chip {{
+    display:inline-flex;
+    align-items:center;
+    padding:0.35rem 0.7rem;
+    border-radius:999px;
+    background:rgba(37,99,235,0.14);
+    border:1px solid rgba(96,165,250,0.24);
+    color:#dbeafe;
+    font-size:0.75rem;
+    font-weight:700;
+}}
+
+.worker-selector-footer {{
+    display:flex;
+    justify-content:space-between;
+    gap:1rem;
+    align-items:center;
+    margin-top:1rem;
+    padding-top:1rem;
+    border-top:1px solid #334155;
+}}
+
+.worker-pick-card.is-disabled {{
+    opacity:0.62;
+    cursor:not-allowed;
+    border-color:rgba(148,163,184,0.16);
+}}
+
+.worker-pick-tags {{
+    display:flex;
+    gap:0.45rem;
+    flex-wrap:wrap;
+}}
+
+#worker-add-btn[disabled] {{
+    opacity:0.55;
+    cursor:not-allowed;
+}}
+
+@media (max-width: 1100px) {{
+    .crew-panels-grid,
+    .crew-summary-strip,
+    .accred-progress-grid,
+    .worker-selector-toolbar {{
+        grid-template-columns:1fr;
+    }}
+}}
+
+@media (max-width: 760px) {{
+    .crew-toolbar,
+    .crew-panel-head,
+    .crew-member-head,
+    .accred-card-head,
+    .worker-selector-head,
+    .worker-selector-footer {{
+        flex-direction:column;
+        align-items:stretch;
+    }}
 }}
 </style>
 
