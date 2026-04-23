@@ -171,9 +171,7 @@ function closeMandanteModal() {
 }
 
 function closeMandanteModalBackdrop(event) {
-    if (event.target === document.getElementById('mandante-modal')) {
-        closeMandanteModal();
-    }
+    if (!erpModalAllowsBackdropClose(event, 'mandante-modal')) return;
 }
 
 async function saveMandante() {
@@ -275,7 +273,7 @@ function closeAreaModal() {
 }
 
 function closeAreaModalBackdrop(event) {
-    if (event.target === document.getElementById('area-modal')) closeAreaModal();
+    if (!erpModalAllowsBackdropClose(event, 'area-modal')) return;
 }
 
 async function saveArea() {
@@ -325,7 +323,7 @@ function closeSectorModal() {
 }
 
 function closeSectorModalBackdrop(event) {
-    if (event.target === document.getElementById('sector-modal')) closeSectorModal();
+    if (!erpModalAllowsBackdropClose(event, 'sector-modal')) return;
 }
 
 async function saveSector() {

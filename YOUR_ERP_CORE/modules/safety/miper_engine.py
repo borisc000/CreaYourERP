@@ -8,6 +8,14 @@ from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
 from core.time_utils import utc_now_iso
+from modules.safety.risk_calculation_service import (
+    action_from_vep as service_action_from_vep,
+    calculate_risk,
+    calculate_vep as service_calculate_vep,
+    normalize_control_hierarchy as service_normalize_control_hierarchy,
+    risk_level_from_vep as service_risk_level_from_vep,
+    summarize_controls as service_summarize_controls,
+)
 
 
 DEFAULT_PROTOCOLS: List[Dict[str, str]] = [
@@ -303,68 +311,23 @@ def normalize_string_list(value: Any) -> List[str]:
 
 
 def normalize_control_hierarchy(value: Any) -> Dict[str, List[str]]:
-    base = {
-        "elimination": [],
-        "engineering": [],
-        "administrative": [],
-        "ppe": [],
-    }
-    if isinstance(value, dict):
-        for key in base.keys():
-            base[key] = normalize_string_list(value.get(key))
-    elif isinstance(value, str):
-        base["administrative"] = normalize_string_list(value)
-    return base
+    return service_normalize_control_hierarchy(value)
 
 
 def summarize_controls(control_hierarchy: Dict[str, List[str]], fallback: str = "") -> str:
-    labels = {
-        "elimination": "Eliminacion",
-        "engineering": "Ingenieria",
-        "administrative": "Administrativos",
-        "ppe": "EPP",
-    }
-    chunks: List[str] = []
-    for key, label in labels.items():
-        items = normalize_string_list(control_hierarchy.get(key))
-        if items:
-            chunks.append(f"{label}: " + "; ".join(items))
-    if chunks:
-        return " | ".join(chunks)
-    return fallback or ""
+    return service_summarize_controls(control_hierarchy, fallback)
 
 
 def calculate_vep(probability: Any, consequence: Any) -> int:
-    try:
-        prob = int(probability or 0)
-        cons = int(consequence or 0)
-    except (TypeError, ValueError):
-        return 0
-    return prob * cons
+    return service_calculate_vep(probability, consequence)
 
 
 def risk_level_from_vep(vep: int) -> str:
-    if vep <= 2:
-        return "Tolerable"
-    if vep == 4:
-        return "Moderado"
-    if vep == 8:
-        return "Importante"
-    if vep >= 16:
-        return "Intolerable"
-    return "-"
+    return service_risk_level_from_vep(vep)
 
 
 def action_from_vep(vep: int) -> str:
-    if vep <= 2:
-        return "No se necesita mejorar la accion preventiva, manteniendo verificaciones periodicas."
-    if vep == 4:
-        return "Se deben hacer esfuerzos para reducir el riesgo dentro de un periodo definido."
-    if vep == 8:
-        return "No se debe comenzar ni continuar el trabajo hasta reducir el riesgo."
-    if vep >= 16:
-        return "No debe comenzar ni continuar el trabajo; si no se reduce, se debe prohibir."
-    return ""
+    return service_action_from_vep(vep)
 
 
 def legal_requirements_for_headcount(worker_count: int) -> List[str]:
@@ -686,8 +649,14 @@ def merge_generated_rows(current: Dict[str, Any], incoming: Dict[str, Any]) -> D
     merged["probability"] = max(int(current.get("probability") or 0), int(incoming.get("probability") or 0))
     merged["consequence"] = max(int(current.get("consequence") or 0), int(incoming.get("consequence") or 0))
     merged["vep"] = calculate_vep(merged["probability"], merged["consequence"])
-    merged["risk_level"] = risk_level_from_vep(merged["vep"])
-    merged["action_required"] = action_from_vep(merged["vep"])
-    merged["is_blocking"] = bool(merged["vep"] >= 16 or merged.get("restriction_alerts"))
+    risk_result = calculate_risk(merged["probability"], merged["consequence"])
+    merged["risk_level"] = risk_result["risk_level_label"]
+    merged["risk_level_label"] = risk_result["risk_level_label"]
+    merged["risk_level_value"] = risk_result["risk_level_value"]
+    merged["severity_color"] = risk_result["severity_color"]
+    merged["action_required"] = risk_result["action_required"]
+    merged["approval_blocked"] = risk_result["approval_blocked"]
+    merged["mitigation_required"] = risk_result["mitigation_required"]
+    merged["is_blocking"] = bool(risk_result["approval_blocked"] or merged.get("restriction_alerts"))
     merged["generated_at"] = _now_iso()
     return merged

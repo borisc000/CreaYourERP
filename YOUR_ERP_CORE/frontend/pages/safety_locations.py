@@ -15,7 +15,7 @@ def safety_locations_page():
             </p>
         </div>
         <div style="display:flex;gap:0.65rem;flex-wrap:wrap;">
-            <a class="btn btn-secondary" href="/app/safety/admin">Reglas MIPER</a>
+            <a class="btn btn-secondary" href="/app/safety/activities">Biblioteca BOT</a>
             <a class="btn btn-primary" href="/app/safety">Volver a Seguridad</a>
         </div>
     </div>

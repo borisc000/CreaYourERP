@@ -5,13 +5,32 @@ const rentalsState = {
     leads: [],
     customers: [],
     selectedContractId: null,
+    context: {
+        leadId: null,
+        customerId: null,
+        focusContractId: null,
+        openNew: false,
+        autoOpened: false,
+    },
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!API.requireAuth()) return;
     highlightNav('/app/rentals');
+    rentalsState.context = readRentalsContext();
     await loadRentalsWorkspace();
 });
+
+function readRentalsContext() {
+    const params = new URLSearchParams(window.location.search || '');
+    return {
+        leadId: Number(params.get('lead_id') || 0) || null,
+        customerId: Number(params.get('customer_id') || 0) || null,
+        focusContractId: Number(params.get('focus_contract_id') || 0) || null,
+        openNew: params.get('open_new') === '1',
+        autoOpened: false,
+    };
+}
 
 function rentEscape(value) {
     return String(value ?? '')
@@ -37,6 +56,87 @@ function rentalSelectedContract() {
     return rentalsState.contracts.find(item => item.id === rentalsState.selectedContractId) || null;
 }
 
+function rentalsContextLead() {
+    return rentalsState.leads.find((item) => item.id === rentalsState.context.leadId) || null;
+}
+
+function rentalsContextCustomer() {
+    return rentalsState.customers.find((item) => item.id === rentalsState.context.customerId) || null;
+}
+
+function rentalContractMatchesContext(item) {
+    const ctx = rentalsState.context || {};
+    if (ctx.leadId && Number(item.lead_id) !== Number(ctx.leadId)) return false;
+    if (ctx.customerId && Number(item.customer_id) !== Number(ctx.customerId)) return false;
+    return true;
+}
+
+function clearRentalsContext() {
+    rentalsState.context = {
+        leadId: null,
+        customerId: null,
+        focusContractId: null,
+        openNew: false,
+        autoOpened: false,
+    };
+    history.replaceState({}, '', '/app/rentals');
+    rentalsState.selectedContractId = rentalsState.contracts[0]?.id || null;
+    renderRentalsContextBanner();
+    renderRentalContracts();
+    renderRentalFocus();
+}
+
+function renderRentalsContextBanner() {
+    const banner = document.getElementById('rentals-context-banner');
+    if (!banner) return;
+    const ctx = rentalsState.context || {};
+    const lead = rentalsContextLead();
+    const customer = rentalsContextCustomer();
+    if (!ctx.leadId && !ctx.customerId) {
+        banner.style.display = 'none';
+        banner.innerHTML = '';
+        return;
+    }
+
+    const parts = [];
+    if (lead) parts.push(`Servicio CRM: <strong>${rentEscape(lead.project_code || '')} ${rentEscape(lead.title || '')}</strong>`);
+    if (customer) parts.push(`Cliente: <strong>${rentEscape(customer.name || '')}</strong>`);
+    if (ctx.focusContractId) parts.push(`Foco expediente #${rentEscape(ctx.focusContractId)}`);
+
+    banner.style.display = 'block';
+    banner.innerHTML = `
+        <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
+            <div>
+                <div class="text-muted text-sm" style="letter-spacing:0.08em;text-transform:uppercase;">Contexto CRM</div>
+                <div style="margin-top:0.35rem;color:#e2e8f0;line-height:1.6;">${parts.join(' · ') || 'Contexto comercial activo'}</div>
+            </div>
+            <div style="display:flex;gap:0.65rem;flex-wrap:wrap;">
+                ${ctx.leadId ? `<a class="btn btn-ghost btn-sm" href="/app/crm/leads/${ctx.leadId}">Volver al servicio</a>` : ''}
+                <button class="btn btn-ghost btn-sm" type="button" onclick="clearRentalsContext()">Ver todos</button>
+            </div>
+        </div>
+    `;
+}
+
+function syncRentalContractFromLead(prefillTitle = false) {
+    const leadId = Number(document.getElementById('rental-contract-lead')?.value || 0) || null;
+    const lead = rentalsState.leads.find((item) => item.id === leadId) || null;
+    const customerInput = document.getElementById('rental-contract-customer');
+    const titleInput = document.getElementById('rental-contract-title');
+    if (!lead) {
+        if (!customerInput?.value && rentalsState.context.customerId) {
+            customerInput.value = String(rentalsState.context.customerId);
+        }
+        return;
+    }
+    if (customerInput && lead.customer_id && !customerInput.value) {
+        customerInput.value = String(lead.customer_id);
+    }
+    if (prefillTitle && titleInput && !titleInput.value.trim()) {
+        titleInput.value = `Arriendo ${lead.title || 'CRM'}`.trim();
+    }
+}
+
 async function loadRentalsWorkspace() {
     const [dashboardRes, assetsRes, contractsRes, leadsRes, customersRes] = await Promise.all([
         API.get('/rentals/dashboard'),
@@ -52,8 +152,15 @@ async function loadRentalsWorkspace() {
     rentalsState.leads = leadsRes?.data?.results || [];
     rentalsState.customers = customersRes?.data?.results || [];
 
-    if (!rentalsState.selectedContractId || !rentalsState.contracts.some(item => item.id === rentalsState.selectedContractId)) {
-        rentalsState.selectedContractId = rentalsState.contracts[0]?.id || null;
+    renderRentalsContextBanner();
+
+    const contextualContracts = rentalsState.contracts.filter(rentalContractMatchesContext);
+    const preferredContractId = rentalsState.context.focusContractId && rentalsState.contracts.some((item) => item.id === rentalsState.context.focusContractId)
+        ? rentalsState.context.focusContractId
+        : (contextualContracts[0]?.id || rentalsState.contracts[0]?.id || null);
+
+    if (!rentalsState.selectedContractId || !rentalsState.contracts.some(item => item.id === rentalsState.selectedContractId) || (contextualContracts.length && !contextualContracts.some((item) => item.id === rentalsState.selectedContractId))) {
+        rentalsState.selectedContractId = preferredContractId;
     }
 
     fillRentalSelects();
@@ -62,6 +169,11 @@ async function loadRentalsWorkspace() {
     renderRentalAssets();
     renderRentalRiskBoard();
     await renderRentalFocus();
+
+    if (rentalsState.context.openNew && !rentalsState.context.autoOpened) {
+        rentalsState.context.autoOpened = true;
+        await openRentalContractModal();
+    }
 }
 
 async function reloadRentalsWorkspace() {
@@ -81,6 +193,7 @@ function filteredRentalContracts() {
     const search = (document.getElementById('rentals-search')?.value || '').trim().toLowerCase();
     const status = document.getElementById('rentals-status-filter')?.value || '';
     return rentalsState.contracts.filter(item => {
+        if (!rentalContractMatchesContext(item)) return false;
         const haystack = [
             item.rental_number,
             item.title,
@@ -99,7 +212,16 @@ function renderRentalContracts() {
     const host = document.getElementById('rentals-contract-list');
     const contracts = filteredRentalContracts();
     if (!contracts.length) {
-        host.innerHTML = '<div class="empty">No hay expedientes que coincidan con el filtro actual.</div>';
+        host.innerHTML = `
+            <div class="empty">
+                ${rentalsState.context.leadId || rentalsState.context.customerId
+                    ? 'No hay expedientes vinculados a este contexto CRM todavia.'
+                    : 'No hay expedientes que coincidan con el filtro actual.'}
+                <div style="margin-top:0.85rem;">
+                    <button class="btn btn-primary btn-sm" type="button" onclick="openRentalContractModal()">Nuevo expediente</button>
+                </div>
+            </div>
+        `;
         return;
     }
 
@@ -208,7 +330,10 @@ async function renderRentalFocus() {
                 <h3 style="margin:0.2rem 0 0.35rem;">${rentEscape(contract.title)}</h3>
                 <div class="text-muted text-sm">${rentEscape(contract.customer_name || 'Sin cliente')} · ${rentEscape(contract.lead_title || 'Sin lead CRM')}</div>
             </div>
-            <button class="btn btn-ghost btn-sm" onclick="openRentalContractModal(${contract.id})">Editar</button>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:flex-end;">
+                ${contract.lead_id ? `<a class="btn btn-ghost btn-sm" href="/app/crm/leads/${contract.lead_id}">CRM</a>` : ''}
+                <button class="btn btn-ghost btn-sm" onclick="openRentalContractModal(${contract.id})">Editar</button>
+            </div>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0.7rem;margin-top:1rem;">
@@ -251,6 +376,10 @@ function fillRentalSelects() {
     const customerSelect = document.getElementById('rental-contract-customer');
     if (leadSelect) {
         leadSelect.innerHTML = '<option value="">Sin lead CRM</option>' + rentalsState.leads.map(item => `<option value="${item.id}">${rentEscape(item.project_code || '')} ${rentEscape(item.title || '')}</option>`).join('');
+        if (!leadSelect.dataset.boundLeadSync) {
+            leadSelect.addEventListener('change', () => syncRentalContractFromLead(true));
+            leadSelect.dataset.boundLeadSync = '1';
+        }
     }
     if (customerSelect) {
         customerSelect.innerHTML = '<option value="">Sin cliente</option>' + rentalsState.customers.map(item => `<option value="${item.id}">${rentEscape(item.name || '')}</option>`).join('');
@@ -353,18 +482,23 @@ async function openRentalContractModal(contractId = null) {
     const modal = document.getElementById('rental-contract-modal');
     modal.style.display = 'flex';
     const contract = rentalsState.contracts.find(item => item.id === Number(contractId));
+    const leadFromContext = rentalsContextLead();
     let contractDetail = null;
     if (contractId) {
         const response = await API.get(`/rentals/contracts/${contractId}`);
         contractDetail = response?.data || null;
     }
+    const defaultLeadId = contract?.lead_id || leadFromContext?.id || rentalsState.context.leadId || '';
+    const defaultCustomerId = contract?.customer_id || leadFromContext?.customer_id || rentalsState.context.customerId || '';
+    const defaultTitle = contract?.title || (leadFromContext ? `Arriendo ${leadFromContext.title || 'CRM'}`.trim() : '');
+
     document.getElementById('rental-contract-modal-title').textContent = contract ? 'Editar expediente de arriendo' : 'Nuevo expediente de arriendo';
     document.getElementById('rental-contract-id').value = contract?.id || '';
-    document.getElementById('rental-contract-title').value = contract?.title || '';
+    document.getElementById('rental-contract-title').value = defaultTitle;
     document.getElementById('rental-contract-status').value = contract?.status || 'draft';
     document.getElementById('rental-contract-risk').value = contract?.risk_level || 'medium';
-    document.getElementById('rental-contract-lead').value = contract?.lead_id || '';
-    document.getElementById('rental-contract-customer').value = contract?.customer_id || '';
+    document.getElementById('rental-contract-lead').value = defaultLeadId;
+    document.getElementById('rental-contract-customer').value = defaultCustomerId;
     document.getElementById('rental-contract-assigned').value = contract?.assigned_to || '';
     document.getElementById('rental-contract-start').value = contract?.start_date || '';
     document.getElementById('rental-contract-end').value = contract?.end_date || '';
@@ -378,6 +512,9 @@ async function openRentalContractModal(contractId = null) {
         lines.forEach(line => addRentalLineRow(line));
     } else {
         addRentalLineRow();
+    }
+    if (!contract) {
+        syncRentalContractFromLead(true);
     }
 }
 
@@ -411,6 +548,11 @@ async function saveRentalContract(event) {
     if (!response?.success) {
         showToast(response?.errors?.[0] || 'No se pudo guardar el expediente', 'error');
         return;
+    }
+    const savedId = Number(response?.data?.contract?.id || response?.data?.id || contractId || 0) || null;
+    if (savedId) {
+        rentalsState.selectedContractId = savedId;
+        rentalsState.context.focusContractId = savedId;
     }
     closeRentalModal('rental-contract-modal');
     await loadRentalsWorkspace();

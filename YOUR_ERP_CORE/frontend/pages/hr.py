@@ -3,88 +3,180 @@ from frontend.pages.layout import base_layout
 
 def hr_page():
     content = """
-    <div class="page-header">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
-            <div>
-                <h1>Recursos Humanos</h1>
-                <p>Departamentos, ficha integral del trabajador, contratos y permisos</p>
+    <div class="talent-cycle-shell">
+        <section class="talent-hero-banner">
+            <div class="talent-hero-copy">
+                <div class="workspace-kicker">Ciclo Laboral Integrado</div>
+                <h1>Una portada ejecutiva para gobernar cargo, seleccion, contrato y desvinculacion.</h1>
+                <p>Centraliza continuidad operacional, ficha 360 y documentos laborales desde una sola vista, conectando perfiles, reclutamiento, asistencia, remuneraciones, acreditaciones y firmas.</p>
+                <div class="workspace-action-row">
+                    <button class="btn btn-primary" onclick="openEmployeeModal()">+ Nuevo trabajador</button>
+                    <a href="/app/recruitment" class="btn btn-ghost">Abrir Reclutamiento</a>
+                    <a href="/app/job-profiles" class="btn btn-ghost">Biblioteca de Perfiles</a>
+                    <a href="/app/cross-correspondence" class="btn btn-ghost">Documentos Laborales</a>
+                </div>
+                <div class="talent-hero-strip">
+                    <div class="talent-hero-chip"><span>Activos</span><strong id="hr-stat-active">-</strong></div>
+                    <div class="talent-hero-chip"><span>Onboarding</span><strong id="hr-stat-onboarding">-</strong></div>
+                    <div class="talent-hero-chip"><span>Contratos activos</span><strong id="hr-stat-contracts">-</strong></div>
+                    <div class="talent-hero-chip"><span>Salidas abiertas</span><strong id="hr-stat-terminations-open">-</strong></div>
+                </div>
             </div>
-            <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                <a href="/app/payroll" class="btn btn-ghost">Remuneraciones</a>
-                <a href="/app/attendance" class="btn btn-ghost">Asistencia</a>
-                <a href="/app/cross-correspondence" class="btn btn-ghost">Correspondencia Cruzada</a>
-                <a href="/app/accreditation" class="btn btn-ghost">Acreditaciones</a>
-                <a href="/app/job-profiles" class="btn btn-ghost">Perfiles de cargo</a>
-                <button class="btn btn-secondary" onclick="openDepartmentModal()">+ Departamento</button>
-                <button class="btn btn-primary" onclick="openEmployeeModal()">+ Empleado</button>
-                <button class="btn btn-ghost" onclick="openContractModal()">+ Contrato</button>
-                <button class="btn btn-ghost" onclick="openLeaveModal()">+ Permiso</button>
+            <div class="talent-hero-board">
+                <span class="workspace-hero__eyebrow">Pulso del sistema laboral</span>
+                <div class="talent-hero-board-value" id="hr-lifecycle-health">Cargando...</div>
+                <p id="hr-lifecycle-health-copy">Analizando continuidad de vacantes, contrataciones, dotacion y documentos.</p>
+                <div class="talent-hero-kpi-grid">
+                    <div class="talent-mini-kpi"><span>Perfiles activos</span><strong id="hr-stat-job-profiles">-</strong></div>
+                    <div class="talent-mini-kpi"><span>Vacantes abiertas</span><strong id="hr-stat-open-jobs">-</strong></div>
+                    <div class="talent-mini-kpi"><span>Listos para contratar</span><strong id="hr-stat-ready-hire">-</strong></div>
+                    <div class="talent-mini-kpi"><span>Vencen &lt; 30 dias</span><strong id="hr-stat-contracts-expiring">-</strong></div>
+                </div>
             </div>
-        </div>
-    </div>
+        </section>
 
-    <div class="cards-row">
-        <div class="stat-card"><div class="label">Empleados</div><div class="value" id="hr-stat-employees">-</div></div>
-        <div class="stat-card"><div class="label">Activos</div><div class="value" id="hr-stat-active">-</div></div>
-        <div class="stat-card"><div class="label">Onboarding</div><div class="value" id="hr-stat-onboarding">-</div></div>
-        <div class="stat-card"><div class="label">Contratos activos</div><div class="value" id="hr-stat-contracts">-</div></div>
-        <div class="stat-card"><div class="label">Permisos pendientes</div><div class="value" id="hr-stat-leaves">-</div></div>
-    </div>
+        <section class="talent-section-card">
+            <div class="talent-section-head">
+                <div>
+                    <span class="workspace-kicker">Mapa de continuidad</span>
+                    <h3>Dashboard de ciclo laboral</h3>
+                    <p>Lectura rapida del embudo completo: perfil, vacante, candidato, contratacion, trabajador activo y salida.</p>
+                </div>
+                <div class="talent-section-actions">
+                    <button class="btn btn-ghost btn-sm" onclick="openDepartmentModal()">+ Departamento</button>
+                    <button class="btn btn-ghost btn-sm" onclick="openContractModal()">+ Contrato</button>
+                    <button class="btn btn-ghost btn-sm" onclick="openLeaveModal()">+ Permiso</button>
+                    <a href="/app/accreditation" class="btn btn-ghost btn-sm">Acreditaciones</a>
+                    <a href="/app/payroll" class="btn btn-ghost btn-sm">Remuneraciones</a>
+                    <a href="/app/attendance" class="btn btn-ghost btn-sm">Asistencia</a>
+                </div>
+            </div>
+            <div class="talent-pipeline-grid" id="hr-lifecycle-board">
+                <div class="workspace-empty">Cargando tablero...</div>
+            </div>
+        </section>
 
-    <div class="card">
-        <h3>Departamentos</h3>
-        <div id="departments-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;">
-            <div class="empty">Cargando...</div>
-        </div>
-    </div>
+        <div class="talent-main-grid">
+            <section class="talent-section-card">
+                <div class="talent-section-head">
+                    <div>
+                        <span class="workspace-kicker">Trabajadores</span>
+                        <h3>Directorio operativo <span class="text-sm text-muted" id="employees-count"></span></h3>
+                        <p>Filtra por estado, revisa alertas y abre la ficha 360 sin perder contexto.</p>
+                    </div>
+                    <div class="talent-search-stack">
+                        <input id="employees-search" class="search-input" type="text" placeholder="Buscar por nombre, codigo, RUT o correo" oninput="renderEmployees()">
+                        <select id="employees-status-filter" onchange="renderEmployees()">
+                            <option value="">Todos los estados</option>
+                            <option value="draft">Borrador</option>
+                            <option value="onboarding">Onboarding</option>
+                            <option value="active">Activo</option>
+                            <option value="leave">Con permiso</option>
+                            <option value="inactive">Desvinculado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="talent-filter-pills">
+                    <button class="talent-filter-pill active" data-hr-filter="" onclick="setEmployeeQuickFilter('')">Todos</button>
+                    <button class="talent-filter-pill" data-hr-filter="onboarding" onclick="setEmployeeQuickFilter('onboarding')">Onboarding</button>
+                    <button class="talent-filter-pill" data-hr-filter="active" onclick="setEmployeeQuickFilter('active')">Activos</button>
+                    <button class="talent-filter-pill" data-hr-filter="leave" onclick="setEmployeeQuickFilter('leave')">Con permiso</button>
+                    <button class="talent-filter-pill" data-hr-filter="inactive" onclick="setEmployeeQuickFilter('inactive')">Desvinculados</button>
+                </div>
+                <div class="table-wrap talent-table-wrap">
+                    <table class="talent-table">
+                        <thead>
+                            <tr><th>Trabajador</th><th>Contacto y prevision</th><th>Estado</th><th>Acciones</th></tr>
+                        </thead>
+                        <tbody id="employees-body"><tr><td colspan="4" class="empty">Cargando...</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
 
-    <div class="card">
-        <h3>
-            Empleados
-            <span class="text-sm text-muted" id="employees-count"></span>
-        </h3>
-        <div style="margin-bottom:1rem;display:flex;gap:0.75rem;flex-wrap:wrap;">
-            <input id="employees-search" class="search-input" type="text" placeholder="Buscar empleado..." oninput="renderEmployees()">
-            <select id="employees-status-filter" onchange="renderEmployees()">
-                <option value="">Todos los estados</option>
-                <option value="draft">Borrador</option>
-                <option value="onboarding">Onboarding</option>
-                <option value="active">Activo</option>
-                <option value="leave">Con permiso</option>
-                <option value="inactive">Inactivo</option>
-            </select>
+            <aside class="talent-section-card talent-employee-panel-shell">
+                <div class="talent-section-head">
+                    <div>
+                        <span class="workspace-kicker">Ficha 360</span>
+                        <h3>Vista integral del trabajador</h3>
+                        <p id="hr-employee-detail-subtitle">Selecciona un trabajador para revisar contrato, permisos, acreditacion, historial y desvinculacion.</p>
+                    </div>
+                    <div class="talent-section-actions">
+                        <button class="btn btn-ghost btn-sm" id="hr-detail-docs-btn" onclick="goToEmployeeDocuments()" disabled>Documentos</button>
+                        <button class="btn btn-ghost btn-sm" id="hr-detail-payroll-btn" onclick="goToPayrollForEmployee()" disabled>Remuneraciones</button>
+                        <button class="btn btn-primary btn-sm" id="hr-detail-terminate-btn" onclick="openTerminationModalForSelected()" disabled>Desvincular</button>
+                    </div>
+                </div>
+                <div id="hr-employee-detail-panel" class="talent-detail-shell">
+                    <div class="workspace-empty">Selecciona un trabajador desde la tabla para cargar su ficha 360.</div>
+                </div>
+            </aside>
         </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr><th>Codigo</th><th>Empleado</th><th>Contacto</th><th>Prevision</th><th>Estado</th><th>Acciones</th></tr>
-                </thead>
-                <tbody id="employees-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
-            </table>
-        </div>
-    </div>
 
-    <div class="card">
-        <h3>Contratos</h3>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr><th>Empleado</th><th>Tipo</th><th>Estado</th><th>Inicio</th><th>Detalle</th><th>Acciones</th></tr>
-                </thead>
-                <tbody id="contracts-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
-            </table>
-        </div>
-    </div>
+        <div class="talent-secondary-grid">
+            <section class="talent-section-card">
+                <div class="talent-section-head">
+                    <div>
+                        <span class="workspace-kicker">Organizacion</span>
+                        <h3>Departamentos</h3>
+                    </div>
+                </div>
+                <div id="departments-grid" class="talent-departments-grid">
+                    <div class="workspace-empty">Cargando...</div>
+                </div>
+            </section>
 
-    <div class="card">
-        <h3>Permisos y Ausencias</h3>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr><th>Empleado</th><th>Tipo</th><th>Estado</th><th>Rango</th><th>Dias</th><th>Acciones</th></tr>
-                </thead>
-                <tbody id="leaves-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
-            </table>
+            <section class="talent-section-card">
+                <div class="talent-section-head">
+                    <div>
+                        <span class="workspace-kicker">Contratos</span>
+                        <h3>Contratos laborales</h3>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table class="talent-table">
+                        <thead>
+                            <tr><th>Empleado</th><th>Tipo</th><th>Estado</th><th>Inicio</th><th>Detalle</th><th>Acciones</th></tr>
+                        </thead>
+                        <tbody id="contracts-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <div class="talent-secondary-grid">
+            <section class="talent-section-card">
+                <div class="talent-section-head">
+                    <div>
+                        <span class="workspace-kicker">Ausencias</span>
+                        <h3>Permisos y ausencias</h3>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table class="talent-table">
+                        <thead>
+                            <tr><th>Empleado</th><th>Tipo</th><th>Estado</th><th>Rango</th><th>Dias</th><th>Acciones</th></tr>
+                        </thead>
+                        <tbody id="leaves-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="talent-section-card">
+                <div class="talent-section-head">
+                    <div>
+                        <span class="workspace-kicker">Cierre laboral</span>
+                        <h3>Desvinculaciones <span class="text-sm text-muted" id="terminations-count"></span></h3>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table class="talent-table">
+                        <thead>
+                            <tr><th>Trabajador</th><th>Causal</th><th>Estado</th><th>Fechas</th><th>Documentos</th><th>Acciones</th></tr>
+                        </thead>
+                        <tbody id="terminations-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
         </div>
     </div>
 
@@ -228,6 +320,58 @@ def hr_page():
                 <div class="form-group"><label>Motivo</label><textarea id="leave-reason"></textarea></div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-ghost" onclick="closeHrModal('leave-modal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="termination-modal">
+        <div class="modal" style="max-width:min(960px,96vw);width:min(960px,96vw);">
+            <h2 id="termination-modal-title">Nueva Desvinculacion</h2>
+            <form onsubmit="saveTermination(event)">
+                <input type="hidden" id="termination-id">
+                <div class="form-row">
+                    <div class="form-group"><label>Empleado *</label><select id="termination-employee" required onchange="syncTerminationContracts()"></select></div>
+                    <div class="form-group"><label>Contrato asociado</label><select id="termination-contract"></select></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Causal</label>
+                        <select id="termination-cause">
+                            <option value="business_needs">Necesidades de la empresa</option>
+                            <option value="fixed_term_end">Termino de plazo fijo</option>
+                            <option value="voluntary_resignation">Renuncia voluntaria</option>
+                            <option value="mutual_agreement">Mutuo acuerdo</option>
+                            <option value="misconduct">Incumplimiento / falta grave</option>
+                            <option value="project_completion">Termino de servicio o proyecto</option>
+                            <option value="other">Otra causal</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select id="termination-status">
+                            <option value="draft">Borrador</option>
+                            <option value="notified">Notificada</option>
+                            <option value="in_signature">En firma</option>
+                            <option value="completed">Cerrada</option>
+                            <option value="cancelled">Cancelada</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Fecha aviso</label><input id="termination-notice-date" type="date"></div>
+                    <div class="form-group"><label>Fecha termino *</label><input id="termination-date" type="date" required></div>
+                    <div class="form-group"><label><input id="termination-rehire-eligible" type="checkbox"> Recontratable</label></div>
+                </div>
+                <div class="form-group"><label>Detalle causal / observaciones</label><textarea id="termination-reason-detail" rows="4"></textarea></div>
+                <div class="form-group"><label>Notas legales / trazabilidad</label><textarea id="termination-legal-notes" rows="4"></textarea></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Nombre documento salida</label><input id="termination-document-name" placeholder="Carta termino contrato"></div>
+                    <div class="form-group"><label>Estado paquete documental</label><select id="termination-document-pack-status"><option value="draft">Borrador</option><option value="ready">Listo</option><option value="signature_pending">En firma</option><option value="signed">Firmado</option><option value="closed">Cerrado</option><option value="void">Anulado</option></select></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" onclick="closeHrModal('termination-modal')">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
                 </div>
             </form>

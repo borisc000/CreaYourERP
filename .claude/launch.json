@@ -4,7 +4,7 @@
     {
       "name": "YOUR ERP API",
       "runtimeExecutable": "YOUR_ERP_CORE/venv/Scripts/python.exe",
-      "runtimeArgs": ["YOUR_ERP_CORE/main.py"],
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--app-dir", "YOUR_ERP_CORE"],
       "port": 8000
     }
   ]

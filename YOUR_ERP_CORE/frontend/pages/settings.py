@@ -185,14 +185,18 @@ def settings_page():
 
             <!-- Panel Servicios -->
             <div id="cat-panel-services">
-                <div style="display:grid;grid-template-columns:100px 1fr 120px 100px;gap:0.5rem;margin-bottom:0.75rem;align-items:center;">
+                <div style="display:grid;grid-template-columns:110px 1fr 220px 120px 100px;gap:0.5rem;margin-bottom:0.75rem;align-items:center;">
                     <input type="text" id="svc-code" placeholder="SVC-001"
                         style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
                     <input type="text" id="svc-desc" placeholder="Descripci&oacute;n del servicio"
                         style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
+                    <select id="svc-service-type"
+                        style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
+                        <option value="">Cargando tipos...</option>
+                    </select>
                     <input type="number" id="svc-price" placeholder="Precio venta" min="0"
                         style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
-                    <button onclick="addCatalogItem('services')" class="btn btn-primary btn-sm">&#43; Agregar</button>
+                    <button id="add-services-btn" onclick="addCatalogItem('services')" class="btn btn-primary btn-sm">&#43; Agregar</button>
                 </div>
                 <div id="cat-list-services" style="border:1px solid #334155;border-radius:8px;overflow:hidden;background:#1e293b;">
                     <div style="padding:1.25rem;text-align:center;color:#64748b;font-size:0.85rem;">Cargando...</div>
@@ -201,12 +205,16 @@ def settings_page():
 
             <!-- Panel Personal -->
             <div id="cat-panel-workers" style="display:none;">
-                <div style="display:grid;grid-template-columns:1fr 150px 100px;gap:0.5rem;margin-bottom:0.75rem;align-items:center;">
+                <div style="display:grid;grid-template-columns:1fr 220px 150px 100px;gap:0.5rem;margin-bottom:0.75rem;align-items:center;">
                     <input type="text" id="wrk-name" placeholder="Cargo (ej: Maestro Civil)"
                         style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
+                    <select id="wrk-service-type"
+                        style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
+                        <option value="">Cargando tipos...</option>
+                    </select>
                     <input type="number" id="wrk-rate" placeholder="Tarifa HH" min="0"
                         style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
-                    <button onclick="addCatalogItem('workers')" class="btn btn-primary btn-sm">&#43; Agregar</button>
+                    <button id="add-workers-btn" onclick="addCatalogItem('workers')" class="btn btn-primary btn-sm">&#43; Agregar</button>
                 </div>
                 <div id="cat-list-workers" style="border:1px solid #334155;border-radius:8px;overflow:hidden;background:#1e293b;">
                     <div style="padding:1.25rem;text-align:center;color:#64748b;font-size:0.85rem;">Cargando...</div>
@@ -215,16 +223,20 @@ def settings_page():
 
             <!-- Panel Insumos -->
             <div id="cat-panel-items" style="display:none;">
-                <div style="display:grid;grid-template-columns:100px 1fr 80px 120px 100px;gap:0.5rem;margin-bottom:0.75rem;align-items:center;">
+                <div style="display:grid;grid-template-columns:110px 1fr 220px 80px 120px 100px;gap:0.5rem;margin-bottom:0.75rem;align-items:center;">
                     <input type="text" id="itm-code" placeholder="MAT-001"
                         style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
                     <input type="text" id="itm-desc" placeholder="Descripci&oacute;n del insumo"
                         style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
+                    <select id="itm-service-type"
+                        style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
+                        <option value="">Cargando tipos...</option>
+                    </select>
                     <input type="text" id="itm-unit" placeholder="un / m² / gl"
                         style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
                     <input type="number" id="itm-price" placeholder="Precio costo" min="0"
                         style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:0.55rem 0.7rem;color:#f1f5f9;font-size:0.82rem;">
-                    <button onclick="addCatalogItem('items')" class="btn btn-primary btn-sm">&#43; Agregar</button>
+                    <button id="add-items-btn" onclick="addCatalogItem('items')" class="btn btn-primary btn-sm">&#43; Agregar</button>
                 </div>
                 <div id="cat-list-items" style="border:1px solid #334155;border-radius:8px;overflow:hidden;background:#1e293b;">
                     <div style="padding:1.25rem;text-align:center;color:#64748b;font-size:0.85rem;">Cargando...</div>

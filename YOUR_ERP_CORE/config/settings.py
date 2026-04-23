@@ -4,14 +4,29 @@ Configuration and environment variables management
 Using Pydantic for type validation
 """
 import os
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _resolve_sqlite_database_name(database_name: str) -> str:
+    """Resolve relative SQLite paths against the ERP core directory."""
+    db_path = Path(database_name or "./erp_dev.db").expanduser()
+    if not db_path.is_absolute():
+        db_path = BASE_DIR / db_path
+    return str(db_path.resolve())
 
 
 class Settings(BaseSettings):
     """Application settings from environment variables"""
 
-    model_config = ConfigDict(env_file=".env", extra='ignore')
+    model_config = ConfigDict(
+        env_file=str(BASE_DIR / ".env"),
+        extra="ignore",
+    )
 
     # Environment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
@@ -28,7 +43,7 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         if self.DATABASE_TYPE == "sqlite":
-            return f"sqlite:///{self.DATABASE_NAME}"
+            return f"sqlite:///{_resolve_sqlite_database_name(self.DATABASE_NAME)}"
         elif self.DATABASE_TYPE == "postgresql":
             return (
                 f"postgresql://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}"

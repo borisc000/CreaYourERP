@@ -10,7 +10,7 @@ def crm_customers_page():
             <p>Gestiona la cartera de clientes de tu empresa</p>
         </div>
         <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
-            <a href="/app/crm" class="btn btn-ghost">&#8592; Pipeline</a>
+            <a href="/app/crm" class="btn btn-ghost">&#8592; Servicios</a>
             <button class="btn btn-primary" onclick="openCreateModal()">&#43; Nuevo Cliente</button>
         </div>
     </div>
@@ -93,10 +93,10 @@ def crm_customers_page():
                     <input type="text" id="cust-city" placeholder="Santiago">
                 </div>
             </div>
-            <div class="form-group">
-                <label>Documentos especificos de acreditacion</label>
-                <select id="cust-acc-template-selector" multiple size="6"></select>
-                <span class="text-muted text-sm">Se suman a los documentos estandar para este cliente y luego aplican automaticamente a los trabajadores asignados.</span>
+            <div class="form-group" style="margin-bottom:0;">
+                <span class="text-muted text-sm">
+                    La documentaci&oacute;n y las plantillas espec&iacute;ficas del cliente se gestionan desde Correspondencia Cruzada.
+                </span>
             </div>
         </div>
         <div class="modal-footer">

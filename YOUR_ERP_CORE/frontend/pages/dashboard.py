@@ -18,7 +18,7 @@ def dashboard_page():
                 <span class="dashboard-chip">Sincronizando modulos...</span>
             </div>
             <div class="dashboard-actions" id="dashboard-hero-actions">
-                <a href="/app/crm" class="btn btn-primary">Abrir pipeline</a>
+                <a href="/app/crm" class="btn btn-primary">Abrir servicios</a>
                 <a href="/app/inventory" class="btn btn-secondary">Ver operacion</a>
                 <a href="/app/signature-center" class="btn btn-ghost">Firmas</a>
             </div>

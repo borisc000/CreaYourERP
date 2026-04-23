@@ -1,6 +1,7 @@
 const recruitmentState = {
     stats: {},
     departments: [],
+    jobProfiles: [],
     stages: [],
     jobs: [],
     candidates: [],
@@ -103,9 +104,10 @@ function badge(text, color = '#334155', fg = '#e2e8f0') {
 }
 
 async function loadRecruitmentData() {
-    const [statsRes, departmentsRes, stagesRes, jobsRes, candidatesRes, applicationsRes, interviewsRes] = await Promise.all([
+    const [statsRes, departmentsRes, jobProfilesRes, stagesRes, jobsRes, candidatesRes, applicationsRes, interviewsRes] = await Promise.all([
         API.get('/recruitment/stats'),
         API.get('/recruitment/departments'),
+        API.get('/job-profiles/profiles'),
         API.get('/recruitment/stages'),
         API.get('/recruitment/jobs'),
         API.get('/recruitment/candidates'),
@@ -115,6 +117,7 @@ async function loadRecruitmentData() {
 
     recruitmentState.stats = statsRes?.data || {};
     recruitmentState.departments = departmentsRes?.data?.results || [];
+    recruitmentState.jobProfiles = jobProfilesRes?.data?.results || [];
     recruitmentState.stages = stagesRes?.data?.results || [];
     recruitmentState.jobs = jobsRes?.data?.results || [];
     recruitmentState.candidates = candidatesRes?.data?.results || [];
@@ -122,11 +125,25 @@ async function loadRecruitmentData() {
     recruitmentState.interviews = interviewsRes?.data?.results || [];
 
     renderRecruitmentStats();
+    renderPipeline();
     renderJobs();
     renderCandidates();
     renderApplications();
     renderInterviews();
     fillRecruitmentSelects();
+    applyJobProfileDeepLink();
+}
+
+function applyJobProfileDeepLink() {
+    const params = new URLSearchParams(window.location.search || '');
+    const profileId = Number(params.get('job_profile_id') || 0);
+    if (!profileId || !recruitmentState.jobProfiles.some(item => item.id === profileId)) return;
+    openJobModal();
+    document.getElementById('job-profile').value = String(profileId);
+    syncJobFromProfile();
+    const url = new URL(window.location.href);
+    url.searchParams.delete('job_profile_id');
+    window.history.replaceState({}, '', url.toString());
 }
 
 function renderRecruitmentStats() {
@@ -135,6 +152,34 @@ function renderRecruitmentStats() {
     document.getElementById('rec-stat-applications').textContent = recruitmentState.stats.applications_active ?? 0;
     document.getElementById('rec-stat-ready-hire').textContent = recruitmentState.stats.applications_ready_to_hire ?? 0;
     document.getElementById('rec-stat-hires').textContent = recruitmentState.stats.applications_hired ?? 0;
+}
+
+function renderPipeline() {
+    const board = document.getElementById('applications-pipeline');
+    if (!board) return;
+    const stages = [...recruitmentState.stages].sort((a, b) => (a.order || 0) - (b.order || 0));
+    if (!stages.length) {
+        board.innerHTML = '<div class="empty">No hay etapas configuradas</div>';
+        return;
+    }
+    board.innerHTML = stages.map(stage => {
+        const items = recruitmentState.applications.filter(item => item.stage_id === stage.id);
+        const topItems = items.slice(0, 4).map(item => `
+            <div style="padding:0.7rem 0.8rem;border-radius:0.85rem;background:#f8fafc;border:1px solid #e5e7eb;margin-top:0.5rem;">
+                <strong style="font-size:0.88rem;">${escapeHtml(item.candidate_name || '-')}</strong>
+                <div class="text-sm text-muted">${escapeHtml(item.job_title || '-')}</div>
+                <div style="margin-top:0.35rem;">${readinessBadge(item.readiness_status, item.readiness_label, item.readiness_completion)}</div>
+            </div>
+        `).join('');
+        return `
+            <div class="stat-card" style="margin-bottom:0;">
+                <div class="label">${escapeHtml(stage.name || '-')}</div>
+                <div class="value" style="font-size:1.45rem;">${items.length}</div>
+                <div class="sub">${stage.is_terminal ? 'Etapa terminal' : 'Etapa activa'}</div>
+                ${topItems || '<div class="text-sm text-muted" style="margin-top:0.75rem;">Sin postulaciones</div>'}
+            </div>
+        `;
+    }).join('');
 }
 
 function renderJobs() {
@@ -157,7 +202,11 @@ function renderJobs() {
     body.innerHTML = jobs.map(job => `
         <tr>
             <td>${escapeHtml(job.code)}</td>
-            <td><strong>${escapeHtml(job.title)}</strong><div class="text-sm text-muted">${escapeHtml(job.location || '')}</div></td>
+            <td>
+                <strong>${escapeHtml(job.title)}</strong>
+                <div class="text-sm text-muted">${escapeHtml(job.job_profile_name || 'Sin perfil asociado')} ${job.job_profile_code ? `· ${escapeHtml(job.job_profile_code)}` : ''}</div>
+                <div class="text-sm text-muted">${escapeHtml(job.location || '')}</div>
+            </td>
             <td>${escapeHtml(job.department_name || '-')}</td>
             <td>${statusBadge(job.status)}</td>
             <td>${badge(`${job.active_applications || 0} activas`, '#0f172a')} ${badge(`${job.hired_count || 0} contratadas`, '#052e16', '#4ade80')}</td>
@@ -323,6 +372,7 @@ function readinessBadge(status, label, completion) {
 }
 
 function fillRecruitmentSelects() {
+    fillSelect('job-profile', recruitmentState.jobProfiles, 'id', item => `${item.code || ''} - ${item.name || ''}`.trim(), true);
     fillSelect('job-department', recruitmentState.departments, 'id', item => item.name, true);
     fillSelect('application-job', recruitmentState.jobs, 'id', item => `${item.code} - ${item.title}`);
     fillSelect('application-candidate', recruitmentState.candidates, 'id', item => item.full_name);
@@ -356,6 +406,7 @@ function closeModal(id) {
 function openJobModal() {
     document.getElementById('job-modal-title').textContent = 'Nueva Vacante';
     document.getElementById('job-id').value = '';
+    document.getElementById('job-profile').value = '';
     document.getElementById('job-title').value = '';
     document.getElementById('job-department').value = '';
     document.getElementById('job-status').value = 'draft';
@@ -368,7 +419,44 @@ function openJobModal() {
     document.getElementById('job-salary-max').value = '';
     document.getElementById('job-description').value = '';
     document.getElementById('job-requirements').value = '';
+    ['job-inline-profile-name', 'job-inline-profile-code', 'job-inline-profile-objective', 'job-inline-profile-scope', 'job-inline-profile-functions', 'job-inline-profile-responsibilities', 'job-inline-profile-risks'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    document.getElementById('job-inline-profile-box').style.display = 'none';
     document.getElementById('job-modal').classList.add('open');
+}
+
+function toggleQuickProfileForm() {
+    const box = document.getElementById('job-inline-profile-box');
+    if (!box) return;
+    const nextVisible = box.style.display === 'none' || !box.style.display;
+    box.style.display = nextVisible ? '' : 'none';
+    if (nextVisible) {
+        document.getElementById('job-profile').value = '';
+        const title = document.getElementById('job-title')?.value || '';
+        if (!document.getElementById('job-inline-profile-name').value) {
+            document.getElementById('job-inline-profile-name').value = title;
+        }
+    }
+}
+
+function syncJobFromProfile() {
+    const profileId = Number(document.getElementById('job-profile')?.value || 0);
+    const profile = recruitmentState.jobProfiles.find(item => item.id === profileId);
+    if (!profile) return;
+    document.getElementById('job-title').value = profile.name || document.getElementById('job-title').value;
+    document.getElementById('job-department').value = profile.department_id || '';
+    document.getElementById('job-description').value = [profile.objective || '', profile.scope || ''].filter(Boolean).join('\n\n');
+    const requirements = [];
+    (profile.functions || []).slice(0, 12).forEach(item => requirements.push(`Funcion: ${item.title}`));
+    (profile.responsibilities || []).slice(0, 12).forEach(item => requirements.push(`Responsabilidad: ${item.title}`));
+    (profile.risks || []).slice(0, 12).forEach(item => {
+        const risk = [item.task_name, item.hazard_factor, item.risk_name].filter(Boolean).join(' - ');
+        if (risk) requirements.push(`Riesgo: ${risk}`);
+    });
+    if (requirements.length) document.getElementById('job-requirements').value = requirements.join('\n');
+    document.getElementById('job-inline-profile-box').style.display = 'none';
 }
 
 function openCandidateModal() {
@@ -456,6 +544,7 @@ function editJob(id) {
     openJobModal();
     document.getElementById('job-modal-title').textContent = 'Editar Vacante';
     document.getElementById('job-id').value = job.id;
+    document.getElementById('job-profile').value = job.job_profile_id || '';
     document.getElementById('job-title').value = job.title || '';
     document.getElementById('job-department').value = job.department_id || '';
     document.getElementById('job-status').value = job.status || 'draft';
@@ -617,7 +706,9 @@ function openHireModal(id) {
 async function saveJob(event) {
     event.preventDefault();
     const id = document.getElementById('job-id').value;
+    const inlineProfileVisible = document.getElementById('job-inline-profile-box')?.style.display !== 'none';
     const payload = {
+        job_profile_id: document.getElementById('job-profile').value || null,
         title: document.getElementById('job-title').value,
         department_id: document.getElementById('job-department').value || null,
         status: document.getElementById('job-status').value,
@@ -631,6 +722,18 @@ async function saveJob(event) {
         description: document.getElementById('job-description').value,
         requirements: document.getElementById('job-requirements').value,
     };
+    if (!payload.job_profile_id && inlineProfileVisible && document.getElementById('job-inline-profile-name').value.trim()) {
+        payload.inline_job_profile = {
+            name: document.getElementById('job-inline-profile-name').value,
+            code: document.getElementById('job-inline-profile-code').value,
+            department_id: document.getElementById('job-department').value || null,
+            objective: document.getElementById('job-inline-profile-objective').value,
+            scope: document.getElementById('job-inline-profile-scope').value,
+            functions: parseLines(document.getElementById('job-inline-profile-functions').value),
+            responsibilities: parseLines(document.getElementById('job-inline-profile-responsibilities').value),
+            risks: parseLines(document.getElementById('job-inline-profile-risks').value),
+        };
+    }
     const res = id ? await API.put(`/recruitment/jobs/${id}`, payload) : await API.post('/recruitment/jobs', payload);
     if (res?.success) {
         closeModal('job-modal');

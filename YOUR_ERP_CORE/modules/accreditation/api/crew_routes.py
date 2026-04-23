@@ -16,6 +16,55 @@ router = APIRouter(
     tags=["accreditation-crew"],
 )
 
+ROLE_LABELS = {
+    "supervisor": "Supervisor",
+    "operator": "Operador",
+    "helper": "Ayudante",
+}
+STATUS_LABELS = {
+    "assigned": "Asignado",
+    "active": "Activo",
+    "removed": "Removido",
+}
+ROLE_ALIASES = {
+    "supervisor": "supervisor",
+    "operator": "operator",
+    "operador": "operator",
+    "helper": "helper",
+    "ayudante": "helper",
+}
+
+
+def _normalize_role(role: str | None) -> str:
+    normalized = str(role or "operator").strip().lower()
+    return ROLE_ALIASES.get(normalized, normalized)
+
+
+def _employee_payload(employee_id: int) -> dict:
+    try:
+        from modules.hr.module_hr import EmployeeProfile
+
+        employee = EmployeeProfile.find_by_id(employee_id)
+    except Exception:
+        employee = None
+
+    if not employee:
+        return {
+            "employee_name": f"Trabajador #{employee_id}",
+            "employee_code": "",
+            "employee_national_id": "",
+            "employee_email": "",
+            "employee_phone": "",
+        }
+
+    return {
+        "employee_name": employee.full_name or f"Trabajador #{employee_id}",
+        "employee_code": employee.employee_code or "",
+        "employee_national_id": employee.national_id or "",
+        "employee_email": employee.work_email or employee.personal_email or "",
+        "employee_phone": employee.phone or "",
+    }
+
 
 def _serialize(assignment: CrewAssignment) -> dict:
     """Serialize a CrewAssignment including its id and default values."""
@@ -24,6 +73,9 @@ def _serialize(assignment: CrewAssignment) -> dict:
     for field_name, field_def in CrewAssignment._fields.items():
         if field_name not in data:
             data[field_name] = getattr(assignment, field_name, field_def.column.default)
+    data.update(_employee_payload(assignment.employee_id))
+    data["role_label"] = ROLE_LABELS.get(data.get("role") or "", data.get("role") or "Sin rol")
+    data["status_label"] = STATUS_LABELS.get(data.get("status") or "", data.get("status") or "Sin estado")
     return data
 
 
@@ -64,7 +116,7 @@ async def add_crew_members(service_order_id: int, crew_data: dict):
     order = _get_order_or_404(service_order_id)
 
     employee_ids = crew_data.get("employee_ids", [])
-    role = crew_data.get("role", "operator")
+    role = _normalize_role(crew_data.get("role", "operator"))
 
     if not employee_ids:
         raise HTTPException(status_code=400, detail="employee_ids is required")
@@ -152,7 +204,7 @@ async def bulk_assign_crew(service_order_id: int, bulk_data: dict):
     created = []
     for item in items:
         emp_id = item.get("employee_id")
-        role = item.get("role", "operator")
+        role = _normalize_role(item.get("role", "operator"))
         if not emp_id:
             continue
 

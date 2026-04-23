@@ -136,6 +136,11 @@ def setup_accreditation_listeners():
             from modules.document_center.module_document_center import (
                 DocumentTemplate,
                 GeneratedDocument,
+                _b64decode,
+                _b64encode,
+                _build_pdf,
+                _merge_docx,
+                _slugify,
             )
 
             template = DocumentTemplate.find_by_id(template_id)
@@ -148,41 +153,50 @@ def setup_accreditation_listeners():
                 logger.error(f"Template {template_id} not found")
                 return
 
-            # Render template content with Jinja2 if available
-            template_content = getattr(template, "template_data", "") or ""
-            document_content = ""
-            if template_content:
-                try:
-                    from core.template_processor import TemplateProcessor
-
-                    rendered = TemplateProcessor.render_template(
-                        template_content, personalization
-                    )
-                    document_content = rendered.get(
-                        "rendered_content", template_content
-                    )
-                except Exception:
-                    document_content = template_content
-
-            if not document_content:
-                document_content = (
-                    f"Generated document for requirement (template {template_id})"
-                )
+            template_bytes = _b64decode(getattr(template, "template_data", "") or "")
+            merged_docx, preview_text = _merge_docx(template_bytes, personalization or {})
+            output_name = f"{template.name or 'Acreditacion'} - trabajador {employee_id}"
+            pdf_bytes = _build_pdf(
+                output_name,
+                merged_docx,
+                preview_text,
+                extra_lines=[
+                    f"Solicitud acreditacion #{doc_gen_request_id}",
+                    f"Servicio/OC: {service_order_id or '-'}",
+                ],
+            )
 
             # Create GeneratedDocument in Document Center
             generated_doc = GeneratedDocument.create({
                 "batch_id": 0,
                 "template_id": template_id,
                 "company_id": company_id,
-                "name": f"Accreditation doc - employee {employee_id}",
-                "output_filename": f"accreditation_{employee_id}_{template_id}.docx",
+                "name": output_name,
+                "output_filename": _slugify(output_name),
                 "employee_id": employee_id,
+                "service_order_id": service_order_id,
+                "subject_type": getattr(template, "subject_type", None) or "trabajador",
+                "subject_id": employee_id,
+                "template_scope_type": getattr(template, "scope_type", None)
+                or "general_empresa",
                 "source_module": "accreditation",
                 "source_record_id": doc_gen_request_id,
                 "target_module": "hr",
+                "target_record_id": service_order_id,
                 "merge_payload": personalization,
-                "docx_data": document_content,
-                "status": "generated",
+                "docx_data": _b64encode(merged_docx),
+                "pdf_data": _b64encode(pdf_bytes),
+                "preview_text": preview_text,
+                "template_signature_layout_snapshot": getattr(template, "signature_layout", [])
+                or [],
+                "signature_roles_snapshot": getattr(template, "signature_roles", [])
+                or [],
+                "signature_positions": getattr(template, "signature_layout", []) or [],
+                "signature_layout_confirmed": bool(
+                    getattr(template, "signature_layout_confirmed", False)
+                    or not getattr(template, "requires_signature", False)
+                ),
+                "status": "ready_for_review",
                 "requires_signature": bool(
                     getattr(template, "requires_signature", False)
                 ),
@@ -242,29 +256,13 @@ def setup_accreditation_listeners():
         if not gen_request:
             return
 
-        if requires_signature:
-            # Route to signature module via existing event
-            gen_request.status = "signature_pending"
-            gen_request.save()
-
-            EventBus.emit("correspondence.approved_for_signature", {
-                "correspondence_id": doc_gen_request_id,
-                "contract_id": None,
-                "document_content": (
-                    f"Accreditation document (gen request {doc_gen_request_id})"
-                ),
-                "template_id": data.get("template_id"),
-                "employee_id": data.get("employee_id"),
-                "service_order_id": data.get("service_order_id"),
-                "company_id": data.get("company_id"),
-                "source": "accreditation",
-            })
-            logger.info(
-                f"Document sent to signature module: {doc_gen_request_id}"
-            )
-        else:
-            # No signature needed - auto-register in accreditation
-            _auto_register_accreditation(gen_request, data)
+        _auto_register_accreditation(
+            gen_request,
+            data,
+            verification_status="pending_review" if requires_signature else "approved",
+            signature_status="pending" if requires_signature else "not_required",
+            request_status="signature_pending" if requires_signature else "signed",
+        )
 
     # ------------------------------------------------------------------
     # 5. signature.completed
@@ -309,7 +307,13 @@ def setup_accreditation_listeners():
     # ------------------------------------------------------------------
     # Helper
     # ------------------------------------------------------------------
-    def _auto_register_accreditation(gen_request, data):
+    def _auto_register_accreditation(
+        gen_request,
+        data,
+        verification_status="approved",
+        signature_status="signed",
+        request_status="signed",
+    ):
         """
         Register the generated document as an EmployeeAccreditationDocument
         and recompute the accreditation check.
@@ -334,28 +338,73 @@ def setup_accreditation_listeners():
             else f"Accreditation - Req #{requirement_id}"
         )
 
-        accred_doc = EmployeeAccreditationDocument.create({
+        existing_docs = EmployeeAccreditationDocument.search([
+            ("employee_id", "=", employee_id),
+            ("requirement_id", "=", requirement_id),
+        ])
+        accred_doc = next(
+            (
+                item
+                for item in existing_docs
+                if item.company_id == company_id
+                and (
+                    not gen_request.generated_document_id
+                    or item.generated_document_id == gen_request.generated_document_id
+                )
+            ),
+            None,
+        )
+
+        payload = {
             "employee_id": employee_id,
             "requirement_id": requirement_id,
             "company_id": company_id,
             "document_name": doc_name,
             "document_url": (
-                f"/documents/generated/{gen_request.generated_document_id}"
+                f"/app/cross-correspondence?generated_document_id={gen_request.generated_document_id}"
             ),
-            "verification_status": "approved",
+            "document_origin": "template_generated",
+            "template_id": gen_request.template_id,
+            "generated_document_id": gen_request.generated_document_id,
+            "service_order_id": service_order_id,
+            "verification_status": verification_status,
             "notes": (
                 f"Auto-generated from accreditation check "
                 f"(service order {service_order_id})"
             ),
             "source_module": "accreditation",
-        })
+            "signature_request_id": gen_request.signature_request_id,
+            "signature_status": signature_status,
+            "signed_document_url": (
+                f"/app/cross-correspondence?generated_document_id={gen_request.generated_document_id}"
+                if signature_status == "signed"
+                else ""
+            ),
+        }
+        if accred_doc:
+            for field_name, value in payload.items():
+                setattr(accred_doc, field_name, value)
+            accred_doc.save()
+        else:
+            accred_doc = EmployeeAccreditationDocument.create(payload)
 
         # Update generation request
-        gen_request.status = "signed"
+        gen_request.status = request_status
         gen_request.accreditation_document_id = (
             accred_doc.id if accred_doc else None
         )
         gen_request.save()
+
+        if gen_request.generated_document_id and accred_doc:
+            try:
+                from modules.document_center.module_document_center import GeneratedDocument
+
+                generated_doc = GeneratedDocument.find_by_id(gen_request.generated_document_id)
+                if generated_doc:
+                    generated_doc.accreditation_document_id = accred_doc.id
+                    generated_doc.save()
+            except Exception as link_exc:
+                logger.warning(f"Could not link GeneratedDocument to accreditation doc: {link_exc}")
 
         logger.info(
             f"Accreditation document registered: "

@@ -39,6 +39,7 @@ import uuid
 import hashlib
 import json
 from core.time_utils import utc_now
+from core.local_persistence import LocalSQLiteStore
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Date,
     Text, JSON, ForeignKey, Index, UniqueConstraint,
@@ -227,6 +228,8 @@ class FieldDefinition:
 
 class BaseModelMeta(ABCMeta):
     """Metaclass para BaseModel (mínima, sin magia oculta)"""
+
+    _registry: Dict[str, Type["BaseModel"]] = {}
     
     def __new__(mcs, name, bases, namespace):
         # Extraer campos
@@ -238,8 +241,12 @@ class BaseModelMeta(ABCMeta):
                 del namespace[key]
         
         namespace['_fields'] = fields
-        
-        return super().__new__(mcs, name, bases, namespace)
+
+        cls = super().__new__(mcs, name, bases, namespace)
+        tablename = getattr(cls, "__tablename__", "") or ""
+        if tablename and name != "BaseModel":
+            BaseModelMeta._registry[tablename] = cls
+        return cls
 
 
 class BaseModel(ABC, metaclass=BaseModelMeta):
@@ -279,6 +286,8 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
     # Almacenamiento en memoria por clase: { tablename: { id: instance } }
     _store: Dict[str, Dict[int, "BaseModel"]] = {}
     _id_counters: Dict[str, int] = {}
+    _persistence_backend: Optional[LocalSQLiteStore] = None
+    _loaded_tables: Dict[str, bool] = {}
 
     def __init__(self, **kwargs):
         """Inicializar modelo con valores"""
@@ -292,6 +301,64 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
             if field_name in self._fields:
                 setattr(self, field_name, value)
                 self._data[field_name] = value
+
+    @classmethod
+    def _get_persistence_backend(cls) -> LocalSQLiteStore:
+        """Obtener el backend SQLite local compartido."""
+        if BaseModel._persistence_backend is None:
+            BaseModel._persistence_backend = LocalSQLiteStore()
+        return BaseModel._persistence_backend
+
+    @classmethod
+    def initialize_persistence(cls, preload_all: bool = True) -> None:
+        """Inicializar almacenamiento local y recargar tablas conocidas."""
+        backend = cls._get_persistence_backend()
+        backend.ensure_ready()
+        if preload_all:
+            for tablename, model_cls in list(BaseModelMeta._registry.items()):
+                model_cls._ensure_table_loaded()
+
+    @classmethod
+    def persistence_ready(cls) -> bool:
+        """Indicar si el almacenamiento local ya está disponible."""
+        return BaseModel._persistence_backend is not None
+
+    @classmethod
+    def persistence_database_path(cls) -> Optional[str]:
+        backend = BaseModel._persistence_backend
+        return str(backend.db_path) if backend else None
+
+    @classmethod
+    def _from_persisted_payload(cls, record_id: int, payload: Dict[str, Any]) -> "BaseModel":
+        """Reconstruir una instancia desde el payload persistido."""
+        instance = cls.__new__(cls)
+        object.__setattr__(instance, "_id", int(record_id))
+        object.__setattr__(instance, "_data", dict(payload))
+        object.__setattr__(instance, "_original_data", dict(payload))
+        object.__setattr__(instance, "_dirty", False)
+        return instance
+
+    @classmethod
+    def _ensure_table_loaded(cls) -> None:
+        """Cargar una tabla desde SQLite solo una vez por proceso."""
+        table = cls.__tablename__
+        if not table:
+            return
+
+        if BaseModel._loaded_tables.get(table):
+            return
+
+        backend = cls._get_persistence_backend()
+        rows = backend.load_table(table)
+        store = BaseModel._store.setdefault(table, {})
+        max_id = 0
+        for record_id, payload in rows:
+            instance = cls._from_persisted_payload(record_id, payload)
+            store[record_id] = instance
+            max_id = max(max_id, record_id)
+
+        BaseModel._id_counters[table] = max(BaseModel._id_counters.get(table, 0), max_id)
+        BaseModel._loaded_tables[table] = True
     
     # ========================================================================
     # PROPIEDADES Y GETTERS/SETTERS
@@ -358,13 +425,15 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
     
     def save(self) -> bool:
         """
-        Guardar cambios en BD (almacenamiento en memoria).
+        Guardar cambios en memoria y en SQLite local.
 
         Si el registro es nuevo, inserta.
         Si ya existe, actualiza.
         """
         try:
             table = self.__tablename__
+            self._ensure_table_loaded()
+            backend = self._get_persistence_backend()
 
             # Hooks
             self.before_save()
@@ -380,6 +449,7 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
                 BaseModel._id_counters[table] += 1
                 self._id = BaseModel._id_counters[table]
                 BaseModel._store[table][self._id] = self
+                backend.upsert(table, self._id, self._data)
 
                 self.logger.debug(f"Inserted {self.__class__.__name__} #{self._id}")
                 self.after_insert()
@@ -389,6 +459,7 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
 
                 if table in BaseModel._store:
                     BaseModel._store[table][self._id] = self
+                backend.upsert(table, self._id, self._data)
 
                 self.logger.debug(f"Updated {self.__class__.__name__} #{self._id}")
                 self.after_update()
@@ -411,6 +482,7 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
             table = self.__tablename__
             if table in BaseModel._store and self._id in BaseModel._store[table]:
                 del BaseModel._store[table][self._id]
+            self._get_persistence_backend().delete(table, self._id)
 
             self.logger.debug(f"Deleted {self.__class__.__name__} #{self._id}")
             self.after_delete()
@@ -424,6 +496,7 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
     def find_by_id(cls, id: int) -> Optional["BaseModel"]:
         """Obtener por ID"""
         table = cls.__tablename__
+        cls._ensure_table_loaded()
         store = BaseModel._store.get(table, {})
         return store.get(id)
 
@@ -437,6 +510,7 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
         Operators: =, !=, <, >, <=, >=, in, not in, like, ilike
         """
         table = cls.__tablename__
+        cls._ensure_table_loaded()
         store = BaseModel._store.get(table, {})
         results = list(store.values())
 
@@ -485,6 +559,7 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
     @classmethod
     def count(cls, domain: List[Tuple] = None) -> int:
         """Contar registros"""
+        cls._ensure_table_loaded()
         return len(cls.search(domain))
     
     # ========================================================================

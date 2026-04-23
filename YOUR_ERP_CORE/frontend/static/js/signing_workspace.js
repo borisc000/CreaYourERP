@@ -84,12 +84,32 @@ function redrawAll() {
 }
 
 function downloadBase64File(fileName, mimeType, data) {
+    const binary = atob(String(data || ''));
+    const chunkSize = 8192;
+    const chunks = [];
+    for (let offset = 0; offset < binary.length; offset += chunkSize) {
+        const slice = binary.slice(offset, offset + chunkSize);
+        const bytes = new Uint8Array(slice.length);
+        for (let i = 0; i < slice.length; i += 1) {
+            bytes[i] = slice.charCodeAt(i);
+        }
+        chunks.push(bytes);
+    }
+    const blob = new Blob(chunks, { type: mimeType || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
-    anchor.href = `data:${mimeType};base64,${data}`;
+    anchor.href = url;
     anchor.download = fileName;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function downloadSignedPdf() {
+    if (!signingDocument?.signed_document) return;
+    const baseName = (signingDocument.document_name || signingDocument.name || 'documento').replace(/\.pdf$/i, '');
+    downloadBase64File(`${baseName}_firmado.pdf`, 'application/pdf', signingDocument.signed_document);
 }
 
 function downloadEvidence() {
@@ -115,9 +135,8 @@ function renderEvidencePills() {
 function renderSuccessActions() {
     const target = document.getElementById('sign-success-actions');
     if (!target || !signingDocument) return;
-    const baseName = (signingDocument.document_name || signingDocument.name || 'documento').replace(/\.pdf$/i, '');
     target.innerHTML = `
-        ${signingDocument.signed_document ? `<button class="btn btn-primary" onclick="downloadBase64File('${safeEscape(`${baseName}_firmado.pdf`)}', 'application/pdf', '${safeEscape(signingDocument.signed_document)}')">Descargar PDF firmado</button>` : ''}
+        ${signingDocument.signed_document ? '<button class="btn btn-primary" onclick="downloadSignedPdf()">Descargar PDF firmado</button>' : ''}
         ${signingDocument.integrity_payload ? '<button class="btn btn-ghost" onclick="downloadEvidence()">Descargar evidencia</button>' : ''}
     `;
 }
@@ -129,14 +148,25 @@ function mountDocumentWorkspace() {
         signWorkspace.destroy();
         signWorkspace = null;
     }
+    const currentRole = signingDocument.current_signer?.role_key || '';
+    const visiblePositions = currentRole
+        ? (signingDocument.signature_positions || []).filter((item) => (
+            String(item.role_key || item.signer_role || '').trim() === currentRole
+        ))
+        : signingDocument.signature_positions || [];
     signWorkspace = PdfSignatureWorkspace.create(host, {
-        title: signingDocument.status === 'signed' ? 'PDF firmado' : 'PDF pendiente de firma',
+        title: signingDocument.status === 'signed' || signingDocument.current_signer?.status === 'signed'
+            ? 'PDF firmado'
+            : 'PDF pendiente de firma',
         readOnly: true,
-        pdfBase64: signingDocument.status === 'signed' && signingDocument.signed_document
+        showMarkers: !(signingDocument.status === 'signed' || signingDocument.current_signer?.status === 'signed'),
+        pdfBase64: (signingDocument.status === 'signed' || signingDocument.current_signer?.status === 'signed') && signingDocument.signed_document
             ? signingDocument.signed_document
             : signingDocument.document_data,
         pdfLayout: signingDocument.pdf_layout || [],
-        positions: signingDocument.signature_positions || [],
+        positions: visiblePositions.length ? visiblePositions : signingDocument.signature_positions || [],
+        signers: signingDocument.signers || [],
+        activeRoleKey: currentRole,
     });
     signWorkspace.load();
 }
@@ -150,11 +180,12 @@ function showDocumentState() {
     document.getElementById('doc-expires').textContent = signingDocument.expires_at ? new Date(signingDocument.expires_at).toLocaleDateString() : '-';
     renderEvidencePills();
 
-    if (signingDocument.status === 'signed') {
+    const signerAlreadySigned = signingDocument.current_signer?.status === 'signed';
+    if (signingDocument.status === 'signed' || signerAlreadySigned) {
         document.getElementById('sign-content').style.display = 'block';
         document.getElementById('sign-form-area').style.display = 'none';
         document.getElementById('sign-success').style.display = 'block';
-        document.getElementById('signed-at').textContent = `Firmado el: ${signingDocument.signed_at || '-'}`;
+        document.getElementById('signed-at').textContent = `Firmado el: ${signingDocument.current_signer?.signed_at || signingDocument.signed_at || '-'}`;
         renderSuccessActions();
     } else {
         document.getElementById('sign-content').style.display = 'block';
@@ -176,6 +207,9 @@ async function loadDocument() {
     }
 
     signingDocument = payload.data;
+    if (signingDocument?.current_signer?.signer_email && document.getElementById('signer-email')) {
+        document.getElementById('signer-email').value = signingDocument.current_signer.signer_email;
+    }
     showDocumentState();
 }
 

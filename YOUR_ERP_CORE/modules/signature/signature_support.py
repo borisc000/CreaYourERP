@@ -14,8 +14,11 @@ from reportlab.pdfgen import canvas as reportlab_canvas
 try:
     from pypdf import PdfReader, PdfWriter
 except Exception:  # pragma: no cover
-    PdfReader = None
-    PdfWriter = None
+    try:
+        from PyPDF2 import PdfReader, PdfWriter
+    except Exception:
+        PdfReader = None
+        PdfWriter = None
 
 
 DEFAULT_PDF_LAYOUT = [{"page": 0, "width": 595.28, "height": 841.89, "rotation": 0}]

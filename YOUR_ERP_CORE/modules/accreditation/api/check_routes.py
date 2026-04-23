@@ -24,6 +24,32 @@ router = APIRouter(
     tags=["accreditation-checks"],
 )
 
+ROLE_LABELS = {
+    "supervisor": "Supervisor",
+    "operator": "Operador",
+    "helper": "Ayudante",
+}
+
+
+def _employee_meta(employee_id: int, service_order_id: int) -> dict:
+    from modules.hr.module_hr import EmployeeProfile
+
+    employee = EmployeeProfile.find_by_id(employee_id) if employee_id else None
+    assignment = CrewAssignment.search([
+        ("service_order_id", "=", service_order_id),
+        ("employee_id", "=", employee_id),
+        ("status", "!=", "removed"),
+    ], limit=1)
+    member = assignment[0] if assignment else None
+    return {
+        "employee_name": getattr(employee, "full_name", None) or f"Trabajador #{employee_id}",
+        "employee_code": getattr(employee, "employee_code", "") or "",
+        "employee_national_id": getattr(employee, "national_id", "") or "",
+        "employee_email": getattr(employee, "work_email", "") or getattr(employee, "personal_email", "") or "",
+        "role": getattr(member, "role", "") or "",
+        "role_label": ROLE_LABELS.get(getattr(member, "role", "") or "", getattr(member, "role", "") or "Sin rol"),
+    }
+
 
 def _serialize_check(check: AccreditationCheck) -> dict:
     data = check.to_dict()
@@ -69,16 +95,13 @@ async def get_accreditation_matrix(service_order_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error computing checks: {e}")
 
-    from modules.hr.module_hr import EmployeeProfile
-
     results = []
     for check_data in checks:
         employee_id = check_data.get("employee_id")
-        emp = EmployeeProfile.find_by_id(employee_id) if employee_id else None
-        employee_name = getattr(emp, "full_name", f"Employee #{employee_id}") if emp else f"Employee #{employee_id}"
+        employee_meta = _employee_meta(employee_id, service_order_id)
         results.append({
             "employee_id": employee_id,
-            "employee_name": employee_name,
+            **employee_meta,
             "level_a_status": check_data.get("level_a_status", "pending"),
             "level_a_total": check_data.get("level_a_total", 0),
             "level_a_valid": check_data.get("level_a_valid", 0),
@@ -104,7 +127,7 @@ async def get_employee_check(service_order_id: int, employee_id: int):
     """
     order = _get_order_or_404(service_order_id)
 
-    from modules.hr.module_hr import EmployeeProfile, AccreditationRequirement
+    from modules.hr.module_hr import AccreditationRequirement
 
     try:
         check_data = AccreditationService.compute_check(
@@ -113,8 +136,7 @@ async def get_employee_check(service_order_id: int, employee_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error computing check: {e}")
 
-    emp = EmployeeProfile.find_by_id(employee_id)
-    employee_name = getattr(emp, "full_name", f"Employee #{employee_id}") if emp else f"Employee #{employee_id}"
+    employee_meta = _employee_meta(employee_id, service_order_id)
 
     # Build per-requirement breakdown using the missing IDs
     def _build_details(missing_ids):
@@ -134,7 +156,7 @@ async def get_employee_check(service_order_id: int, employee_id: int):
 
     return {
         "employee_id": employee_id,
-        "employee_name": employee_name,
+        **employee_meta,
         "level_a_status": check_data.get("level_a_status", "pending"),
         "level_a_total": check_data.get("level_a_total", 0),
         "level_a_valid": check_data.get("level_a_valid", 0),

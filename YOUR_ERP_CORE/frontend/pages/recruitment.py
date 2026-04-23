@@ -27,6 +27,19 @@ def recruitment_page():
     </div>
 
     <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+            <div>
+                <h3 style="margin:0;">Pipeline de seleccion</h3>
+                <p class="text-muted" style="margin:0.35rem 0 0;">Vista por etapas desde postulacion hasta contratacion, conectada con la vacante y su perfil de cargo.</p>
+            </div>
+            <a href="/app/job-profiles" class="btn btn-ghost btn-sm">Biblioteca de perfiles</a>
+        </div>
+        <div id="applications-pipeline" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-top:1rem;">
+            <div class="empty">Cargando pipeline...</div>
+        </div>
+    </div>
+
+    <div class="card">
         <h3>
             Vacantes
             <span class="text-sm text-muted" id="jobs-count"></span>
@@ -115,10 +128,34 @@ def recruitment_page():
     </div>
 
     <div class="modal-overlay" id="job-modal">
-        <div class="modal">
+        <div class="modal" style="max-width:min(1060px,96vw);width:min(1060px,96vw);">
             <h2 id="job-modal-title">Nueva Vacante</h2>
             <form onsubmit="saveJob(event)">
                 <input type="hidden" id="job-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Perfil de cargo</label>
+                        <select id="job-profile" onchange="syncJobFromProfile()"></select>
+                    </div>
+                    <div class="form-group" style="display:flex;align-items:end;">
+                        <button type="button" class="btn btn-ghost" onclick="toggleQuickProfileForm()">Crear perfil rapido en este flujo</button>
+                    </div>
+                </div>
+                <div id="job-inline-profile-box" style="display:none;padding:1rem;border-radius:1rem;background:#f8fafc;border:1px solid #e5e7eb;margin-bottom:1rem;">
+                    <div class="form-row">
+                        <div class="form-group"><label>Nombre perfil</label><input id="job-inline-profile-name"></div>
+                        <div class="form-group"><label>Codigo perfil</label><input id="job-inline-profile-code" placeholder="SUP-OPS"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Objetivo</label><textarea id="job-inline-profile-objective" rows="3"></textarea></div>
+                        <div class="form-group"><label>Alcance</label><textarea id="job-inline-profile-scope" rows="3"></textarea></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Funciones base (una por linea)</label><textarea id="job-inline-profile-functions" rows="3"></textarea></div>
+                        <div class="form-group"><label>Responsabilidades (una por linea)</label><textarea id="job-inline-profile-responsibilities" rows="3"></textarea></div>
+                    </div>
+                    <div class="form-group"><label>Riesgos base (uno por linea)</label><textarea id="job-inline-profile-risks" rows="3"></textarea></div>
+                </div>
                 <div class="form-row">
                     <div class="form-group"><label>Titulo *</label><input id="job-title" required></div>
                     <div class="form-group"><label>Departamento</label><select id="job-department"></select></div>

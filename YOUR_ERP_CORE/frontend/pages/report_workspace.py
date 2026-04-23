@@ -651,5 +651,5 @@ def report_workspace_page(report_id):
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
         """,
-        scripts=["report_pdf_generator.js", "report_workspace.js"]
+        scripts=["report_pdf_generator.js?v=2", "report_workspace.js"]
     )

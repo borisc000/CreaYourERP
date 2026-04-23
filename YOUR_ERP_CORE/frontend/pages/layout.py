@@ -1,5 +1,14 @@
+import json
+import time
+
+from core.mvp import MVP_DISABLED_MODULES
+
+
+ASSET_VERSION = str(int(time.time()))
+
+
 def base_layout(title, page_id, content, scripts=None, no_sidebar=False):
-    asset_version = "4.4"
+    asset_version = ASSET_VERSION
     sidebar = ""
     main_class = "main-content"
     main_extra = ""
@@ -17,90 +26,80 @@ def base_layout(title, page_id, content, scripts=None, no_sidebar=False):
                 <a href="/app/dashboard" data-roles="superadmin,company_admin,employee">
                     <span class="icon">&#9632;</span> Dashboard
                 </a>
-
-                <div class="nav-section" data-roles="superadmin,company_admin,employee" data-module="crm">CRM</div>
-                <a href="/app/crm" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="crm">
-                    <span class="icon">&#128200;</span> Pipeline
+                <a href="/app/tasks" data-roles="superadmin,company_admin,employee" data-module="tasks">
+                    <span class="icon">&#9989;</span> Tareas / Actividades
                 </a>
-                <a href="/app/crm/customers" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="crm">
-                    <span class="icon">&#127970;</span> Clientes
+
+                <div class="nav-section" data-roles="superadmin,company_admin,employee">CRM</div>
+                <a href="/app/crm" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="crm">
+                    <span class="icon">&#128200;</span> Servicios
                 </a>
                 <a href="/app/quotes" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="crm">
                     <span class="icon">&#128196;</span> Cotizaciones
                 </a>
+                <a href="/app/crm/customers" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="crm">
+                    <span class="icon">&#127970;</span> Clientes
+                </a>
                 <a href="/app/catalogs" class="nav-child" data-roles="superadmin,company_admin" data-module="crm">
-                    <span class="icon">&#128218;</span> Cat&aacute;logos
+                    <span class="icon">&#128218;</span> Cat&aacute;logo
                 </a>
 
-                <div class="nav-section" data-roles="superadmin,company_admin,employee" data-module="finance">Finanzas</div>
-                <a href="/app/billing" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="finance">
-                    <span class="icon">&#128179;</span> Facturaci&oacute;n
+                <div class="nav-section" data-roles="superadmin,company_admin,employee">Finanzas</div>
+                <a href="/app/planning" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="finance">
+                    <span class="icon">&#128200;</span> Planificacion / Presupuesto
                 </a>
-
-                <div class="nav-section" data-roles="superadmin,company_admin,employee" data-module="recruitment">Talento</div>
-                <a href="/app/recruitment" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="recruitment">
-                    <span class="icon">&#128188;</span> Reclutamiento
-                </a>
-                <a href="/app/hr" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="hr">
-                    <span class="icon">&#128101;</span> Recursos Humanos
-                </a>
-                <a href="/app/job-profiles" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="hr">
-                    <span class="icon">&#129489;</span> Perfiles de Cargo
-                </a>
-                <a href="/app/attendance" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="hr">
-                    <span class="icon">&#128337;</span> Control Asistencia
-                </a>
-                <a href="/app/payroll" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="payroll">
-                    <span class="icon">&#128178;</span> Remuneraciones
-                </a>
-                <a href="/app/accreditation" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="hr">
-                    <span class="icon">&#128203;</span> Acreditaciones
-                </a>
-
-                <div class="nav-section" data-roles="superadmin,company_admin,employee" data-module="document_center">Documentos</div>
-                <a href="/app/cross-correspondence" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="document_center">
-                    <span class="icon">&#128196;</span> Correspondencia Cruzada
-                </a>
-
-                <div class="nav-section" data-roles="superadmin,company_admin,employee" data-module="signature">Firmas</div>
-                <a href="/app/signature-center" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="signature">
-                    <span class="icon">&#9998;</span> Control de Firmas
-                </a>
-
-                <div class="nav-section" data-roles="superadmin,company_admin,employee" data-module="operations">Operaciones</div>
-                <a href="/app/rentals" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="rentals">
-                    <span class="icon">&#128666;</span> Arriendos
+                <a href="/app/expenses" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="finance">
+                    <span class="icon">&#128176;</span> Control de Gastos
                 </a>
                 <a href="/app/inventory" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="inventory">
                     <span class="icon">&#128230;</span> Inventario
                 </a>
+                <a href="/app/suppliers" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="suppliers">
+                    <span class="icon">&#129309;</span> Proveedores
+                </a>
+
+                <div class="nav-section" data-roles="superadmin,company_admin,employee">Personas</div>
+                <a href="/app/hr" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="hr">
+                    <span class="icon">&#128101;</span> Ciclo Laboral
+                </a>
+                <a href="/app/accreditation" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="hr">
+                    <span class="icon">&#128203;</span> Acreditaciones
+                </a>
+                <a href="/app/recruitment" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="recruitment">
+                    <span class="icon">&#128188;</span> Reclutamiento
+                </a>
+                <a href="/app/job-profiles" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="hr">
+                    <span class="icon">&#129489;</span> Perfiles de Cargo
+                </a>
+
+                <div class="nav-section" data-roles="superadmin,company_admin,employee">Documentos</div>
+                <a href="/app/cross-correspondence" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="document_center">
+                    <span class="icon">&#128196;</span> Correspondencia Cruzada
+                </a>
+                <a href="/app/signature-center" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="signature">
+                    <span class="icon">&#9998;</span> Control de Firmas
+                </a>
+
+                <div class="nav-section" data-roles="superadmin,company_admin,employee">Prevenci&oacute;n</div>
                 <a href="/app/safety" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="safety">
                     <span class="icon">&#9888;</span> Seguridad
                 </a>
-                <a href="/app/safety/admin" class="nav-child" data-roles="superadmin,company_admin" data-module="safety">
-                    <span class="icon">&#9881;</span> Reglas MIPER
+                <a href="/app/safety/activities" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="safety">
+                    <span class="icon">&#128218;</span> Biblioteca BOT
                 </a>
-                <a href="/app/safety/locations" class="nav-child" data-roles="superadmin,company_admin" data-module="safety">
-                    <span class="icon">&#127760;</span> Ubicaciones MIPER
+                <a href="/app/safety/procedures" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="safety">
+                    <span class="icon">&#128220;</span> Procedimientos
                 </a>
-
-                <div class="nav-section" data-roles="superadmin,company_admin,employee" data-module="operations">Normativa</div>
-                <a href="/app/riohs" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="operations">
-                    <span class="icon">&#128203;</span> RIOHS / RIHS
+                <a href="/app/safety/miper" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="safety">
+                    <span class="icon">&#9638;</span> Matriz MIPER
                 </a>
 
-                <div class="nav-section" data-roles="superadmin,company_admin" data-module="settings">Administraci&oacute;n</div>
+                <div class="nav-section" data-roles="superadmin,company_admin">Administraci&oacute;n</div>
                 <a href="/app/users" class="nav-child" data-roles="superadmin,company_admin" data-module="settings">
                     <span class="icon">&#9679;</span> Usuarios
                 </a>
                 <a href="/app/settings" class="nav-child" data-roles="superadmin,company_admin" data-module="settings">
                     <span class="icon">&#9881;</span> Configuraci&oacute;n
-                </a>
-                <a href="/app/google-workspace" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="google_workspace">
-                    <span class="icon">&#9729;</span> Google Workspace
-                </a>
-                <a href="/app/ai" class="nav-child" data-roles="superadmin,company_admin,employee" data-module="ai">
-                    <span class="icon">&#129302;</span> IA y Agentes
                 </a>
             </nav>
             <div class="sidebar-footer">
@@ -138,6 +137,9 @@ def base_layout(title, page_id, content, scripts=None, no_sidebar=False):
 </main>
 </div>
 <div id="toast" class="toast"></div>
+<script>
+window.__ERP_MVP_DISABLED_MODULES = {json.dumps(sorted(MVP_DISABLED_MODULES))};
+</script>
 <script src="/static/js/api.js?v={asset_version}"></script>
 {scripts_html}
 <script>

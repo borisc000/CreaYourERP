@@ -65,11 +65,25 @@ async function generateReportPDF(reportId) {
             margin,
             pageWidth,
         });
+
+        const coverThumbnails = [];
+        for (let i = 0; i < checkpoints.length; i++) {
+            const cp = checkpoints[i];
+            if (cp.photos && cp.photos.length > 0) {
+                const fullAsset = await loadCheckpointPhotoAsset(cp.photos[0], imageAssetCache);
+                const thumbAsset = await extractSquareThumbnailFromAsset(fullAsset);
+                coverThumbnails.push(thumbAsset);
+            } else {
+                coverThumbnails.push(null);
+            }
+        }
+
         drawCoverPage(doc, report, checkpoints, totalPhotos, pdfContext, {
             pageWidth,
             pageHeight,
             margin,
             contentWidth,
+            coverThumbnails,
         });
 
         for (let i = 0; i < checkpoints.length; i++) {
@@ -101,21 +115,6 @@ async function generateReportPDF(reportId) {
                 });
             }
         }
-
-        doc.addPage();
-        paintPageChrome(doc, report, pdfContext, { logoAsset, qrDataUrl, margin, pageWidth });
-        drawSummaryPage(doc, report, checkpoints, pdfContext, {
-            margin,
-            contentWidth,
-            pageHeight,
-        });
-
-        doc.addPage();
-        paintPageChrome(doc, report, pdfContext, { logoAsset, qrDataUrl, margin, pageWidth });
-        drawSignaturesPage(doc, report, pdfContext, {
-            margin,
-            contentWidth,
-        });
 
         addPageFooters(doc, {
             margin,
@@ -183,9 +182,9 @@ function paintPageChrome(doc, report, context, options) {
         doc.text(line, margin + 27, 17 + (index * 4));
     });
 
-    const rightBoxX = pageWidth - margin - 56;
+    const rightBoxX = pageWidth - margin - 74;
     doc.setDrawColor(255, 255, 255);
-    doc.roundedRect(rightBoxX, 6, 56, 18, 2.5, 2.5, 'S');
+    doc.roundedRect(rightBoxX, 6, 74, 18, 2.5, 2.5, 'S');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.text('REPORTE DE TERRENO', rightBoxX + 3, 11);
@@ -195,11 +194,13 @@ function paintPageChrome(doc, report, context, options) {
     doc.setFontSize(8);
     doc.text(`Estado: ${report.estado || 'ABIERTO'}`, rightBoxX + 3, 22.5);
     if (context.projectCode) {
-        doc.text(truncateText(context.projectCode, 18), rightBoxX + 53, 22.5, { align: 'right' });
+        doc.text(truncateText(context.projectCode, 14), rightBoxX + 54, 22.5, { align: 'right' });
     }
 
     if (qrDataUrl) {
-        doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 15, 32.5, 15, 15);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(rightBoxX + 57, 7.5, 15, 15, 1.5, 1.5, 'F');
+        doc.addImage(qrDataUrl, 'PNG', rightBoxX + 57.5, 8, 14, 14);
     }
 
     doc.setDrawColor(...REPORT_PDF_THEME.line);
@@ -207,72 +208,33 @@ function paintPageChrome(doc, report, context, options) {
 }
 
 function drawCoverPage(doc, report, checkpoints, totalPhotos, context, layout) {
-    const { margin, contentWidth } = layout;
-    let y = 42;
+    const { margin, contentWidth, pageHeight, coverThumbnails } = layout;
+    let y = 38;
 
     doc.setTextColor(...REPORT_PDF_THEME.text);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.text('Reporte de Terreno', margin, y);
+    doc.setFontSize(16);
+    doc.text('Resumen Ejecutivo', margin, y);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setTextColor(...REPORT_PDF_THEME.textMuted);
-    y += 5;
-    doc.text('Documento operativo con checkpoints, observaciones y evidencia fotográfica.', margin, y);
+    y += 4;
+    doc.text('Documento consolidado de ejecución, validación y verificación de servicio.', margin, y);
 
-    y += 8;
-    doc.setFillColor(...REPORT_PDF_THEME.panel);
-    doc.setDrawColor(...REPORT_PDF_THEME.line);
-    doc.roundedRect(margin, y, contentWidth, 30, 3, 3, 'FD');
-
-    doc.setTextColor(...REPORT_PDF_THEME.accent);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('SERVICIO / PROYECTO', margin + 4, y + 6);
-    doc.setTextColor(...REPORT_PDF_THEME.text);
-    doc.setFontSize(14);
-    doc.text((report.servicio || 'Sin nombre').toUpperCase(), margin + 4, y + 13);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...REPORT_PDF_THEME.textMuted);
-    doc.text(`Emisión: ${formatDateShort(report.emision)}`, margin + 4, y + 20);
-    doc.text(`Estado: ${report.estado || 'ABIERTO'}`, margin + 58, y + 20);
-    doc.text(
-        context.projectCode ? `Código: ${truncateText(context.projectCode, 26)}` : `Reporte: ${context.reportNumber || report.id}`,
-        margin + 110,
-        y + 20
-    );
-    doc.text(context.leadTitle ? truncateText(context.leadTitle, 52) : 'Documento operativo del servicio ejecutado', margin + 4, y + 25.2);
-
-    y += 38;
-    const infoHeight = drawInfoGrid(doc, [
-        ['Empresa cliente', context.customerName || report.empresa || 'No informada'],
-        ['RUT empresa', context.customerRut || 'No informado'],
-        ['Correo empresa', context.customerEmail || 'No informado'],
-        ['Representante', context.representativeName || report.mandante || 'No informado'],
-        ['Correo representante', context.representativeEmail || 'No informado'],
-        ['Tipo de servicio', context.serviceType || report.tiposervicio || 'No informado'],
-        ['Supervisor', report.supervisor || 'No informado'],
-        ['APR / ADM', [report.apr || '', report.adm || ''].filter(Boolean).join(' · ') || 'No informado'],
-        ['Área / Sector', [report.area || '', report.sector || ''].filter(Boolean).join(' · ') || 'No informado'],
-        ['Verificación QR', context.verificationUrl ? truncateText(context.verificationUrl, 72) : 'Disponible en el código QR del documento'],
-    ], {
+    y += 6;
+    const serviceCardHeight = drawCoverServiceCard(doc, report, context, {
         x: margin,
         y,
         width: contentWidth,
-        columns: 2,
-        minCellHeight: 13,
-        maxLines: 3,
     });
 
-    y += infoHeight + 7;
+    y += serviceCardHeight + 6;
     drawMetricsStrip(doc, [
         ['Checkpoints', String(checkpoints.length)],
-        ['Fotos', String(totalPhotos)],
-        ['Primer hito', checkpoints[0]?.tipo || '—'],
-        ['Último hito', checkpoints.length ? checkpoints[checkpoints.length - 1].tipo || '—' : '—'],
+        ['Fotos Adjuntas', String(totalPhotos)],
+        ['Primer Hito', checkpoints[0]?.tipo || '—'],
+        ['Último Hito', checkpoints.length ? checkpoints[checkpoints.length - 1].tipo || '—' : '—'],
     ], {
         x: margin,
         y,
@@ -280,48 +242,214 @@ function drawCoverPage(doc, report, checkpoints, totalPhotos, context, layout) {
     });
 
     y += 24;
+    
+    // Firmas Y (al final de la página)
+    const signatureHeight = 25; 
+    const signaturesY = pageHeight - margin - signatureHeight - 7;
+    
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setTextColor(...REPORT_PDF_THEME.text);
-    doc.text('Resumen ejecutivo', margin, y);
+    doc.text('Resumen de Checkpoints', margin, y);
 
-    y += 5;
+    y += 4;
+    const availableHeightForList = signaturesY - y - 6;
     doc.setFillColor(248, 250, 252);
-    doc.roundedRect(margin, y, contentWidth, 56, 3, 3, 'FD');
+    doc.roundedRect(margin, y, contentWidth, availableHeightForList, 2.5, 2.5, 'FD');
     doc.setDrawColor(...REPORT_PDF_THEME.line);
 
-    const previewRows = checkpoints.slice(0, 6);
+    const rowHeight = 18;
+    const maxRows = Math.floor((availableHeightForList - 4) / rowHeight);
+    
+    const previewRows = checkpoints.slice(0, maxRows);
     if (!previewRows.length) {
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         doc.setTextColor(...REPORT_PDF_THEME.textMuted);
         doc.text('Aún no existen checkpoints en este reporte.', margin + 5, y + 10);
-        return;
+    } else {
+        let cursorY = y + 4;
+        previewRows.forEach((checkpoint, index) => {
+            if (index > 0) {
+                doc.setDrawColor(...REPORT_PDF_THEME.line);
+                doc.line(margin + 4, cursorY, margin + contentWidth - 4, cursorY);
+            }
+            
+            const thumbAsset = coverThumbnails && coverThumbnails[index];
+            const thumbSize = 13;
+            if (thumbAsset) {
+                doc.addImage(thumbAsset.dataUrl, thumbAsset.format, margin + 5, cursorY + 2.5, thumbSize, thumbSize);
+            } else {
+                doc.setFillColor(235, 239, 245);
+                doc.roundedRect(margin + 5, cursorY + 2.5, thumbSize, thumbSize, 1.5, 1.5, 'F');
+            }
+
+            const textX = margin + 5 + thumbSize + 5;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9.5);
+            doc.setTextColor(...REPORT_PDF_THEME.accent);
+            doc.text(`${index + 1}. ${checkpoint.tipo || 'ITEM'}`, textX, cursorY + 6.5);
+
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...REPORT_PDF_THEME.textMuted);
+            doc.setFontSize(8);
+            doc.text(formatDateShort(checkpoint.emision), margin + contentWidth - 5, cursorY + 6.5, { align: 'right' });
+
+            const description = checkpoint.descripcion || 'Sin observaciones.';
+            const lines = doc.splitTextToSize(description, contentWidth - thumbSize - 20);
+            doc.setFontSize(8.5);
+            doc.setTextColor(...REPORT_PDF_THEME.text);
+            doc.text(lines.slice(0, 2), textX, cursorY + 11.5);
+            
+            cursorY += rowHeight;
+        });
+
+        if (checkpoints.length > maxRows) {
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(8);
+            doc.setTextColor(...REPORT_PDF_THEME.textMuted);
+            doc.text(`+ ${checkpoints.length - maxRows} checkpoints adicionales detallados en las páginas siguientes.`, margin + 5, y + availableHeightForList - 3);
+        }
     }
 
-    let cursorY = y + 9;
-    previewRows.forEach((checkpoint, index) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...REPORT_PDF_THEME.text);
+    doc.text('Firmas de Recepción', margin, signaturesY - 2.5);
+
+    const cards = [
+        ['Supervisor', report.supervisor || 'Pendiente'],
+        ['Prevencionista', report.apr || 'Pendiente'],
+        ['Admin (ADM)', report.adm || 'Pendiente'],
+        ['Mandante', context.representativeName || report.mandante || 'Pendiente'],
+    ];
+
+    const cardWidth = (contentWidth - 12) / 4;
+    cards.forEach((card, index) => {
+        const x = margin + (index * (cardWidth + 4));
+        doc.setFillColor(255, 255, 255);
         doc.setDrawColor(...REPORT_PDF_THEME.line);
-        if (index > 0) {
-            doc.line(margin + 4, cursorY - 4, margin + contentWidth - 4, cursorY - 4);
-        }
+        doc.roundedRect(x, signaturesY, cardWidth, signatureHeight, 2, 2, 'FD');
 
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
+        doc.setFontSize(7.5);
         doc.setTextColor(...REPORT_PDF_THEME.accent);
-        doc.text(`${index + 1}. ${checkpoint.tipo || 'ITEM'}`, margin + 5, cursorY);
+        doc.text(card[0].toUpperCase(), x + 3, signaturesY + 5);
 
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...REPORT_PDF_THEME.textMuted);
-        doc.setFontSize(8.5);
-        doc.text(formatDateShort(checkpoint.emision), margin + contentWidth - 5, cursorY, { align: 'right' });
-
-        const lines = doc.splitTextToSize(checkpoint.descripcion || 'Sin observaciones.', contentWidth - 10);
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.setTextColor(...REPORT_PDF_THEME.text);
-        doc.text(lines.slice(0, 2), margin + 5, cursorY + 4.5);
-        cursorY += 12;
+        const nameLines = doc.splitTextToSize(card[1] || '', cardWidth - 6);
+        doc.text(nameLines.slice(0, 2), x + 3, signaturesY + 10);
+
+        doc.setDrawColor(...REPORT_PDF_THEME.textMuted);
+        doc.line(x + 3, signaturesY + 19, x + cardWidth - 3, signaturesY + 19);
+        doc.setFontSize(6.5);
+        doc.setTextColor(...REPORT_PDF_THEME.textMuted);
+        doc.text('Firma y Fecha', x + 3, signaturesY + 22);
     });
+}
+
+function drawCoverServiceCard(doc, report, context, options) {
+    const { x, y, width } = options;
+    const cardHeight = 58;
+    const inset = 4.5;
+    const verificationWidth = 54;
+    const verificationX = x + width - verificationWidth - inset;
+    const titleWidth = width - verificationWidth - (inset * 3);
+    const serviceName = truncateText(
+        normalizeCoverValue(report.servicio, normalizeCoverValue(context.leadTitle, 'Servicio sin nombre')).toUpperCase(),
+        64
+    );
+
+    doc.setFillColor(...REPORT_PDF_THEME.panel);
+    doc.setDrawColor(...REPORT_PDF_THEME.line);
+    doc.roundedRect(x, y, width, cardHeight, 2.5, 2.5, 'FD');
+
+    doc.setTextColor(...REPORT_PDF_THEME.accent);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text('SERVICIO / PROYECTO', x + inset, y + 6);
+
+    doc.setTextColor(...REPORT_PDF_THEME.text);
+    doc.setFontSize(13);
+    doc.text(doc.splitTextToSize(serviceName, titleWidth).slice(0, 1), x + inset, y + 13);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...REPORT_PDF_THEME.textMuted);
+    doc.text(
+        truncateText(normalizeCoverValue(context.leadTitle, 'Documento operativo del servicio ejecutado'), 74),
+        x + inset,
+        y + 18.5
+    );
+
+    doc.setFillColor(239, 246, 255);
+    doc.setDrawColor(191, 219, 254);
+    doc.roundedRect(verificationX, y + 4, verificationWidth, 18, 2, 2, 'FD');
+    doc.setTextColor(...REPORT_PDF_THEME.accent);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.4);
+    doc.text('VERIFICACIÓN', verificationX + 3, y + 8.7);
+    doc.setTextColor(...REPORT_PDF_THEME.text);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.6);
+    doc.text(
+        truncateText(normalizeCoverValue(context.verificationLabel, context.reportNumber || 'reporte'), 30),
+        verificationX + 3,
+        y + 13
+    );
+    doc.setTextColor(...REPORT_PDF_THEME.textMuted);
+    doc.setFontSize(6.8);
+    doc.text('Escanea QR o abre enlace', verificationX + 3, y + 17.2);
+
+    const gridY = y + 25;
+    const columnGap = 3;
+    const rowGap = 3;
+    const columns = 3;
+    const cellWidth = (width - (inset * 2) - ((columns - 1) * columnGap)) / columns;
+    const cellHeight = 11;
+    const rows = [
+        ['Fecha de emisión', report.emision ? formatDateShort(report.emision) : '—'],
+        ['Tipo de servicio', context.serviceType || report.tiposervicio],
+        ['Cliente', context.customerName || report.empresa],
+        ['Mandante', context.representativeName || report.mandante],
+        ['Área', report.area],
+        ['Sector', report.sector],
+    ];
+
+    rows.forEach((item, index) => {
+        const col = index % columns;
+        const row = Math.floor(index / columns);
+        drawCoverFieldCell(doc, item[0], item[1], {
+            x: x + inset + (col * (cellWidth + columnGap)),
+            y: gridY + (row * (cellHeight + rowGap)),
+            width: cellWidth,
+            height: cellHeight,
+        });
+    });
+
+    return cardHeight;
+}
+
+function drawCoverFieldCell(doc, label, rawValue, options) {
+    const { x, y, width, height } = options;
+    const value = normalizeCoverValue(rawValue);
+
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(224, 231, 243);
+    doc.roundedRect(x, y, width, height, 1.8, 1.8, 'FD');
+
+    doc.setTextColor(...REPORT_PDF_THEME.textMuted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.text(String(label || '').toUpperCase(), x + 2.2, y + 3.6);
+
+    doc.setTextColor(...REPORT_PDF_THEME.text);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.2);
+    const valueLines = doc.splitTextToSize(truncateText(value, 42), width - 4.4);
+    doc.text(valueLines.slice(0, 1), x + 2.2, y + 8.2);
 }
 
 function drawCheckpointPage(doc, checkpoint, index, total, photoAsset, photoIndex, photoCount, layout) {
@@ -396,127 +524,7 @@ function drawCheckpointPage(doc, checkpoint, index, total, photoAsset, photoInde
     );
 }
 
-function drawSummaryPage(doc, report, checkpoints, context, layout) {
-    const { margin, contentWidth } = layout;
-    let y = 42;
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(...REPORT_PDF_THEME.text);
-    doc.text('Resumen de checkpoints', margin, y);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(...REPORT_PDF_THEME.textMuted);
-    y += 5;
-    doc.text(`Reporte #${report.id} · ${checkpoints.length} checkpoint(s)`, margin, y);
-    if (context.verificationUrl) {
-        y += 5;
-        doc.text(`Verificación espejo: ${truncateText(context.verificationUrl, 88)}`, margin, y);
-    }
-
-    if (typeof doc.autoTable === 'function') {
-        doc.autoTable({
-            startY: y + 6,
-            margin: { left: margin, right: margin },
-            head: [['#', 'Fecha', 'Tipo', 'Descripción', 'Fotos']],
-            body: checkpoints.map((checkpoint, index) => [
-                String(index + 1),
-                formatDateShort(checkpoint.emision),
-                checkpoint.tipo || '—',
-                truncateText(checkpoint.descripcion || 'Sin observaciones.', 96),
-                String((checkpoint.photos && checkpoint.photos.length) || 0),
-            ]),
-            theme: 'grid',
-            styles: {
-                font: 'helvetica',
-                fontSize: 8.6,
-                cellPadding: 2.5,
-                lineColor: REPORT_PDF_THEME.line,
-                textColor: REPORT_PDF_THEME.text,
-            },
-            headStyles: {
-                fillColor: REPORT_PDF_THEME.ink,
-                textColor: REPORT_PDF_THEME.white,
-                fontStyle: 'bold',
-            },
-            alternateRowStyles: {
-                fillColor: [248, 250, 252],
-            },
-            columnStyles: {
-                0: { cellWidth: 12, halign: 'center' },
-                1: { cellWidth: 26 },
-                2: { cellWidth: 28 },
-                4: { cellWidth: 16, halign: 'center' },
-            },
-        });
-        return;
-    }
-
-    const rows = checkpoints.map((checkpoint, index) => (
-        `${index + 1}. ${formatDateShort(checkpoint.emision)} · ${checkpoint.tipo || '—'} · ${(checkpoint.photos || []).length} foto(s)`
-    ));
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(...REPORT_PDF_THEME.text);
-    doc.text(rows, margin, y + 12);
-}
-
-function drawSignaturesPage(doc, report, context, layout) {
-    const { margin, contentWidth } = layout;
-    let y = 42;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(...REPORT_PDF_THEME.text);
-    doc.text('Recepción y firmas', margin, y);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(...REPORT_PDF_THEME.textMuted);
-    y += 5;
-    doc.text('Espacios preparados para validación operativa del servicio reportado.', margin, y);
-
-    const cards = [
-        ['Supervisor de servicio', report.supervisor || 'Pendiente'],
-        ['Prevencionista', report.apr || 'Pendiente'],
-        ['Administrador de contrato', report.adm || 'Pendiente'],
-        ['Mandante', context.representativeName || report.mandante || 'Pendiente'],
-    ];
-
-    const cardWidth = (contentWidth - 8) / 2;
-    const cardHeight = 42;
-    let cursorY = y + 10;
-
-    cards.forEach((card, index) => {
-        const column = index % 2;
-        const row = Math.floor(index / 2);
-        const x = margin + (column * (cardWidth + 8));
-        const cardY = cursorY + (row * (cardHeight + 10));
-
-        doc.setFillColor(...REPORT_PDF_THEME.panel);
-        doc.setDrawColor(...REPORT_PDF_THEME.line);
-        doc.roundedRect(x, cardY, cardWidth, cardHeight, 3, 3, 'FD');
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(...REPORT_PDF_THEME.accent);
-        doc.text(card[0].toUpperCase(), x + 4, cardY + 7);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10.5);
-        doc.setTextColor(...REPORT_PDF_THEME.text);
-        const nameLines = doc.splitTextToSize(card[1], cardWidth - 8);
-        doc.text(nameLines, x + 4, cardY + 15);
-
-        doc.setDrawColor(...REPORT_PDF_THEME.textMuted);
-        doc.line(x + 4, cardY + 31, x + cardWidth - 4, cardY + 31);
-        doc.setFontSize(8);
-        doc.setTextColor(...REPORT_PDF_THEME.textMuted);
-        doc.text('Firma', x + 4, cardY + 35.5);
-        doc.text('Fecha', x + cardWidth - 18, cardY + 35.5);
-    });
-}
 
 function drawDescriptionCard(doc, description, options) {
     const { x, y, width } = options;
@@ -730,6 +738,36 @@ function blobToImageAsset(blob) {
     });
 }
 
+function extractSquareThumbnailFromAsset(asset) {
+    if (!asset || !asset.dataUrl) return Promise.resolve(null);
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const width = img.naturalWidth || img.width;
+            const height = img.naturalHeight || img.height;
+            const size = Math.min(width, height);
+            const sx = (width - size) / 2;
+            const sy = (height - size) / 2;
+            const renderSize = 256;
+            const canvas = document.createElement('canvas');
+            canvas.width = renderSize;
+            canvas.height = renderSize;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, renderSize, renderSize);
+            ctx.drawImage(img, sx, sy, size, size, 0, 0, renderSize, renderSize);
+            resolve({
+                dataUrl: canvas.toDataURL('image/jpeg', 0.85),
+                width: renderSize,
+                height: renderSize,
+                format: 'JPEG'
+            });
+        };
+        img.onerror = () => resolve(null);
+        img.src = asset.dataUrl;
+    });
+}
+
 async function loadGenericImageAsset(url) {
     if (!url) return null;
 
@@ -747,6 +785,7 @@ function buildPdfContext(report, settings, dossier) {
     const customer = dossier?.customer || {};
     const mandante = dossier?.mandante || {};
     const lead = dossier?.lead || {};
+    const reportNumber = lead.report_number || report.report_number || `RPT-${String(report.id || 0).padStart(5, '0')}`;
     const verificationPath = report?.mirror_url || (report?.public_token ? `/app/reports/verify/${report.public_token}` : '');
 
     return {
@@ -765,9 +804,10 @@ function buildPdfContext(report, settings, dossier) {
         projectCode: lead.project_code || '',
         leadTitle: lead.title || '',
         serviceType: dossier?.service_type?.name || report.tiposervicio || '',
-        reportNumber: lead.report_number || report.report_number || `RPT-${String(report.id || 0).padStart(5, '0')}`,
+        reportNumber,
         verificationPath,
         verificationUrl: toAbsoluteUrl(verificationPath),
+        verificationLabel: buildVerificationDisplayLabel(reportNumber),
     };
 }
 
@@ -775,6 +815,18 @@ function toAbsoluteUrl(path) {
     if (!path) return '';
     if (/^https?:\/\//i.test(path)) return path;
     return `${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+function buildVerificationDisplayLabel(reportNumber) {
+    const safeNumber = normalizeCoverValue(reportNumber, 'reporte');
+    const hostname = String(window.location.hostname || '').trim().replace(/^www\./i, '');
+    const isLocalHost = !hostname
+        || hostname === 'localhost'
+        || hostname === '127.0.0.1'
+        || /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)
+        || hostname.includes('.local');
+    const displayHost = isLocalHost ? 'app.midominio.cl' : hostname;
+    return `${displayHost}/v/${safeNumber}`;
 }
 
 function fitWithin(sourceWidth, sourceHeight, maxWidth, maxHeight) {
@@ -852,6 +904,14 @@ function truncateText(text, maxLength) {
     const normalized = String(text || '').replace(/\s+/g, ' ').trim();
     if (normalized.length <= maxLength) return normalized;
     return `${normalized.slice(0, Math.max(0, maxLength - 1))}…`;
+}
+
+function normalizeCoverValue(value, fallback = '—') {
+    const normalized = String(value ?? '').replace(/\s+/g, ' ').trim();
+    if (!normalized || normalized === 'sin-fecha' || /^--/.test(normalized) || /^seleccione/i.test(normalized)) {
+        return fallback;
+    }
+    return normalized;
 }
 
 window.generateReportPDF = generateReportPDF;

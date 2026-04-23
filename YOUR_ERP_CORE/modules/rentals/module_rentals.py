@@ -214,6 +214,8 @@ class RentalContract(BaseModel, AuditMixin):
     customer_id = Column(ColumnType.INTEGER, label="Customer")
     company_id = Column(ColumnType.INTEGER, required=True, label="Company")
     source_type = Column(ColumnType.STRING, default="manual", label="Source")
+    source_quote_id = Column(ColumnType.INTEGER, label="Source Quote")
+    source_quote_number = Column(ColumnType.STRING, label="Source Quote Number")
     status = Column(ColumnType.STRING, default="draft", label="Status")
     precheck_status = Column(ColumnType.STRING, default="pending", label="Precheck Status")
     legal_status = Column(ColumnType.STRING, default="pending", label="Legal Status")
@@ -244,6 +246,8 @@ class RentalContract(BaseModel, AuditMixin):
         self.title = _clean_str(self.title)
         self.rental_number = _clean_str(self.rental_number)
         self.source_type = _clean_str(self.source_type, "manual")
+        self.source_quote_id = _safe_int(self.source_quote_id)
+        self.source_quote_number = _clean_str(self.source_quote_number)
         self.status = _clean_str(self.status, "draft")
         self.precheck_status = _clean_str(self.precheck_status, "pending")
         self.legal_status = _clean_str(self.legal_status, "pending")
@@ -279,6 +283,8 @@ class RentalContract(BaseModel, AuditMixin):
             "customer_id": self.customer_id,
             "company_id": self.company_id,
             "source_type": self.source_type or "manual",
+            "source_quote_id": self.source_quote_id,
+            "source_quote_number": self.source_quote_number or "",
             "status": self.status or "draft",
             "precheck_status": self.precheck_status or "pending",
             "legal_status": self.legal_status or "pending",
@@ -632,6 +638,32 @@ class RentalsModule(BaseModule):
         if self.env.user and self.env.user.role != "superadmin" and asset.company_id != self._company_id():
             return None
         return asset
+
+    def _validate_contract_links(self, company_id: int, lead_id: Optional[int], customer_id: Optional[int]):
+        lead = None
+        if lead_id:
+            try:
+                from modules.crm.module_crm import Lead
+
+                lead = Lead.find_by_id(lead_id)
+            except Exception as exc:
+                raise ValidationError(f"Could not resolve linked lead: {exc}")
+            if not lead or lead.company_id != company_id:
+                raise ValidationError("Lead not found for this company")
+
+        if customer_id:
+            try:
+                from modules.crm.module_crm import Customer
+
+                customer = Customer.find_by_id(customer_id)
+            except Exception as exc:
+                raise ValidationError(f"Could not resolve linked customer: {exc}")
+            if not customer or customer.company_id != company_id:
+                raise ValidationError("Customer not found for this company")
+
+        if lead and not customer_id and lead.customer_id:
+            customer_id = lead.customer_id
+        return lead, customer_id
 
     def _log_to_lead(self, lead_id: Optional[int], action: str, details: str = "") -> None:
         if not lead_id:
@@ -1026,21 +1058,18 @@ class RentalsModule(BaseModule):
         title = data.get("title")
         customer_id = _safe_int(data.get("customer_id"))
         lead_id = _safe_int(data.get("lead_id"))
+        source_quote_id = _safe_int(data.get("source_quote_id"))
+        source_quote_number = _clean_str(data.get("source_quote_number"))
         source_type = "crm_lead" if lead_id else _clean_str(data.get("source_type"), "manual")
+        if source_quote_id:
+            source_type = _clean_str(data.get("source_type"), "accepted_quote")
 
-        if lead_id:
-            try:
-                from modules.crm.module_crm import Lead
-
-                lead = Lead.find_by_id(lead_id)
-                if not lead or lead.company_id != company_id:
-                    return Response.bad_request("Lead not found for this company")
-                if not title:
-                    title = f"Arriendo {lead.title}"
-                if not customer_id and lead.customer_id:
-                    customer_id = lead.customer_id
-            except Exception as exc:
-                return Response.bad_request(f"Could not resolve linked lead: {exc}")
+        try:
+            lead, customer_id = self._validate_contract_links(company_id, lead_id, customer_id)
+        except ValidationError as exc:
+            return Response.bad_request(str(exc))
+        if lead and not title:
+            title = f"Arriendo {lead.title}"
 
         try:
             contract = RentalContract.create(
@@ -1050,6 +1079,8 @@ class RentalsModule(BaseModule):
                     "customer_id": customer_id,
                     "company_id": company_id,
                     "source_type": source_type,
+                    "source_quote_id": source_quote_id,
+                    "source_quote_number": source_quote_number,
                     "status": data.get("status") or "draft",
                     "precheck_status": data.get("precheck_status") or "pending",
                     "legal_status": data.get("legal_status") or "pending",
@@ -1093,6 +1124,15 @@ class RentalsModule(BaseModule):
 
         data = request.data or {}
         try:
+            old_lead_id = contract.lead_id
+            new_lead_id = contract.lead_id
+            new_customer_id = contract.customer_id
+            if "lead_id" in data:
+                new_lead_id = _safe_int(data.get("lead_id"))
+            if "customer_id" in data:
+                new_customer_id = _safe_int(data.get("customer_id"))
+            _, new_customer_id = self._validate_contract_links(contract.company_id, new_lead_id, new_customer_id)
+
             for field in (
                 "title",
                 "status",
@@ -1107,15 +1147,16 @@ class RentalsModule(BaseModule):
                 "notes",
                 "closure_summary",
                 "source_type",
+                "source_quote_number",
             ):
                 if field in data:
                     setattr(contract, field, data.get(field))
-            if "customer_id" in data:
-                contract.customer_id = _safe_int(data.get("customer_id"))
-            if "lead_id" in data:
-                contract.lead_id = _safe_int(data.get("lead_id"))
+            contract.customer_id = new_customer_id
+            contract.lead_id = new_lead_id
             if "assigned_to" in data:
                 contract.assigned_to = _safe_int(data.get("assigned_to"))
+            if "source_quote_id" in data:
+                contract.source_quote_id = _safe_int(data.get("source_quote_id"))
             contract.validate()
             contract.save()
             if "lines" in data:
@@ -1123,6 +1164,10 @@ class RentalsModule(BaseModule):
             self._refresh_contract_totals(contract)
             self._refresh_contract_status_from_records(contract)
             self._recompute_asset_allocations(contract.company_id)
+            if old_lead_id and old_lead_id != contract.lead_id:
+                self._log_to_lead(old_lead_id, "Rental - Lead desvinculado", f"Expediente {contract.rental_number} reasignado a otra oportunidad")
+            if contract.lead_id and old_lead_id != contract.lead_id:
+                self._create_event(contract, "lead_linked", "Lead vinculado", f"Oportunidad #{contract.lead_id}", {"lead_id": contract.lead_id})
             self._create_event(contract, "updated", "Expediente actualizado", "Se actualizaron datos del arriendo")
             return Response.ok({"message": "Rental contract updated", **self._serialize_contract_workspace(contract)})
         except ValidationError as exc:

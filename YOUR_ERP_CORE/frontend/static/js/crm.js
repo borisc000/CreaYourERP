@@ -4,12 +4,15 @@
 
 // ── State ─────────────────────────────────────────────────────
 let CRM = {
-    stages:    [],   // [{id, name, order}]
-    customers:    [],   // [{id, name}]
-    users:        [],   // [{id, name}]
+    stages: [],   // [{id, name, order}]
+    leads: [],
+    filteredLeads: [],
+    customers: [],   // [{id, name}]
+    users: [],   // [{id, name}]
     serviceTypes: [],   // [{id, name}]
     dragLeadId: null,
 };
+let leadModalBaseline = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!API.getToken()) { window.location.href = '/app/login'; return; }
@@ -17,54 +20,191 @@ document.addEventListener('DOMContentLoaded', async () => {
     highlightNav('/app/crm');
     
     document.getElementById('lead-customer').addEventListener('change', async (e) => {
-        const customerId = e.target.value;
-        const mandanteSelect = document.getElementById('lead-mandante');
-        if (!customerId) {
-            mandanteSelect.innerHTML = '<option value="">— Seleccione un cliente —</option>';
-            mandanteSelect.disabled = true;
-            return;
-        }
-        mandanteSelect.disabled = true;
-        mandanteSelect.innerHTML = '<option value="">Cargando...</option>';
-        const res = await API.get(`/crm/customers/${customerId}/mandantes`);
-        if (res && res.success && res.data.results.length) {
-            populateSelect('lead-mandante', res.data.results, 'id', 'name', '— Sin contacto —');
-            mandanteSelect.disabled = false;
-        } else {
-            mandanteSelect.innerHTML = '<option value="">— Sin contactos B2B —</option>';
-            mandanteSelect.disabled = false;
-        }
+        await loadLeadMandantes(e.target.value);
     });
 
     await loadCRM();
 });
 
 async function loadCRM() {
-    await Promise.all([
-        loadStats(),
-        loadBoardData(),
-    ]);
+    await loadBoardData();
 }
 
 // ── Stats ─────────────────────────────────────────────────────
 async function loadStats() {
-    const res = await API.get('/crm/stats');
-    if (!res || !res.success) return;
-    const d = res.data;
-
-    setText('stat-pipeline',    formatMoney(d.pipeline_value));
-    setText('stat-open-leads',  d.open_leads + ' oportunidades abiertas');
-    setText('stat-won-value',   formatMoney(d.won_value));
-    setText('stat-won-leads',   d.won_leads + ' oportunidades ganadas');
-    setText('stat-conversion',  d.conversion_rate + '%');
-    setText('stat-customers',   d.total_customers);
+    renderCrmStats();
 }
 
 // ── Board data ────────────────────────────────────────────────
+function toComparableDate(value) {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toDateInput(value) {
+    const parsed = toComparableDate(value);
+    if (!parsed) return '';
+    const adjusted = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000);
+    return adjusted.toISOString().slice(0, 10);
+}
+
+function todayInputValue() {
+    const now = new Date();
+    const adjusted = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return adjusted.toISOString().slice(0, 10);
+}
+
+function shiftDays(date, deltaDays) {
+    const copy = new Date(date);
+    copy.setDate(copy.getDate() + deltaDays);
+    return copy;
+}
+
+function startOfMonth(date = new Date()) {
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function startOfYear(date = new Date()) {
+    return new Date(date.getFullYear(), 0, 1);
+}
+
+function getLeadDateValue(lead, fieldName) {
+    if (!lead || !fieldName) return null;
+    return toComparableDate(lead[fieldName] || '');
+}
+
+function populateCrmFilterServiceTypes() {
+    populateSelect('crm-filter-service-type', CRM.serviceTypes, 'id', 'name', 'Todos los tipos');
+}
+
+function applyCrmQuickPeriod() {
+    const period = document.getElementById('crm-filter-period')?.value || 'all';
+    const fromInput = document.getElementById('crm-filter-from');
+    const toInput = document.getElementById('crm-filter-to');
+    if (!fromInput || !toInput) return;
+
+    const today = new Date();
+    let from = '';
+    let to = '';
+
+    if (period === 'this_month') {
+        from = toDateInput(startOfMonth(today));
+        to = todayInputValue();
+    } else if (period === 'last_30') {
+        from = toDateInput(shiftDays(today, -29));
+        to = todayInputValue();
+    } else if (period === 'this_year') {
+        from = toDateInput(startOfYear(today));
+        to = todayInputValue();
+    } else if (period !== 'custom') {
+        from = '';
+        to = '';
+    }
+
+    if (period !== 'custom') {
+        fromInput.value = from;
+        toInput.value = to;
+    }
+    applyCrmFilters();
+}
+
+function syncCrmManualPeriod() {
+    const period = document.getElementById('crm-filter-period');
+    if (period) period.value = 'custom';
+    applyCrmFilters();
+}
+
+function clearCrmFilters() {
+    setVal('crm-filter-search', '');
+    setVal('crm-filter-status', 'open');
+    setVal('crm-filter-service-type', '');
+    setVal('crm-filter-date-field', 'created_at');
+    setVal('crm-filter-period', 'all');
+    setVal('crm-filter-from', '');
+    setVal('crm-filter-to', '');
+    applyCrmFilters();
+}
+
+function leadMatchesDateRange(lead, fieldName, fromValue, toValue) {
+    if (!fromValue && !toValue) return true;
+    const value = getLeadDateValue(lead, fieldName);
+    if (!value) return false;
+    const fromDate = fromValue ? new Date(`${fromValue}T00:00:00`) : null;
+    const toDate = toValue ? new Date(`${toValue}T23:59:59`) : null;
+    if (fromDate && value < fromDate) return false;
+    if (toDate && value > toDate) return false;
+    return true;
+}
+
+function applyCrmFilters() {
+    const search = (document.getElementById('crm-filter-search')?.value || '').trim().toLowerCase();
+    const status = document.getElementById('crm-filter-status')?.value || '';
+    const serviceTypeId = document.getElementById('crm-filter-service-type')?.value || '';
+    const dateField = document.getElementById('crm-filter-date-field')?.value || 'created_at';
+    const fromValue = document.getElementById('crm-filter-from')?.value || '';
+    const toValue = document.getElementById('crm-filter-to')?.value || '';
+
+    CRM.filteredLeads = CRM.leads.filter((lead) => {
+        if (status && lead.status !== status) return false;
+        if (serviceTypeId && String(lead.service_type_id || '') !== String(serviceTypeId)) return false;
+        if (!leadMatchesDateRange(lead, dateField, fromValue, toValue)) return false;
+
+        if (!search) return true;
+        const haystack = [
+            lead.project_code,
+            lead.title,
+            lead.customer_name,
+            lead.stage_name,
+            lead.assigned_name,
+            lead.service_name,
+            lead.source,
+        ].join(' ').toLowerCase();
+        return haystack.includes(search);
+    });
+
+    renderCrmStats();
+    renderCrmFilterSummary();
+    renderBoard();
+}
+
+function renderCrmStats() {
+    const leads = CRM.filteredLeads || [];
+    const openLeads = leads.filter((lead) => lead.status === 'open');
+    const wonLeads = leads.filter((lead) => lead.status === 'won');
+    const lostLeads = leads.filter((lead) => lead.status === 'lost');
+    const pipelineValue = openLeads.reduce((sum, lead) => sum + Number(lead.expected_revenue || 0), 0);
+    const wonValue = wonLeads.reduce((sum, lead) => sum + Number(lead.expected_revenue || 0), 0);
+    const conversionBase = wonLeads.length + lostLeads.length;
+    const conversionRate = conversionBase ? Math.round((wonLeads.length / conversionBase) * 100) : 0;
+    const activeCustomerIds = new Set(leads.map((lead) => lead.customer_id).filter(Boolean));
+
+    setText('stat-pipeline', formatMoney(pipelineValue));
+    setText('stat-open-leads', `${openLeads.length} oportunidades abiertas`);
+    setText('stat-won-value', formatMoney(wonValue));
+    setText('stat-won-leads', `${wonLeads.length} oportunidades ganadas`);
+    setText('stat-conversion', `${conversionRate}%`);
+    setText('stat-customers', activeCustomerIds.size || CRM.customers.length || 0);
+    setText(
+        'stat-customers-sub',
+        leads.length ? `${activeCustomerIds.size} clientes visibles en el filtro` : 'registrados en el sistema'
+    );
+}
+
+function renderCrmFilterSummary() {
+    const summary = document.getElementById('crm-filter-summary');
+    if (!summary) return;
+    const total = CRM.leads.length;
+    const visible = CRM.filteredLeads.length;
+    const periodLabel = document.getElementById('crm-filter-period')?.selectedOptions?.[0]?.textContent || 'Todo';
+    const dateFieldLabel = document.getElementById('crm-filter-date-field')?.selectedOptions?.[0]?.textContent || 'Creacion';
+    summary.textContent = `${visible} de ${total} servicio(s) visibles | periodo: ${periodLabel} | fecha base: ${dateFieldLabel}`;
+}
+
 async function loadBoardData() {
     const [stagesRes, leadsRes, customersRes, usersRes, servicesRes] = await Promise.all([
         API.get('/crm/stages'),
-        API.get('/crm/leads'),
+        API.get('/crm/leads?limit=500'),
         API.get('/crm/customers'),
         API.get('/users'),
         API.get('/crm/service-types'),
@@ -77,8 +217,8 @@ async function loadBoardData() {
     CRM.serviceTypes = servicesRes?.data?.results || [];
 
     populateSelect('lead-service-type', CRM.serviceTypes, 'id', 'name', '— Seleccione Tipo —');
-
-    renderBoard();
+    populateCrmFilterServiceTypes();
+    applyCrmQuickPeriod();
 }
 
 // ── Render Kanban ─────────────────────────────────────────────
@@ -97,7 +237,8 @@ function renderBoard() {
     const byStage = {};
     CRM.stages.forEach(s => { byStage[s.id] = []; });
     const unassigned = [];
-    CRM.leads.forEach(l => {
+    const visibleLeads = CRM.filteredLeads || [];
+    visibleLeads.forEach(l => {
         if (l.stage_id && byStage[l.stage_id] !== undefined) {
             byStage[l.stage_id].push(l);
         } else {
@@ -217,15 +358,76 @@ async function moveLeadToStage(leadId, newStageId) {
             lead.stage_id   = newStageId;
             lead.stage_name = CRM.stages.find(s => s.id === newStageId)?.name || '';
         }
-        renderBoard();
-        await loadStats();
+        applyCrmFilters();
     } else {
         showToast('Error al mover la oportunidad', 'error');
     }
 }
 
+async function loadLeadMandantes(customerId, selectedMandanteId = '') {
+    const mandanteSelect = document.getElementById('lead-mandante');
+    if (!mandanteSelect) return;
+    if (!customerId) {
+        mandanteSelect.innerHTML = '<option value="">— Seleccione un cliente —</option>';
+        mandanteSelect.disabled = true;
+        return;
+    }
+
+    mandanteSelect.disabled = true;
+    mandanteSelect.innerHTML = '<option value="">Cargando...</option>';
+    const res = await API.get(`/crm/customers/${customerId}/mandantes`);
+    const mandantes = res?.data?.results || [];
+    if (res && res.success && mandantes.length) {
+        populateSelect('lead-mandante', mandantes, 'id', 'name', '— Sin contacto —');
+        mandanteSelect.disabled = false;
+        setVal('lead-mandante', selectedMandanteId || '');
+        return;
+    }
+
+    mandanteSelect.innerHTML = '<option value="">— Sin contactos B2B —</option>';
+    mandanteSelect.disabled = false;
+}
+
+function getLeadModalState() {
+    return {
+        lead_id: document.getElementById('lead-id')?.value || '',
+        title: document.getElementById('lead-title')?.value || '',
+        customer_id: document.getElementById('lead-customer')?.value || '',
+        mandante_id: document.getElementById('lead-mandante')?.value || '',
+        stage_id: document.getElementById('lead-stage')?.value || '',
+        service_type_id: document.getElementById('lead-service-type')?.value || '',
+        revenue: document.getElementById('lead-revenue')?.value || '',
+        probability: document.getElementById('lead-probability')?.value || '',
+        priority: document.getElementById('lead-priority')?.value || '',
+        status: document.getElementById('lead-status')?.value || '',
+        assigned_to: document.getElementById('lead-assigned')?.value || '',
+        description: document.getElementById('lead-description')?.value || '',
+        source: document.getElementById('lead-source')?.value || '',
+        visit_date: document.getElementById('lead-visit')?.value || '',
+        quote_deadline: document.getElementById('lead-deadline')?.value || '',
+        po_number: document.getElementById('lead-oc')?.value || '',
+        report_number: document.getElementById('lead-report')?.value || '',
+        hes_number: document.getElementById('lead-hes')?.value || '',
+        invoice_number: document.getElementById('lead-invoice')?.value || '',
+        is_paid: !!document.getElementById('lead-paid')?.checked,
+        uploads: ['lead-docs-presales', 'lead-docs-oc', 'lead-docs-report', 'lead-docs-hes', 'lead-docs-payment'].map((id) => ({
+            id,
+            files: Array.from(document.getElementById(id)?.files || []).map((file) => `${file.name}:${file.size}`),
+        })),
+    };
+}
+
+function markLeadModalBaseline() {
+    leadModalBaseline = JSON.stringify(getLeadModalState());
+}
+
+function isLeadModalDirty() {
+    if (leadModalBaseline === null) return false;
+    return JSON.stringify(getLeadModalState()) !== leadModalBaseline;
+}
+
 // ── Lead Modal ────────────────────────────────────────────────
-function openLeadModal(leadId = null, defaultStageId = null) {
+async function openLeadModal(leadId = null, defaultStageId = null) {
     const modal = document.getElementById('lead-modal');
     const isEdit = leadId !== null;
 
@@ -254,8 +456,8 @@ function openLeadModal(leadId = null, defaultStageId = null) {
         setVal('lead-visit',       lead.visit_date || '');
         setVal('lead-deadline',    lead.quote_deadline || '');
         setVal('lead-service-type', lead.service_type_id || '');
-        setVal('lead-oc',          lead.oc_number || '');
-        setVal('lead-report',      lead.technical_report || '');
+        setVal('lead-oc',          lead.po_number || '');
+        setVal('lead-report',      lead.report_number || '');
         setVal('lead-hes',         lead.hes_number || '');
         setVal('lead-invoice',     lead.invoice_number || '');
         document.getElementById('lead-paid').checked = !!lead.is_paid;
@@ -267,8 +469,7 @@ function openLeadModal(leadId = null, defaultStageId = null) {
         
         // Trigger customer change to load mandantes, then set value
         if (lead.customer_id) {
-            document.getElementById('lead-customer').dispatchEvent(new Event('change'));
-            setTimeout(() => setVal('lead-mandante', lead.mandante_id || ''), 300);
+            await loadLeadMandantes(lead.customer_id, lead.mandante_id || '');
         } else {
             document.getElementById('lead-mandante').innerHTML = '<option value="">— Seleccione un cliente —</option>';
             document.getElementById('lead-mandante').disabled = true;
@@ -305,15 +506,22 @@ function openLeadModal(leadId = null, defaultStageId = null) {
     }
 
     modal.style.display = 'flex';
+    markLeadModalBaseline();
     setTimeout(() => document.getElementById('lead-title').focus(), 80);
 }
 
 function closeLeadModal() {
     document.getElementById('lead-modal').style.display = 'none';
+    leadModalBaseline = null;
 }
 
 function closeLeadModalOnBackdrop(event) {
-    if (event.target === document.getElementById('lead-modal')) closeLeadModal();
+    if (!erpModalAllowsBackdropClose(event, 'lead-modal')) return;
+}
+
+function requestCloseLeadModal() {
+    if (isLeadModalDirty() && !confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return;
+    closeLeadModal();
 }
 
 async function saveLead() {
@@ -336,8 +544,8 @@ async function saveLead() {
         source:           document.getElementById('lead-source').value || null,
         visit_date:       document.getElementById('lead-visit').value || null,
         quote_deadline:   document.getElementById('lead-deadline').value || null,
-        oc_number:        document.getElementById('lead-oc').value.trim() || null,
-        technical_report: document.getElementById('lead-report').value.trim() || null,
+        po_number:        document.getElementById('lead-oc').value.trim() || null,
+        report_number:    document.getElementById('lead-report').value.trim() || null,
         hes_number:       document.getElementById('lead-hes').value.trim() || null,
         invoice_number:   document.getElementById('lead-invoice').value.trim() || null,
         is_paid:          document.getElementById('lead-paid').checked,
@@ -390,9 +598,9 @@ async function saveLead() {
         }
 
         showToast(id ? 'Oportunidad actualizada' : 'Oportunidad creada', 'success');
+        markLeadModalBaseline();
         closeLeadModal();
         await loadBoardData();
-        await loadStats();
     } else {
         showToast((res?.errors || ['Error desconocido']).join(', '), 'error');
     }
@@ -409,8 +617,7 @@ async function deleteLead() {
         showToast('Oportunidad eliminada', 'success');
         closeLeadModal();
         CRM.leads = CRM.leads.filter(l => l.id !== parseInt(id));
-        renderBoard();
-        await loadStats();
+        applyCrmFilters();
     } else {
         showToast('Error al eliminar', 'error');
     }
@@ -430,7 +637,7 @@ function closeCustomerModal() {
 }
 
 function closeCustomerModalOnBackdrop(event) {
-    if (event.target === document.getElementById('customer-modal')) closeCustomerModal();
+    if (!erpModalAllowsBackdropClose(event, 'customer-modal')) return;
 }
 
 async function saveCustomer() {
@@ -449,8 +656,7 @@ async function saveCustomer() {
         showToast('Cliente creado', 'success');
         closeCustomerModal();
         CRM.customers.push(res.data);
-        // Refresh stats
-        await loadStats();
+        renderCrmStats();
     } else {
         showToast((res?.errors || ['Error']).join(', '), 'error');
     }
@@ -472,8 +678,7 @@ function closeCustomersListModal() {
 }
 
 function closeCustomersListModalOnBackdrop(event) {
-    if (event.target === document.getElementById('customers-list-modal'))
-        closeCustomersListModal();
+    if (!erpModalAllowsBackdropClose(event, 'customers-list-modal')) return;
 }
 
 function filterCustomersList(q) {
@@ -505,8 +710,7 @@ function renderCustomersList(list) {
 
 // ── Keyboard shortcuts ────────────────────────────────────────
 document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-        closeLeadModal();
+    if (e.key === 'Escape' && erpModalAllowsEscapeClose()) {
         closeCustomerModal();
         closeCustomersListModal();
     }
@@ -593,4 +797,3 @@ document.addEventListener('DOMContentLoaded', () => {
         board.scrollLeft = scrollLeft - walk;
     });
 });
-

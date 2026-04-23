@@ -27,19 +27,41 @@ def _serialize(order: ServiceOrder) -> dict:
     return data
 
 
+def _resolve_lead(lead_id: Optional[int]):
+    if not lead_id:
+        return None
+    try:
+        from modules.crm.module_crm import Lead
+
+        return Lead.find_by_id(int(lead_id))
+    except Exception:
+        return None
+
+
 # ============================================================================
 # LIST
 # ============================================================================
 
 @router.get("")
 async def list_service_orders(
-    company_id: int = Query(..., description="Company ID (required)"),
+    company_id: Optional[int] = Query(None, description="Company ID"),
     customer_id: Optional[int] = Query(None),
     lead_id: Optional[int] = Query(None),
     status: Optional[str] = Query(None),
 ):
     """List service orders filtered by company, optionally by customer, lead and status."""
-    domain = [("company_id", "=", company_id)]
+    lead = _resolve_lead(lead_id)
+    effective_company_id = company_id or getattr(lead, "company_id", None)
+
+    if effective_company_id is None and customer_id is None and lead_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="company_id, customer_id or lead_id is required",
+        )
+
+    domain = []
+    if effective_company_id is not None:
+        domain.append(("company_id", "=", effective_company_id))
     if customer_id is not None:
         domain.append(("customer_id", "=", customer_id))
     if lead_id is not None:
@@ -48,6 +70,7 @@ async def list_service_orders(
         domain.append(("status", "=", status))
 
     orders = ServiceOrder.search(domain)
+    orders.sort(key=lambda item: item.id or 0, reverse=True)
     return [_serialize(o) for o in orders]
 
 
@@ -58,8 +81,19 @@ async def list_service_orders(
 @router.post("")
 async def create_service_order(order_data: dict):
     """Create a new service order."""
+    payload = dict(order_data or {})
+    lead = _resolve_lead(payload.get("lead_id"))
+    if payload.get("customer_id") in ("", 0, "0"):
+        payload["customer_id"] = None
+    if not payload.get("company_id") and lead:
+        payload["company_id"] = getattr(lead, "company_id", None)
+    if payload.get("customer_id") is None and lead:
+        payload["customer_id"] = getattr(lead, "customer_id", None)
+    if not payload.get("title") and lead:
+        payload["title"] = getattr(lead, "title", None) or f"Orden de Servicio - Lead {lead.id}"
+
     try:
-        order = ServiceOrder.create(order_data)
+        order = ServiceOrder.create(payload)
     except (ValueError, Exception) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return _serialize(order)

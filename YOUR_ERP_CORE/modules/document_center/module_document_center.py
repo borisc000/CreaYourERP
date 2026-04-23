@@ -13,6 +13,7 @@ import io
 import json
 import re
 import tempfile
+import unicodedata
 import zipfile
 from datetime import datetime
 from subprocess import DEVNULL, run
@@ -32,6 +33,7 @@ from modules.signature.signature_support import (
     default_signature_positions,
     extract_pdf_layout,
     normalize_signature_positions,
+    sha256_hex,
 )
 
 
@@ -48,6 +50,9 @@ GENERATED_DOCUMENT_STATUSES = (
     "error",
 )
 TARGET_MODULES = ("general", "hr", "payroll", "safety", "crm", "quotes", "recruitment", "inventory")
+TEMPLATE_SCOPE_TYPES = ("general_empresa", "general_cliente", "especifica_cliente_oc")
+TEMPLATE_SUBJECT_TYPES = ("trabajador", "empresa", "cliente", "oc", "mixto")
+PLACEHOLDER_VALIDATION_STATUSES = ("pending", "valid", "invalid")
 EVENT_TYPES = (
     "generated",
     "viewed",
@@ -62,7 +67,8 @@ EVENT_TYPES = (
 )
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 PDF_MIME = "application/pdf"
-PLACEHOLDER_RE = re.compile(r"<<\s*([A-Za-z0-9_.-]+)\s*>>")
+PLACEHOLDER_RE = re.compile(r"<<\s*([^<>]+?)\s*>>")
+RAW_PLACEHOLDER_RE = re.compile(r"<<\s*([^<>]+?)\s*>>")
 DOCX_XML_PATHS = (
     "word/document.xml",
     "word/header1.xml",
@@ -121,6 +127,55 @@ def _normalize_str_list(value: Any) -> List[str]:
     return [str(value).strip()] if str(value).strip() else []
 
 
+def _normalize_signature_roles(value: Any, default_email: str = "", default_name: str = "") -> List[Dict[str, Any]]:
+    if value is None:
+        value = []
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            value = parsed if isinstance(parsed, list) else []
+        except Exception:
+            value = []
+    if not isinstance(value, list):
+        value = []
+
+    roles: List[Dict[str, Any]] = []
+    seen = set()
+    for index, raw_item in enumerate(value, start=1):
+        if isinstance(raw_item, str):
+            raw_item = {"role_key": raw_item, "signer_name": raw_item}
+        if not isinstance(raw_item, dict):
+            continue
+        role_key = str(raw_item.get("role_key") or raw_item.get("key") or f"firmante_{index}").strip()
+        if not role_key:
+            role_key = f"firmante_{index}"
+        if role_key in seen:
+            role_key = f"{role_key}_{index}"
+        seen.add(role_key)
+        roles.append(
+            {
+                "role_key": role_key,
+                "signer_name": str(raw_item.get("signer_name") or raw_item.get("name") or role_key).strip(),
+                "signer_email": str(
+                    raw_item.get("signer_email") or raw_item.get("email") or default_email or ""
+                ).strip(),
+                "signing_order": _safe_int(raw_item.get("signing_order") or raw_item.get("order"), index) or index,
+            }
+        )
+
+    if not roles:
+        roles = [
+            {
+                "role_key": "trabajador",
+                "signer_name": default_name or "Trabajador",
+                "signer_email": default_email or "",
+                "signing_order": 1,
+            }
+        ]
+    roles.sort(key=lambda item: (_safe_int(item.get("signing_order"), 0) or 0, item.get("role_key") or ""))
+    return roles
+
+
 def _slugify(value: Any, fallback: str = "documento") -> str:
     cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", str(value or "").strip())
     cleaned = cleaned.strip("_")
@@ -133,7 +188,9 @@ def _slugify_code(value: Any, fallback: str = "REQ") -> str:
 
 
 def _normalize_key(value: Any) -> str:
-    return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().lower())
+    normalized = unicodedata.normalize("NFKD", str(value or "").strip().lower())
+    ascii_text = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return re.sub(r"[^a-z0-9]+", "", ascii_text)
 
 
 def _b64encode(data: bytes) -> str:
@@ -155,10 +212,31 @@ def _extract_placeholders(text: str) -> List[str]:
     return found
 
 
+def _extract_invalid_placeholders(text: str) -> List[str]:
+    invalid = []
+    seen = set()
+    for raw_key in RAW_PLACEHOLDER_RE.findall(text or ""):
+        key = str(raw_key or "").strip()
+        if key:
+            continue
+        if key not in seen:
+            seen.add(key)
+            invalid.append(key)
+    return invalid
+
+
 def _replace_placeholders(text: str, values: Dict[str, Any]) -> str:
+    normalized_values = {
+        _normalize_key(key): value
+        for key, value in (values or {}).items()
+        if str(key or "").strip()
+    }
+
     def _resolver(match: re.Match[str]) -> str:
         key = match.group(1).strip()
         value = values.get(key, "")
+        if value in (None, ""):
+            value = normalized_values.get(_normalize_key(key), "")
         if value is None:
             return ""
         return str(value)
@@ -422,7 +500,11 @@ def _build_merge_data(
     row_index: int,
     batch_name: str,
 ) -> Dict[str, Any]:
-    values: Dict[str, Any] = {}
+    values: Dict[str, Any] = {
+        str(key).strip(): _merge_scalar(value)
+        for key, value in (row or {}).items()
+        if str(key or "").strip()
+    }
     for placeholder in template.placeholder_keys or []:
         column_name = mapping.get(placeholder) or placeholder
         values[placeholder] = _value_for_column(row, column_name)
@@ -469,9 +551,20 @@ class DocumentTemplate(BaseModel, AuditMixin):
     category = Column(ColumnType.STRING, default="general", label="Category")
     document_type = Column(ColumnType.STRING, default="general", label="Document Type")
     target_module = Column(ColumnType.STRING, default="general", label="Target Module")
+    scope_type = Column(
+        ColumnType.STRING,
+        default="general_empresa",
+        label="Scope Type",
+    )
+    subject_type = Column(
+        ColumnType.STRING,
+        default="trabajador",
+        label="Subject Type",
+    )
     status = Column(ColumnType.STRING, default="draft", label="Status")
     company_id = Column(ColumnType.INTEGER, required=True, label="Company")
     customer_id = Column(ColumnType.INTEGER, label="Customer")
+    service_order_id = Column(ColumnType.INTEGER, label="Service Order")
     service_type_id = Column(ColumnType.INTEGER, label="Service Type")
     requires_signature = Column(ColumnType.BOOLEAN, default=False, label="Requires Signature")
     auto_register_accreditation = Column(
@@ -487,7 +580,22 @@ class DocumentTemplate(BaseModel, AuditMixin):
     original_filename = Column(ColumnType.STRING, label="Original Filename")
     template_mime = Column(ColumnType.STRING, default=DOCX_MIME, label="Template MIME")
     template_data = Column(ColumnType.TEXT, required=True, label="Template Data")
+    template_pdf_data = Column(ColumnType.TEXT, label="Template PDF Data")
+    template_pdf_layout = Column(ColumnType.JSON, default=[], label="Template PDF Layout")
+    signature_layout = Column(ColumnType.JSON, default=[], label="Template Signature Layout")
+    signature_roles = Column(ColumnType.JSON, default=[], label="Signature Roles")
+    signature_layout_confirmed = Column(
+        ColumnType.BOOLEAN,
+        default=False,
+        label="Template Signature Layout Confirmed",
+    )
     placeholder_keys = Column(ColumnType.JSON, default=[], label="Placeholder Keys")
+    placeholder_validation_status = Column(
+        ColumnType.STRING,
+        default="pending",
+        label="Placeholder Validation Status",
+    )
+    invalid_placeholders = Column(ColumnType.JSON, default=[], label="Invalid Placeholders")
     preview_text = Column(ColumnType.TEXT, label="Preview Text")
     tags = Column(ColumnType.JSON, default=[], label="Tags")
 
@@ -495,12 +603,38 @@ class DocumentTemplate(BaseModel, AuditMixin):
         super().validate()
         if not (self.name or "").strip():
             raise ValidationError("Template name is required")
+        self.scope_type = self.scope_type or "general_empresa"
+        self.subject_type = self.subject_type or "trabajador"
+        self.placeholder_validation_status = self.placeholder_validation_status or "pending"
         if self.status not in TEMPLATE_STATUSES:
             raise ValidationError(f"Template status must be one of: {', '.join(TEMPLATE_STATUSES)}")
         if self.target_module not in TARGET_MODULES:
             raise ValidationError(f"Target module must be one of: {', '.join(TARGET_MODULES)}")
+        if self.scope_type not in TEMPLATE_SCOPE_TYPES:
+            raise ValidationError(f"Scope type must be one of: {', '.join(TEMPLATE_SCOPE_TYPES)}")
+        if self.subject_type not in TEMPLATE_SUBJECT_TYPES:
+            raise ValidationError(
+                f"Subject type must be one of: {', '.join(TEMPLATE_SUBJECT_TYPES)}"
+            )
+        if self.placeholder_validation_status not in PLACEHOLDER_VALIDATION_STATUSES:
+            raise ValidationError(
+                "Placeholder validation status must be one of: "
+                + ", ".join(PLACEHOLDER_VALIDATION_STATUSES)
+            )
         if not self.template_data:
             raise ValidationError("Template file is required")
+        self.template_pdf_layout = self.template_pdf_layout or []
+        self.signature_roles = self.signature_roles or []
+        self.invalid_placeholders = self.invalid_placeholders or []
+        if self.requires_signature and self.template_pdf_layout:
+            self.signature_layout = normalize_signature_positions(
+                self.signature_layout or default_signature_positions(self.template_pdf_layout),
+                self.template_pdf_layout,
+            )
+            self.signature_layout_confirmed = bool(self.signature_layout_confirmed)
+        else:
+            self.signature_layout = self.signature_layout or []
+            self.signature_layout_confirmed = not self.requires_signature
 
     def to_dict(self, include_content: bool = False) -> Dict[str, Any]:
         data = {
@@ -510,9 +644,12 @@ class DocumentTemplate(BaseModel, AuditMixin):
             "category": self.category or "general",
             "document_type": self.document_type or "general",
             "target_module": self.target_module or "general",
+            "scope_type": self.scope_type or "general_empresa",
+            "subject_type": self.subject_type or "trabajador",
             "status": self.status or "draft",
             "company_id": self.company_id,
             "customer_id": self.customer_id,
+            "service_order_id": self.service_order_id,
             "service_type_id": self.service_type_id,
             "requires_signature": bool(self.requires_signature),
             "auto_register_accreditation": bool(self.auto_register_accreditation),
@@ -521,7 +658,13 @@ class DocumentTemplate(BaseModel, AuditMixin):
             "filename_pattern": self.filename_pattern or "",
             "original_filename": self.original_filename or "",
             "template_mime": self.template_mime or DOCX_MIME,
+            "template_pdf_layout": self.template_pdf_layout or [],
+            "signature_layout": self.signature_layout or [],
+            "signature_roles": self.signature_roles or [],
+            "signature_layout_confirmed": bool(self.signature_layout_confirmed),
             "placeholder_keys": self.placeholder_keys or [],
+            "placeholder_validation_status": self.placeholder_validation_status or "pending",
+            "invalid_placeholders": self.invalid_placeholders or [],
             "preview_text": self.preview_text or "",
             "tags": self.tags or [],
             "created_at": _fmt_dt(self._data.get("created_at")),
@@ -529,6 +672,7 @@ class DocumentTemplate(BaseModel, AuditMixin):
         }
         if include_content:
             data["template_data"] = self.template_data
+            data["template_pdf_data"] = self.template_pdf_data
         return data
 
 
@@ -565,7 +709,9 @@ class DocumentBatch(BaseModel, AuditMixin):
             raise ValidationError(f"Target module must be one of: {', '.join(TARGET_MODULES)}")
 
     def to_dict(self) -> Dict[str, Any]:
-        template = DocumentTemplate.find_by_id(self.template_id) if self.template_id else None
+        template = getattr(self, "_template_cache", None)
+        if template is None and self.template_id:
+            template = DocumentTemplate.find_by_id(self.template_id)
         return {
             "id": self.id,
             "name": self.name or "",
@@ -585,7 +731,7 @@ class DocumentBatch(BaseModel, AuditMixin):
             "target_record_id": self.target_record_id,
             "customer_id": self.customer_id,
             "service_type_id": self.service_type_id,
-            "created_by": self.created_by,
+            "created_by": _safe_int(self._data.get("created_by"), None),
             "notes": self.notes or "",
             "created_at": _fmt_dt(self._data.get("created_at")),
             "updated_at": _fmt_dt(self._data.get("updated_at")),
@@ -607,7 +753,15 @@ class GeneratedDocument(BaseModel, AuditMixin):
     recipient_email = Column(ColumnType.STRING, label="Recipient Email")
     employee_id = Column(ColumnType.INTEGER, label="Employee")
     customer_id = Column(ColumnType.INTEGER, label="Customer")
+    service_order_id = Column(ColumnType.INTEGER, label="Service Order")
     service_type_id = Column(ColumnType.INTEGER, label="Service Type")
+    subject_type = Column(ColumnType.STRING, default="trabajador", label="Subject Type")
+    subject_id = Column(ColumnType.INTEGER, label="Subject ID")
+    template_scope_type = Column(
+        ColumnType.STRING,
+        default="general_empresa",
+        label="Template Scope Type",
+    )
     source_module = Column(ColumnType.STRING, label="Source Module")
     source_record_id = Column(ColumnType.INTEGER, label="Source Record")
     source_label = Column(ColumnType.STRING, label="Source Label")
@@ -617,6 +771,17 @@ class GeneratedDocument(BaseModel, AuditMixin):
     docx_data = Column(ColumnType.TEXT, label="DOCX Data")
     pdf_data = Column(ColumnType.TEXT, label="PDF Data")
     pdf_layout = Column(ColumnType.JSON, default=[], label="PDF Layout")
+    pdf_layout_hash = Column(ColumnType.STRING, label="PDF Layout Hash")
+    template_signature_layout_snapshot = Column(
+        ColumnType.JSON,
+        default=[],
+        label="Template Signature Layout Snapshot",
+    )
+    signature_roles_snapshot = Column(
+        ColumnType.JSON,
+        default=[],
+        label="Signature Roles Snapshot",
+    )
     signature_positions = Column(ColumnType.JSON, default=[], label="Signature Positions")
     signature_layout_confirmed = Column(ColumnType.BOOLEAN, default=False, label="Signature Layout Confirmed")
     preview_text = Column(ColumnType.TEXT, label="Preview Text")
@@ -634,6 +799,8 @@ class GeneratedDocument(BaseModel, AuditMixin):
 
     def validate(self):
         super().validate()
+        self.template_scope_type = self.template_scope_type or "general_empresa"
+        self.subject_type = self.subject_type or "trabajador"
         if self.status not in GENERATED_DOCUMENT_STATUSES:
             raise ValidationError(
                 "Generated document status must be one of: "
@@ -641,14 +808,27 @@ class GeneratedDocument(BaseModel, AuditMixin):
             )
         if self.target_module not in TARGET_MODULES:
             raise ValidationError(f"Target module must be one of: {', '.join(TARGET_MODULES)}")
+        if self.template_scope_type not in TEMPLATE_SCOPE_TYPES:
+            raise ValidationError(
+                f"Template scope type must be one of: {', '.join(TEMPLATE_SCOPE_TYPES)}"
+            )
+        if self.subject_type not in TEMPLATE_SUBJECT_TYPES:
+            raise ValidationError(
+                f"Subject type must be one of: {', '.join(TEMPLATE_SUBJECT_TYPES)}"
+            )
         self._refresh_pdf_signature_layout()
 
     def _refresh_pdf_signature_layout(self) -> None:
         if not self.pdf_data:
             self.pdf_layout = self.pdf_layout or []
+            self.pdf_layout_hash = self.pdf_layout_hash or ""
             self.signature_positions = self.signature_positions or []
             return
-        self.pdf_layout = extract_pdf_layout(_b64decode(self.pdf_data))
+        pdf_bytes = _b64decode(self.pdf_data)
+        pdf_hash = sha256_hex(pdf_bytes)
+        if pdf_hash != (self.pdf_layout_hash or "") or not self.pdf_layout:
+            self.pdf_layout = extract_pdf_layout(pdf_bytes)
+            self.pdf_layout_hash = pdf_hash
         if self.requires_signature:
             positions = self.signature_positions or default_signature_positions(self.pdf_layout)
             self.signature_positions = normalize_signature_positions(positions, self.pdf_layout)
@@ -658,8 +838,12 @@ class GeneratedDocument(BaseModel, AuditMixin):
             self.signature_layout_confirmed = True
 
     def to_dict(self, include_content: bool = False) -> Dict[str, Any]:
-        template = DocumentTemplate.find_by_id(self.template_id) if self.template_id else None
-        batch = DocumentBatch.find_by_id(self.batch_id) if self.batch_id else None
+        template = getattr(self, "_template_cache", None)
+        if template is None and self.template_id:
+            template = DocumentTemplate.find_by_id(self.template_id)
+        batch = getattr(self, "_batch_cache", None)
+        if batch is None and self.batch_id:
+            batch = DocumentBatch.find_by_id(self.batch_id)
         data = {
             "id": self.id,
             "batch_id": self.batch_id,
@@ -675,7 +859,11 @@ class GeneratedDocument(BaseModel, AuditMixin):
             "recipient_email": self.recipient_email or "",
             "employee_id": self.employee_id,
             "customer_id": self.customer_id,
+            "service_order_id": self.service_order_id,
             "service_type_id": self.service_type_id,
+            "subject_type": self.subject_type or "trabajador",
+            "subject_id": self.subject_id,
+            "template_scope_type": self.template_scope_type or "general_empresa",
             "source_module": self.source_module or "",
             "source_record_id": self.source_record_id,
             "source_label": self.source_label or "",
@@ -684,6 +872,8 @@ class GeneratedDocument(BaseModel, AuditMixin):
             "merge_payload": self.merge_payload or {},
             "preview_text": self.preview_text or "",
             "pdf_layout": self.pdf_layout or [],
+            "template_signature_layout_snapshot": self.template_signature_layout_snapshot or [],
+            "signature_roles_snapshot": self.signature_roles_snapshot or [],
             "signature_positions": self.signature_positions or [],
             "signature_layout_confirmed": bool(self.signature_layout_confirmed),
             "status": self.status or "ready_for_review",
@@ -758,6 +948,18 @@ class DocumentCenterModule(BaseModule):
         self.register_route("/document-center/templates/{id}", self.get_template, methods=["GET"], auth_required=True)
         self.register_route("/document-center/templates/{id}", self.update_template, methods=["PUT"], auth_required=True)
         self.register_route("/document-center/templates/{id}", self.delete_template, methods=["DELETE"], auth_required=True)
+        self.register_route(
+            "/document-center/templates/{id}/preview-pdf",
+            self.get_template_preview_pdf,
+            methods=["GET"],
+            auth_required=True,
+        )
+        self.register_route(
+            "/document-center/templates/{id}/signature-layout",
+            self.update_template_signature_layout,
+            methods=["POST"],
+            auth_required=True,
+        )
         self.register_route("/document-center/lookups", self.get_lookups, methods=["GET"], auth_required=True)
 
         self.register_route("/document-center/data-sources/preview", self.preview_data_source, methods=["POST"], auth_required=True)
@@ -776,11 +978,95 @@ class DocumentCenterModule(BaseModule):
         self.register_route("/document-center/generated/{id}/close", self.close_document, methods=["POST"], auth_required=True)
         self.register_route("/document-center/generated/{id}/history", self.get_document_history, methods=["GET"], auth_required=True)
 
+        self._backfill_document_center_metadata()
         self.logger.info("Document center module initialized")
 
     def _company_id(self) -> Optional[int]:
         user = self.env.user
         return user.company_id if user else None
+
+    def _backfill_document_center_metadata(self) -> None:
+        try:
+            templates = DocumentTemplate.search([])
+            documents = GeneratedDocument.search([])
+            template_map = {item.id: item for item in templates if item.id}
+            docs_by_template: Dict[int, List[GeneratedDocument]] = {}
+            for document in documents:
+                if document.template_id:
+                    docs_by_template.setdefault(document.template_id, []).append(document)
+
+            for template in templates:
+                dirty = False
+                if not template.scope_type:
+                    template.scope_type = "general_cliente" if template.customer_id else "general_empresa"
+                    dirty = True
+                if not template.subject_type:
+                    template.subject_type = "trabajador"
+                    dirty = True
+                if not template.placeholder_validation_status:
+                    template.placeholder_validation_status = "valid" if template.placeholder_keys else "pending"
+                    dirty = True
+                if template.requires_signature and not template.signature_roles:
+                    template.signature_roles = _normalize_signature_roles([])
+                    dirty = True
+                if template.requires_signature and not (template.signature_layout or []):
+                    source_doc = next(
+                        (
+                            item
+                            for item in docs_by_template.get(template.id, [])
+                            if item.signature_positions and item.signature_layout_confirmed
+                        ),
+                        None,
+                    )
+                    if source_doc:
+                        template.signature_layout = source_doc.signature_positions or []
+                        template.signature_roles = source_doc.signature_roles_snapshot or template.signature_roles or []
+                        template.signature_layout_confirmed = bool(source_doc.signature_layout_confirmed)
+                        if source_doc.pdf_data and not template.template_pdf_data:
+                            template.template_pdf_data = source_doc.pdf_data
+                            template.template_pdf_layout = source_doc.pdf_layout or []
+                        dirty = True
+                if template.template_data and (
+                    not template.template_pdf_data
+                    or not (template.placeholder_keys or [])
+                    or (template.placeholder_validation_status or "") in ("pending", "invalid")
+                ):
+                    self._refresh_template_preview_metadata(template)
+                    dirty = True
+                if dirty:
+                    template.save()
+
+            for document in documents:
+                template = template_map.get(document.template_id)
+                dirty = False
+                if not document.template_scope_type:
+                    document.template_scope_type = (
+                        template.scope_type
+                        if template
+                        else "general_cliente"
+                        if document.customer_id
+                        else "general_empresa"
+                    )
+                    dirty = True
+                if not document.subject_type:
+                    document.subject_type = template.subject_type if template else "trabajador"
+                    dirty = True
+                if not document.subject_id:
+                    document.subject_id = (
+                        document.employee_id
+                        or document.customer_id
+                        or document.service_order_id
+                        or document.company_id
+                    )
+                    dirty = True
+                if template and not (document.template_signature_layout_snapshot or []):
+                    document.template_signature_layout_snapshot = template.signature_layout or []
+                    document.signature_roles_snapshot = template.signature_roles or []
+                    dirty = True
+                if dirty:
+                    document.save()
+        except Exception as exc:
+            self.logger.warning(f"Document Center metadata backfill skipped: {exc}")
 
     def _tenant_filter(self) -> List[tuple]:
         user = self.env.user
@@ -861,6 +1147,49 @@ class DocumentCenterModule(BaseModule):
     def _workspace_url(self, document_id: Any) -> str:
         return f"/app/cross-correspondence?generated_document_id={document_id}"
 
+    def _refresh_template_preview_metadata(
+        self,
+        template: DocumentTemplate,
+        template_bytes: Optional[bytes] = None,
+        placeholder_keys: Optional[List[str]] = None,
+        preview_text: Optional[str] = None,
+    ) -> None:
+        raw_template_bytes = template_bytes or _b64decode(template.template_data or "")
+        next_placeholder_keys = placeholder_keys
+        next_preview_text = preview_text
+        if next_placeholder_keys is None or next_preview_text is None:
+            next_placeholder_keys, next_preview_text = _extract_docx_preview_and_keys(raw_template_bytes)
+
+        template.placeholder_keys = next_placeholder_keys or []
+        template.preview_text = next_preview_text or ""
+        template.invalid_placeholders = _extract_invalid_placeholders(template.preview_text or "")
+        template.placeholder_validation_status = (
+            "invalid" if template.invalid_placeholders else "valid"
+        )
+
+        pdf_bytes = _build_pdf(
+            template.name or "Plantilla",
+            raw_template_bytes,
+            template.preview_text or "",
+            extra_lines=[
+                "Vista previa de plantilla",
+                f"Ambito: {template.scope_type or 'general_empresa'}",
+                f"Sujeto: {template.subject_type or 'trabajador'}",
+            ],
+        )
+        template.template_pdf_data = _b64encode(pdf_bytes)
+        template.template_pdf_layout = extract_pdf_layout(pdf_bytes)
+        template.signature_roles = _normalize_signature_roles(template.signature_roles or [])
+        if template.requires_signature:
+            template.signature_layout = normalize_signature_positions(
+                template.signature_layout or default_signature_positions(template.template_pdf_layout),
+                template.template_pdf_layout,
+            )
+            template.signature_layout_confirmed = bool(template.signature_layout_confirmed)
+        else:
+            template.signature_layout = []
+            template.signature_layout_confirmed = True
+
     def _company_payload(self) -> Dict[str, Any]:
         try:
             from modules.base.module_base import Company
@@ -898,6 +1227,31 @@ class DocumentCenterModule(BaseModule):
             reverse=True,
         )
         return ordered[0] if ordered else None
+
+    def _resolve_signature_recipient(self, document: GeneratedDocument) -> Tuple[str, str]:
+        recipient_name = str(document.recipient_name or "").strip() or f"Documento #{document.id or ''}".strip()
+        recipient_email = str(document.recipient_email or "").strip()
+        if recipient_email:
+            return recipient_email, recipient_name
+
+        if document.employee_id:
+            try:
+                from modules.hr.module_hr import EmployeeProfile
+
+                employee = EmployeeProfile.find_by_id(int(document.employee_id))
+                if employee:
+                    recipient_name = str(employee.full_name or recipient_name).strip() or recipient_name
+                    recipient_email = str(employee.work_email or employee.personal_email or "").strip()
+                    if recipient_email:
+                        return recipient_email, recipient_name
+            except Exception as exc:
+                self.logger.warning(f"Could not resolve worker email for document #{document.id}: {exc}")
+
+        safe_local = "".join(
+            char.lower() if char.isalnum() else "."
+            for char in (recipient_name or f"documento-{document.id or 'firma'}")
+        ).strip(".") or f"documento.{document.id or 'firma'}"
+        return f"{safe_local}.{document.id or 'manual'}@firma-local.invalid", recipient_name
 
     def _payroll_profile_for_employee(self, employee_id: Optional[int]):
         if not employee_id:
@@ -1017,7 +1371,12 @@ class DocumentCenterModule(BaseModule):
                     "customer_id": customer_id,
                     "is_global": not customer_id,
                     "is_mandatory": True,
+                    "fulfillment_mode": "template_generated" if template.requires_signature else "hybrid",
+                    "accepted_file_types": ["pdf", "docx"],
+                    "requires_signature": bool(template.requires_signature),
                     "tracks_expiration": False,
+                    "expiration_required": False,
+                    "default_validity_days": 0,
                     "warning_days": 0,
                     "display_order": 999,
                 }
@@ -1061,6 +1420,10 @@ class DocumentCenterModule(BaseModule):
             "company_id": document.company_id,
             "document_name": document.name or template.name or "Documento generado",
             "document_url": self._workspace_url(document.id),
+            "document_origin": "template_generated",
+            "template_id": template.id,
+            "generated_document_id": document.id,
+            "service_order_id": document.service_order_id,
             "document_number": document.output_filename or "",
             "issued_on": utc_strftime("%Y-%m-%d"),
             "expires_on": "",
@@ -1070,6 +1433,14 @@ class DocumentCenterModule(BaseModule):
             "notes": notes,
             "source_module": document.source_module or document.target_module or "document_center",
             "signature_request_id": document.signature_request_id,
+            "signature_status": (
+                "signed"
+                if document.status == "signed"
+                else "pending"
+                if document.requires_signature
+                else "not_required"
+            ),
+            "signed_document_url": self._workspace_url(document.id) if document.status == "signed" else "",
         }
         try:
             if existing:
@@ -1095,8 +1466,16 @@ class DocumentCenterModule(BaseModule):
                 return
             accreditation_document.document_name = document.name or accreditation_document.document_name
             accreditation_document.document_url = self._workspace_url(document.id)
+            accreditation_document.document_origin = "template_generated"
+            accreditation_document.template_id = document.template_id
+            accreditation_document.generated_document_id = document.id
+            accreditation_document.service_order_id = document.service_order_id
             accreditation_document.document_number = document.output_filename or accreditation_document.document_number
             accreditation_document.signature_request_id = document.signature_request_id
+            accreditation_document.signature_status = "signed" if document.status == "signed" else "not_required"
+            accreditation_document.signed_document_url = (
+                self._workspace_url(document.id) if document.status == "signed" else accreditation_document.signed_document_url
+            )
             accreditation_document.source_module = (
                 document.source_module or document.target_module or "document_center"
             )
@@ -1192,8 +1571,11 @@ class DocumentCenterModule(BaseModule):
             {
                 "employee_id": employee.id,
                 "customer_id": customer_id,
+                "service_order_id": _safe_int(data.get("service_order_id"), None),
+                "requirement_code": _slugify_code(data.get("requirement_code") or ""),
                 "service_type_id": service_type_id,
                 "nombre": employee.full_name or "",
+                "nombre_completo": employee.full_name or "",
                 "trabajador": employee.full_name or "",
                 "employee_name": employee.full_name or "",
                 "full_name": employee.full_name or "",
@@ -1205,6 +1587,16 @@ class DocumentCenterModule(BaseModule):
                 "employee_code": employee.employee_code or "",
                 "cargo": employee.position_title or "",
                 "position_title": employee.position_title or "",
+                "direccion": employee.address or "",
+                "domicilio": employee.address or "",
+                "comuna": employee.commune or "",
+                "ciudad": employee.city or "",
+                "pais": employee.nationality or "",
+                "nacionalidad": employee.nationality or "",
+                "situacion_civil": employee.marital_status or "",
+                "estado_civil": employee.marital_status or "",
+                "fecha_nacimiento": str(employee.birth_date or ""),
+                "fecha_de_nacimiento": str(employee.birth_date or ""),
                 "cliente": customer_payload.get("name") or lead_payload.get("customer_name") or "",
                 "customer_name": customer_payload.get("name") or lead_payload.get("customer_name") or "",
                 "customer_tax_id": customer_payload.get("tax_id") or "",
@@ -1267,6 +1659,8 @@ class DocumentCenterModule(BaseModule):
             "lead_id": lead.id if lead else None,
             "safety_folder_id": folder.id if folder else None,
             "customer_id": customer_id,
+            "service_order_id": _safe_int(data.get("service_order_id"), None),
+            "requirement_code": _slugify_code(data.get("requirement_code") or ""),
             "service_type_id": service_type_id,
             "default_target_module": data.get("target_module")
             or ("safety" if folder else ("crm" if lead else "hr")),
@@ -1275,9 +1669,11 @@ class DocumentCenterModule(BaseModule):
         return row, row_context, context_meta
 
     def _refresh_signature_state(self, document: GeneratedDocument) -> None:
-        document._refresh_pdf_signature_layout()
         if not document.signature_request_id:
+            if document.requires_signature and not (document.pdf_layout or []):
+                document._refresh_pdf_signature_layout()
             return
+        document._refresh_pdf_signature_layout()
         try:
             from modules.signature.module_signature import SignatureRequest
 
@@ -1295,6 +1691,39 @@ class DocumentCenterModule(BaseModule):
                 document.signed_at = _fmt_dt(signature_request.signed_at) or document.signed_at
                 document._refresh_pdf_signature_layout()
                 document.save()
+                if document.accreditation_document_id:
+                    try:
+                        from modules.hr.module_hr import EmployeeAccreditationDocument
+
+                        accreditation_document = EmployeeAccreditationDocument.find_by_id(
+                            int(document.accreditation_document_id)
+                        )
+                        if accreditation_document:
+                            accreditation_document.signature_request_id = document.signature_request_id
+                            accreditation_document.signature_status = "signed"
+                            accreditation_document.signed_document_url = self._workspace_url(document.id)
+                            accreditation_document.save()
+                    except Exception as sync_exc:
+                        self.logger.warning(
+                            f"Accreditation signature sync skipped for doc #{document.id}: {sync_exc}"
+                        )
+                if (document.source_module or "") == "accreditation" and document.source_record_id:
+                    try:
+                        from modules.accreditation.models import DocumentGenerationRequest
+
+                        gen_request = DocumentGenerationRequest.find_by_id(
+                            int(document.source_record_id)
+                        )
+                        if gen_request:
+                            gen_request.status = "signed"
+                            gen_request.generated_document_id = document.id
+                            gen_request.signature_request_id = document.signature_request_id
+                            gen_request.accreditation_document_id = document.accreditation_document_id
+                            gen_request.save()
+                    except Exception as gen_exc:
+                        self.logger.warning(
+                            f"Accreditation generation request sync skipped for doc #{document.id}: {gen_exc}"
+                        )
             elif signature_request.status in ("sent", "viewed") and document.status not in ("signed", "closed"):
                 document.signature_positions = signature_request.signature_positions or document.signature_positions or []
                 document.signature_layout_confirmed = bool(signature_request.layout_confirmed)
@@ -1319,8 +1748,13 @@ class DocumentCenterModule(BaseModule):
             return {
                 "id": signature_request.id,
                 "status": signature_request.status,
-                "public_url": f"/app/sign/{signature_request.access_token}" if signature_request.access_token else None,
+                "public_url": (
+                    f"/app/sign/{signature_request.signer_public_token()}"
+                    if signature_request.signer_public_token()
+                    else None
+                ),
                 "request_to_email": signature_request.request_to_email,
+                "signers": [signer.to_dict() for signer in signature_request.get_signers()],
                 "signed_at": _fmt_dt(signature_request.signed_at),
                 "signed_document_hash": signature_request.signed_document_hash,
                 "digital_key_fingerprint": signature_request.digital_key_fingerprint,
@@ -1365,11 +1799,39 @@ class DocumentCenterModule(BaseModule):
 
         status = request.get_param("status")
         target_module = request.get_param("target_module")
+        scope_type = request.get_param("scope_type")
+        subject_type = request.get_param("subject_type")
+        customer_id = _safe_int(request.get_param("customer_id"), None)
+        service_order_id = _safe_int(request.get_param("service_order_id"), None)
+        requirement_code = request.get_param("requirement_code")
         templates = DocumentTemplate.search(self._tenant_filter())
         if status:
             templates = [item for item in templates if (item.status or "") == status]
         if target_module:
             templates = [item for item in templates if (item.target_module or "") == target_module]
+        if scope_type:
+            templates = [item for item in templates if (item.scope_type or "") == scope_type]
+        if subject_type:
+            templates = [item for item in templates if (item.subject_type or "") == subject_type]
+        if customer_id:
+            templates = [
+                item
+                for item in templates
+                if not item.customer_id or item.customer_id == customer_id
+            ]
+        if service_order_id:
+            templates = [
+                item
+                for item in templates
+                if not item.service_order_id or item.service_order_id == service_order_id
+            ]
+        if requirement_code:
+            normalized_code = _slugify_code(requirement_code)
+            templates = [
+                item
+                for item in templates
+                if _slugify_code(item.accreditation_requirement_code or item.name or "") == normalized_code
+            ]
         templates.sort(key=lambda item: ((item.name or "").lower(), item.id or 0))
         return Response.ok({"count": len(templates), "results": [item.to_dict() for item in templates]})
 
@@ -1389,9 +1851,12 @@ class DocumentCenterModule(BaseModule):
                     "category": data.get("category") or "general",
                     "document_type": data.get("document_type") or "general",
                     "target_module": data.get("target_module") or "general",
+                    "scope_type": data.get("scope_type") or "general_empresa",
+                    "subject_type": data.get("subject_type") or "trabajador",
                     "status": data.get("status") or "active",
                     "company_id": self._company_id(),
                     "customer_id": _safe_int(data.get("customer_id"), None),
+                    "service_order_id": _safe_int(data.get("service_order_id"), None),
                     "service_type_id": _safe_int(data.get("service_type_id"), None),
                     "requires_signature": _normalize_bool(data.get("requires_signature"), False),
                     "auto_register_accreditation": _normalize_bool(
@@ -1404,11 +1869,25 @@ class DocumentCenterModule(BaseModule):
                     "original_filename": data.get("original_filename") or "template.docx",
                     "template_mime": data.get("template_mime") or DOCX_MIME,
                     "template_data": data.get("template_data"),
+                    "signature_layout": data.get("signature_layout") or [],
+                    "signature_roles": _normalize_signature_roles(data.get("signature_roles") or []),
+                    "signature_layout_confirmed": _normalize_bool(
+                        data.get("signature_layout_confirmed"), False
+                    ),
                     "placeholder_keys": placeholder_keys,
+                    "placeholder_validation_status": "valid",
+                    "invalid_placeholders": [],
                     "preview_text": preview_text,
                     "tags": data.get("tags") or [],
                 }
             )
+            self._refresh_template_preview_metadata(
+                template,
+                template_bytes=template_bytes,
+                placeholder_keys=placeholder_keys,
+                preview_text=preview_text,
+            )
+            template.save()
             return Response.created(template.to_dict())
         except ValidationError as exc:
             return Response.bad_request(str(exc))
@@ -1436,15 +1915,41 @@ class DocumentCenterModule(BaseModule):
             return error
 
         data = request.data or {}
-        for field_name in ("name", "description", "category", "document_type", "target_module", "status", "filename_pattern", "original_filename", "template_mime"):
+        refresh_preview = False
+        for field_name in (
+            "name",
+            "description",
+            "category",
+            "document_type",
+            "target_module",
+            "scope_type",
+            "subject_type",
+            "status",
+            "filename_pattern",
+            "original_filename",
+            "template_mime",
+        ):
             if field_name in data:
                 setattr(template, field_name, data.get(field_name))
+                if field_name in ("name", "scope_type", "subject_type"):
+                    refresh_preview = True
         if "customer_id" in data:
             template.customer_id = _safe_int(data.get("customer_id"), None)
+        if "service_order_id" in data:
+            template.service_order_id = _safe_int(data.get("service_order_id"), None)
         if "service_type_id" in data:
             template.service_type_id = _safe_int(data.get("service_type_id"), None)
         if "requires_signature" in data:
             template.requires_signature = _normalize_bool(data.get("requires_signature"), False)
+            refresh_preview = True
+        if "signature_layout" in data:
+            template.signature_layout = data.get("signature_layout") or []
+        if "signature_roles" in data:
+            template.signature_roles = _normalize_signature_roles(data.get("signature_roles") or [])
+        if "signature_layout_confirmed" in data:
+            template.signature_layout_confirmed = _normalize_bool(
+                data.get("signature_layout_confirmed"), False
+            )
         if "auto_register_accreditation" in data:
             template.auto_register_accreditation = _normalize_bool(
                 data.get("auto_register_accreditation"), False
@@ -1465,8 +1970,19 @@ class DocumentCenterModule(BaseModule):
                 template.template_data = data.get("template_data")
                 template.placeholder_keys = placeholder_keys
                 template.preview_text = preview_text
+                self._refresh_template_preview_metadata(
+                    template,
+                    template_bytes=template_bytes,
+                    placeholder_keys=placeholder_keys,
+                    preview_text=preview_text,
+                )
             except Exception as exc:
                 return Response.bad_request(f"Could not read Word template: {exc}")
+        elif refresh_preview:
+            try:
+                self._refresh_template_preview_metadata(template)
+            except Exception as exc:
+                return Response.bad_request(f"Could not refresh template preview: {exc}")
 
         try:
             template.save()
@@ -1488,6 +2004,79 @@ class DocumentCenterModule(BaseModule):
             return Response.bad_request("Cannot delete a template that already generated documents")
         template.delete()
         return Response.ok({"message": "Template deleted"})
+
+    async def get_template_preview_pdf(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        template, error = self._template_or_404(request.params.get("id"))
+        if error:
+            return error
+
+        if not template.template_pdf_data:
+            try:
+                self._refresh_template_preview_metadata(template)
+                template.save()
+            except Exception as exc:
+                return Response.bad_request(f"Could not build template PDF preview: {exc}")
+
+        return Response.ok(
+            {
+                "id": template.id,
+                "file_name": f"{_slugify(template.name or 'plantilla')}_preview.pdf",
+                "mime_type": PDF_MIME,
+                "pdf_data": template.template_pdf_data or "",
+                "pdf_layout": template.template_pdf_layout or [],
+                "signature_layout": template.signature_layout or [],
+                "signature_roles": template.signature_roles or [],
+                "signature_layout_confirmed": bool(template.signature_layout_confirmed),
+                "placeholder_keys": template.placeholder_keys or [],
+                "placeholder_validation_status": template.placeholder_validation_status or "pending",
+                "invalid_placeholders": template.invalid_placeholders or [],
+            }
+        )
+
+    async def update_template_signature_layout(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        template, error = self._template_or_404(request.params.get("id"))
+        if error:
+            return error
+        if not template.requires_signature:
+            return Response.bad_request("This template does not require signatures")
+
+        if not template.template_pdf_data or not template.template_pdf_layout:
+            try:
+                self._refresh_template_preview_metadata(template)
+            except Exception as exc:
+                return Response.bad_request(f"Could not build template PDF preview: {exc}")
+
+        template.signature_roles = _normalize_signature_roles(
+            request.get_data("signature_roles") or template.signature_roles or []
+        )
+        template.signature_layout = normalize_signature_positions(
+            request.get_data("signature_layout") or request.get_data("signature_positions") or template.signature_layout or [],
+            template.template_pdf_layout or [],
+        )
+        if not template.signature_layout:
+            return Response.bad_request("At least one signature box is required")
+        template.signature_layout_confirmed = True
+        try:
+            template.save()
+            return Response.ok(
+                {
+                    "id": template.id,
+                    "signature_layout": template.signature_layout or [],
+                    "signature_roles": template.signature_roles or [],
+                    "template_pdf_layout": template.template_pdf_layout or [],
+                    "signature_layout_confirmed": bool(template.signature_layout_confirmed),
+                }
+            )
+        except ValidationError as exc:
+            return Response.bad_request(str(exc))
 
     async def get_lookups(self, request: Request) -> Response:
         err = self._require_access()
@@ -1633,6 +2222,17 @@ class DocumentCenterModule(BaseModule):
                     f"Fila: {row_index}",
                 ]
                 pdf_bytes = _build_pdf(title, merged_docx, preview_text, extra_lines=extra_lines)
+                subject_type_value = template.subject_type or "trabajador"
+                if subject_type_value == "trabajador":
+                    subject_id_value = row_context["employee_id"]
+                elif subject_type_value == "cliente":
+                    subject_id_value = row_context["customer_id"] or batch.customer_id
+                elif subject_type_value == "oc":
+                    subject_id_value = row_context["target_record_id"] or batch.target_record_id
+                elif subject_type_value == "empresa":
+                    subject_id_value = self._company_id()
+                else:
+                    subject_id_value = row_context["employee_id"]
                 generated = GeneratedDocument.create(
                     {
                         "batch_id": batch.id,
@@ -1646,7 +2246,13 @@ class DocumentCenterModule(BaseModule):
                         "recipient_email": row_context["recipient_email"],
                         "employee_id": row_context["employee_id"],
                         "customer_id": row_context["customer_id"] or batch.customer_id,
+                        "service_order_id": _safe_int(
+                            data.get("service_order_id") or row.get("service_order_id"), None
+                        ),
                         "service_type_id": row_context["service_type_id"] or batch.service_type_id,
+                        "subject_type": subject_type_value,
+                        "subject_id": subject_id_value,
+                        "template_scope_type": template.scope_type or "general_empresa",
                         "source_module": str(
                             data.get("source_module") or row.get("source_module") or "document_center"
                         ).strip()
@@ -1663,6 +2269,16 @@ class DocumentCenterModule(BaseModule):
                         "docx_data": _b64encode(merged_docx),
                         "pdf_data": _b64encode(pdf_bytes),
                         "preview_text": preview_text,
+                        "template_signature_layout_snapshot": template.signature_layout or [],
+                        "signature_roles_snapshot": _normalize_signature_roles(
+                            template.signature_roles or [],
+                            default_email=row_context["recipient_email"],
+                            default_name=row_context["recipient_name"],
+                        ),
+                        "signature_positions": template.signature_layout or [],
+                        "signature_layout_confirmed": bool(
+                            template.signature_layout_confirmed or not template.requires_signature
+                        ),
                         "status": "ready_for_review",
                         "requires_signature": template.requires_signature
                         if data.get("requires_signature_override") in (None, "")
@@ -1718,6 +2334,21 @@ class DocumentCenterModule(BaseModule):
         if isinstance(template_ids, str):
             template_ids = [item.strip() for item in template_ids.split(",") if item.strip()]
         template_ids = [_safe_int(item, None) for item in template_ids if _safe_int(item, None)]
+        if not template_ids and data.get("requirement_code"):
+            requirement_code = _slugify_code(data.get("requirement_code"))
+            candidates = [
+                item
+                for item in DocumentTemplate.search(self._tenant_filter())
+                if (item.status or "") == "active"
+                and _slugify_code(
+                    item.accreditation_requirement_code
+                    or item.document_type
+                    or item.name
+                    or ""
+                )
+                == requirement_code
+            ]
+            template_ids = [item.id for item in candidates if item.id]
         if not template_ids:
             raise ValidationError("Select at least one template")
 
@@ -1825,6 +2456,13 @@ class DocumentCenterModule(BaseModule):
             return err
 
         batches = DocumentBatch.search(self._tenant_filter())
+        template_map = {
+            item.id: item
+            for item in DocumentTemplate.search(self._tenant_filter())
+            if item.id
+        }
+        for batch in batches:
+            batch._template_cache = template_map.get(batch.template_id)
         template_id = _safe_int(request.get_param("template_id"), None)
         if template_id:
             batches = [item for item in batches if item.template_id == template_id]
@@ -1841,7 +2479,14 @@ class DocumentCenterModule(BaseModule):
             return error
 
         documents = GeneratedDocument.search([("batch_id", "=", batch.id)])
+        template_map = {
+            item.id: item
+            for item in DocumentTemplate.search(self._tenant_filter())
+            if item.id
+        }
         for item in documents:
+            item._template_cache = template_map.get(item.template_id)
+            item._batch_cache = batch
             self._refresh_signature_state(item)
         documents.sort(key=lambda item: (item.row_index or 0, item.id or 0))
         return Response.ok(
@@ -1895,6 +2540,16 @@ class DocumentCenterModule(BaseModule):
             return err
 
         documents = GeneratedDocument.search(self._tenant_filter())
+        template_map = {
+            item.id: item
+            for item in DocumentTemplate.search(self._tenant_filter())
+            if item.id
+        }
+        batch_map = {
+            item.id: item
+            for item in DocumentBatch.search(self._tenant_filter())
+            if item.id
+        }
         status = request.get_param("status")
         target_module = request.get_param("target_module")
         template_id = _safe_int(request.get_param("template_id"), None)
@@ -1906,11 +2561,6 @@ class DocumentCenterModule(BaseModule):
         source_record_id = _safe_int(request.get_param("source_record_id"), None)
         search = (request.get_param("search", "") or "").strip().lower()
 
-        for item in documents:
-            self._refresh_signature_state(item)
-
-        if status:
-            documents = [item for item in documents if (item.status or "") == status]
         if target_module:
             documents = [item for item in documents if (item.target_module or "") == target_module]
         if template_id:
@@ -1936,6 +2586,14 @@ class DocumentCenterModule(BaseModule):
                 or search in (item.recipient_email or "").lower()
                 or search in (item.output_filename or "").lower()
             ]
+
+        for item in documents:
+            item._template_cache = template_map.get(item.template_id)
+            item._batch_cache = batch_map.get(item.batch_id)
+            self._refresh_signature_state(item)
+
+        if status:
+            documents = [item for item in documents if (item.status or "") == status]
 
         documents.sort(key=lambda item: (_fmt_dt(item._data.get("created_at")) or "", item.id or 0), reverse=True)
         return Response.ok({"count": len(documents), "results": [item.to_dict() for item in documents]})
@@ -1982,6 +2640,11 @@ class DocumentCenterModule(BaseModule):
             request.get_data("signature_positions", []),
             document.pdf_layout,
         )
+        document.signature_roles_snapshot = _normalize_signature_roles(
+            request.get_data("signature_roles") or document.signature_roles_snapshot or [],
+            default_email=document.recipient_email,
+            default_name=document.recipient_name,
+        )
         document.signature_layout_confirmed = True
         document.save()
         if document.signature_request_id:
@@ -1993,6 +2656,7 @@ class DocumentCenterModule(BaseModule):
                     signature_request.signature_positions = document.signature_positions or []
                     signature_request.layout_confirmed = True
                     signature_request.save()
+                    signature_request.sync_signers(document.signature_roles_snapshot or [])
             except Exception as exc:
                 self.logger.warning(f"Signature request layout sync skipped: {exc}")
         self._log_event(
@@ -2005,6 +2669,7 @@ class DocumentCenterModule(BaseModule):
             {
                 "id": document.id,
                 "signature_positions": document.signature_positions or [],
+                "signature_roles": document.signature_roles_snapshot or [],
                 "pdf_layout": document.pdf_layout or [],
                 "status": document.status,
             }
@@ -2075,8 +2740,6 @@ class DocumentCenterModule(BaseModule):
         self._refresh_signature_state(document)
         if not document.requires_signature:
             return Response.bad_request("This document does not require signature")
-        if not document.recipient_email:
-            return Response.bad_request("The generated document does not have a recipient email")
         if not document.pdf_data:
             return Response.bad_request("The generated document does not have PDF content")
         if document.signature_request_id and document.status in ("signature_pending", "signed", "closed"):
@@ -2094,6 +2757,19 @@ class DocumentCenterModule(BaseModule):
             return Response.bad_request("You must confirm the signature position visually before sending this PDF")
         document.signature_positions = signature_positions
         document.signature_layout_confirmed = True
+        recipient_email, recipient_name = self._resolve_signature_recipient(document)
+        document.recipient_email = recipient_email
+        document.recipient_name = recipient_name
+        signature_roles = _normalize_signature_roles(
+            document.signature_roles_snapshot or [],
+            default_email=recipient_email,
+            default_name=recipient_name,
+        )
+        for role in signature_roles:
+            if not str(role.get("signer_email") or "").strip():
+                role["signer_email"] = recipient_email
+            if not str(role.get("signer_name") or "").strip():
+                role["signer_name"] = recipient_name
         try:
             from modules.signature.module_signature import SignatureRequest
 
@@ -2102,7 +2778,7 @@ class DocumentCenterModule(BaseModule):
                     "name": document.name,
                     "description": f"Generated from template #{document.template_id}",
                     "request_from": self.env.user.id if self.env.user else None,
-                    "request_to_email": document.recipient_email,
+                    "request_to_email": recipient_email,
                     "document_name": f"{document.output_filename}.pdf",
                     "document_data": document.pdf_data,
                     "signature_positions": signature_positions,
@@ -2114,6 +2790,7 @@ class DocumentCenterModule(BaseModule):
                     "generated_document_id": document.id,
                 }
             )
+            sig_request.sync_signers(signature_roles)
             sig_request.send_request()
             email_status = None
             signature_module = self.core.module_registry.get_module("signature")
@@ -2146,7 +2823,7 @@ class DocumentCenterModule(BaseModule):
             document,
             "signature_requested",
             request,
-            notes=f"Sent to signature for {document.recipient_email}",
+            notes=f"Sent to signature for {recipient_name} <{recipient_email}>",
             metadata={
                 "signature_request_id": sig_request.id,
                 "access_token": sig_request.access_token,

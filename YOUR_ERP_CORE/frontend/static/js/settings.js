@@ -22,8 +22,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    ERPSync.subscribe('service-types:changed', async ({ source }) => {
+        if (source === 'settings') return;
+        await loadServiceTypes(true);
+    });
+
+    ERPSync.subscribe('quote-catalog:changed', async ({ source, catalog }) => {
+        if (source === 'settings') return;
+        if (catalog && CAT_ENDPOINTS[catalog]) {
+            await loadCatalog(catalog);
+            return;
+        }
+        await loadCatalog('services');
+        await loadCatalog('workers');
+        await loadCatalog('items');
+    });
+
     await loadSettings();
-    await loadServiceTypes();
+    await loadServiceTypes(true);
 });
 
 async function loadSettings() {
@@ -161,26 +177,100 @@ function updatePdfPreview() {
     });
 });
 
+let SETTINGS_SERVICE_TYPES = [];
+
+const CAT_ENDPOINTS = {
+    services: '/quotes/catalog/services',
+    workers: '/quotes/catalog/workers',
+    items: '/quotes/catalog/items',
+};
+
+const SETTINGS_CATALOG_SELECT_IDS = {
+    services: 'svc-service-type',
+    workers: 'wrk-service-type',
+    items: 'itm-service-type',
+};
+
+function settingsEsc(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function catalogServiceTypeBadge(name) {
+    if (!name) {
+        return '<span style="display:inline-flex;align-items:center;padding:0.18rem 0.55rem;border-radius:999px;border:1px solid rgba(100,116,139,0.35);background:rgba(15,23,42,0.5);color:#94a3b8;font-size:0.72rem;font-weight:700;">Sin tipo</span>';
+    }
+    return `<span style="display:inline-flex;align-items:center;padding:0.18rem 0.55rem;border-radius:999px;border:1px solid rgba(59,130,246,0.28);background:rgba(37,99,235,0.18);color:#bfdbfe;font-size:0.72rem;font-weight:700;">${settingsEsc(name)}</span>`;
+}
+
+function renderSettingsServiceTypeOptions() {
+    if (!SETTINGS_SERVICE_TYPES.length) {
+        return '<option value="">Primero crea un tipo de servicio</option>';
+    }
+    return ['<option value="">Seleccione tipo *</option>']
+        .concat(SETTINGS_SERVICE_TYPES.map((serviceType) => (
+            `<option value="${serviceType.id}">${settingsEsc(serviceType.name)}</option>`
+        )))
+        .join('');
+}
+
+function populateCatalogServiceTypeInputs() {
+    const hasServiceTypes = SETTINGS_SERVICE_TYPES.length > 0;
+    Object.values(SETTINGS_CATALOG_SELECT_IDS).forEach((id) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const currentValue = select.value || '';
+        select.innerHTML = renderSettingsServiceTypeOptions();
+        select.disabled = !hasServiceTypes;
+        select.value = SETTINGS_SERVICE_TYPES.some((serviceType) => String(serviceType.id) === String(currentValue))
+            ? currentValue
+            : '';
+    });
+
+    ['services', 'workers', 'items'].forEach((cat) => {
+        const button = document.getElementById(`add-${cat}-btn`);
+        if (button) button.disabled = !hasServiceTypes;
+    });
+}
+
+function getCatalogServiceTypeId(cat) {
+    const select = document.getElementById(SETTINGS_CATALOG_SELECT_IDS[cat]);
+    const parsed = parseInt(select?.value || '', 10);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function ensureServiceTypesAvailable() {
+    if (SETTINGS_SERVICE_TYPES.length) return true;
+    showToast('Primero crea un tipo de servicio en Configuracion.', 'error');
+    return false;
+}
+
 /* ── Service Types ────────────────────────────────────── */
-async function loadServiceTypes() {
+async function loadServiceTypes(silent = false) {
     const list = document.getElementById('service-types-list');
     if (!list) return;
 
     list.innerHTML = '<li style="padding:1.5rem;text-align:center;color:#64748b">Cargando...</li>';
-    const res = await API.get('/crm/service-types');
-    
+    const { response: res, results } = await ERPSharedCatalogs.loadServiceTypes();
+
     if (res?.success) {
-        if (!res.data.results || res.data.results.length === 0) {
+        SETTINGS_SERVICE_TYPES = results;
+        populateCatalogServiceTypeInputs();
+
+        if (!SETTINGS_SERVICE_TYPES.length) {
             list.innerHTML = '<li style="padding:1.5rem;text-align:center;color:#64748b">No hay servicios configurados.</li>';
             return;
         }
         
         list.innerHTML = '';
-        res.data.results.forEach(st => {
+        SETTINGS_SERVICE_TYPES.forEach(st => {
             const li = document.createElement('li');
             li.className = 'service-list-item';
             li.innerHTML = `
-                <span style="font-weight: 500;">${st.name}</span>
+                <span style="font-weight: 500;">${settingsEsc(st.name)}</span>
                 <button class="delete-service-btn" data-id="${st.id}" title="Eliminar">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                 </button>
@@ -188,7 +278,12 @@ async function loadServiceTypes() {
             list.appendChild(li);
         });
     } else {
+        SETTINGS_SERVICE_TYPES = [];
+        populateCatalogServiceTypeInputs();
         list.innerHTML = '<li style="padding:1.5rem;text-align:center;color:#ef4444">Error al cargar servicios</li>';
+        if (!silent) {
+            showToast((res?.errors || ['Error al cargar servicios']).join(', '), 'error');
+        }
     }
 }
 
@@ -206,7 +301,8 @@ async function addServiceType() {
 
     if (res?.success) {
         input.value = '';
-        await loadServiceTypes();
+        await loadServiceTypes(true);
+        ERPSharedCatalogs.announceServiceTypesChanged('settings', 'created');
     } else {
         showToast((res?.errors || ['Error al crear servicio']).join(', '), 'error');
     }
@@ -215,7 +311,8 @@ async function addServiceType() {
 async function deleteServiceType(id) {
     const res = await API.del(`/crm/service-types/${id}`);
     if (res?.success) {
-        await loadServiceTypes();
+        await loadServiceTypes(true);
+        ERPSharedCatalogs.announceServiceTypesChanged('settings', 'deleted');
     } else {
         showToast((res?.errors || ['Error al eliminar']).join(', '), 'error');
     }
@@ -248,6 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ta = document.getElementById('s-default-terms');
     if (ta) ta.addEventListener('input', updateTermsPreview);
     // Cargar catálogos al inicio
+    populateCatalogServiceTypeInputs();
     loadCatalog('services');
     loadCatalog('workers');
     loadCatalog('items');
@@ -256,12 +354,6 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ══════════════════════════════════════════════
    CATÁLOGOS DE COTIZACIÓN
 ══════════════════════════════════════════════ */
-
-const CAT_ENDPOINTS = {
-    services: '/quotes/catalog/services',
-    workers:  '/quotes/catalog/workers',
-    items:    '/quotes/catalog/items',
-};
 
 function switchCatTab(cat) {
     // Paneles
@@ -298,28 +390,49 @@ async function loadCatalog(cat) {
 }
 
 function renderCatRow(cat, item) {
-    let info = '';
+    let label = '';
+    let amount = '';
+
     if (cat === 'services') {
-        info = `<span style="font-family:monospace;font-size:0.78rem;color:#3b82f6;margin-right:0.75rem;">${item.code}</span>`
-             + `<span style="font-weight:500;">${item.description}</span>`
-             + `<span style="margin-left:auto;color:#22c55e;font-size:0.82rem;">$${Number(item.selling_price||0).toLocaleString('es-CL')}</span>`;
+        label = `
+            <div style="display:flex;flex-direction:column;gap:0.2rem;min-width:0;">
+                <div style="display:flex;align-items:center;gap:0.75rem;min-width:0;">
+                    <span style="font-family:monospace;font-size:0.78rem;color:#3b82f6;">${settingsEsc(item.code)}</span>
+                    <span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${settingsEsc(item.description)}</span>
+                </div>
+                ${catalogServiceTypeBadge(item.service_type_name)}
+            </div>`;
+        amount = `$${Number(item.selling_price || 0).toLocaleString('es-CL')}`;
     } else if (cat === 'workers') {
-        info = `<span style="font-weight:500;">${item.position_name}</span>`
-             + `<span style="margin-left:auto;color:#22c55e;font-size:0.82rem;">$${Number(item.hour_rate_hh||0).toLocaleString('es-CL')} HH</span>`;
+        label = `
+            <div style="display:flex;flex-direction:column;gap:0.2rem;min-width:0;">
+                <span style="font-weight:500;">${settingsEsc(item.position_name)}</span>
+                ${catalogServiceTypeBadge(item.service_type_name)}
+            </div>`;
+        amount = `$${Number(item.hour_rate_hh || 0).toLocaleString('es-CL')} HH`;
     } else {
-        info = `<span style="font-family:monospace;font-size:0.78rem;color:#3b82f6;margin-right:0.75rem;">${item.code}</span>`
-             + `<span style="font-weight:500;">${item.description}</span>`
-             + `<span style="font-size:0.78rem;color:#94a3b8;margin-left:0.5rem;">[${item.unit||'un'}]</span>`
-             + `<span style="margin-left:auto;color:#22c55e;font-size:0.82rem;">$${Number(item.cost_price||0).toLocaleString('es-CL')}</span>`;
+        label = `
+            <div style="display:flex;flex-direction:column;gap:0.2rem;min-width:0;">
+                <div style="display:flex;align-items:center;gap:0.75rem;min-width:0;">
+                    <span style="font-family:monospace;font-size:0.78rem;color:#3b82f6;">${settingsEsc(item.code)}</span>
+                    <span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${settingsEsc(item.description)}</span>
+                    <span style="font-size:0.78rem;color:#94a3b8;">[${settingsEsc(item.unit || 'un')}]</span>
+                </div>
+                ${catalogServiceTypeBadge(item.service_type_name)}
+            </div>`;
+        amount = `$${Number(item.cost_price || 0).toLocaleString('es-CL')}`;
     }
 
-    return `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.65rem 1rem;
+    return `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;
                 border-bottom:1px solid #334155;color:#f1f5f9;font-size:0.85rem;
                 background:#1e293b;transition:background 0.15s;"
             onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
-        ${info}
+        <div style="display:flex;align-items:center;gap:0.75rem;min-width:0;flex:1;">
+            ${label}
+        </div>
+        <span style="color:#22c55e;font-size:0.82rem;font-weight:700;white-space:nowrap;">${amount}</span>
         <button onclick="deleteCatalogItem('${cat}', ${item.id})"
-            style="margin-left:0.5rem;background:none;border:none;color:#64748b;cursor:pointer;
+            style="background:none;border:none;color:#64748b;cursor:pointer;
                    padding:4px;border-radius:4px;display:flex;align-items:center;flex-shrink:0;"
             onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#64748b'"
             title="Eliminar">
@@ -333,6 +446,14 @@ function renderCatRow(cat, item) {
 }
 
 async function addCatalogItem(cat) {
+    if (!ensureServiceTypesAvailable()) return;
+
+    const serviceTypeId = getCatalogServiceTypeId(cat);
+    if (!serviceTypeId) {
+        showToast('Selecciona un tipo de servicio.', 'error');
+        return;
+    }
+
     let payload = {};
 
     if (cat === 'services') {
@@ -340,13 +461,13 @@ async function addCatalogItem(cat) {
         const desc  = document.getElementById('svc-desc')?.value.trim();
         const price = parseFloat(document.getElementById('svc-price')?.value) || 0;
         if (!code || !desc) { showToast('Código y descripción son requeridos', 'error'); return; }
-        payload = { code, description: desc, selling_price: price, cost_price: price };
+        payload = { code, description: desc, selling_price: price, cost_price: price, service_type_id: serviceTypeId };
 
     } else if (cat === 'workers') {
         const name = document.getElementById('wrk-name')?.value.trim();
         const rate = parseFloat(document.getElementById('wrk-rate')?.value) || 0;
         if (!name) { showToast('Nombre del cargo es requerido', 'error'); return; }
-        payload = { position_name: name, hour_rate_hh: rate };
+        payload = { position_name: name, hour_rate_hh: rate, service_type_id: serviceTypeId };
 
     } else {
         const code  = document.getElementById('itm-code')?.value.trim();
@@ -354,7 +475,7 @@ async function addCatalogItem(cat) {
         const unit  = document.getElementById('itm-unit')?.value.trim() || 'un';
         const price = parseFloat(document.getElementById('itm-price')?.value) || 0;
         if (!code || !desc) { showToast('Código y descripción son requeridos', 'error'); return; }
-        payload = { code, description: desc, unit, cost_price: price };
+        payload = { code, description: desc, unit, cost_price: price, service_type_id: serviceTypeId };
     }
 
     const res = await API.post(CAT_ENDPOINTS[cat], payload);
@@ -362,7 +483,10 @@ async function addCatalogItem(cat) {
         // Limpiar inputs
         ['svc-code','svc-desc','svc-price','wrk-name','wrk-rate','itm-code','itm-desc','itm-unit','itm-price']
             .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        const select = document.getElementById(SETTINGS_CATALOG_SELECT_IDS[cat]);
+        if (select) select.value = '';
         await loadCatalog(cat);
+        ERPSharedCatalogs.announceQuoteCatalogChanged('settings', cat, 'created');
         showToast('Ítem agregado al catálogo ✓');
     } else {
         showToast((res?.errors?.[0]) || 'Error al agregar ítem', 'error');
@@ -373,6 +497,7 @@ async function deleteCatalogItem(cat, id) {
     const res = await API.del(CAT_ENDPOINTS[cat] + '/' + id);
     if (res?.success) {
         await loadCatalog(cat);
+        ERPSharedCatalogs.announceQuoteCatalogChanged('settings', cat, 'deleted');
     } else {
         showToast((res?.errors?.[0]) || 'Error al eliminar', 'error');
     }

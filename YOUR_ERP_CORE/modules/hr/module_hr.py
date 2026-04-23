@@ -27,10 +27,22 @@ CONTRACT_TYPES = ("indefinite", "fixed_term", "internship", "services")
 CONTRACT_STATUSES = ("draft", "active", "expired", "terminated")
 LEAVE_TYPES = ("vacation", "sick", "administrative", "unpaid", "parental")
 LEAVE_STATUSES = ("pending", "approved", "rejected", "cancelled")
+TERMINATION_CAUSES = (
+    "voluntary_resignation",
+    "business_needs",
+    "misconduct",
+    "fixed_term_end",
+    "mutual_agreement",
+    "project_completion",
+    "other",
+)
+TERMINATION_STATUSES = ("draft", "notified", "in_signature", "completed", "cancelled")
+TERMINATION_DOCUMENT_STATUSES = ("draft", "ready", "signature_pending", "signed", "closed", "void")
 AFP_CODES = ("capital", "cuprum", "habitat", "modelo", "planvital", "provida", "uno")
 HEALTH_SYSTEMS = ("fonasa", "isapre")
 CRIMINAL_RECORD_STATUSES = ("pending", "clear", "observed", "not_provided")
 ACCREDITATION_VERIFICATION_STATUSES = ("pending_review", "approved", "rejected")
+ACCREDITATION_FULFILLMENT_MODES = ("upload_only", "template_generated", "hybrid")
 ACCREDITATION_REQUIREMENT_CATEGORIES = (
     "identity",
     "contractual",
@@ -63,6 +75,9 @@ DEFAULT_GLOBAL_ACCREDITATION_REQUIREMENTS = [
         "category": "identity",
         "warning_days": 30,
         "tracks_expiration": True,
+        "expiration_required": True,
+        "fulfillment_mode": "upload_only",
+        "accepted_file_types": ["pdf", "jpg", "jpeg", "png"],
         "description": "Documento base para acreditar identidad del trabajador.",
     },
     {
@@ -71,6 +86,9 @@ DEFAULT_GLOBAL_ACCREDITATION_REQUIREMENTS = [
         "category": "contractual",
         "warning_days": 0,
         "tracks_expiration": False,
+        "fulfillment_mode": "template_generated",
+        "requires_signature": True,
+        "accepted_file_types": ["pdf", "docx"],
         "description": "Contrato vigente firmado por ambas partes.",
     },
     {
@@ -79,6 +97,9 @@ DEFAULT_GLOBAL_ACCREDITATION_REQUIREMENTS = [
         "category": "contractual",
         "warning_days": 0,
         "tracks_expiration": False,
+        "fulfillment_mode": "template_generated",
+        "requires_signature": True,
+        "accepted_file_types": ["pdf", "docx"],
         "description": "Anexo de cargo o funciones firmado digitalmente.",
     },
     {
@@ -87,6 +108,9 @@ DEFAULT_GLOBAL_ACCREDITATION_REQUIREMENTS = [
         "category": "health",
         "warning_days": 30,
         "tracks_expiration": True,
+        "expiration_required": True,
+        "fulfillment_mode": "upload_only",
+        "accepted_file_types": ["pdf", "jpg", "jpeg", "png"],
         "description": "Controla la vigencia del examen medico ocupacional.",
     },
     {
@@ -95,6 +119,9 @@ DEFAULT_GLOBAL_ACCREDITATION_REQUIREMENTS = [
         "category": "safety",
         "warning_days": 15,
         "tracks_expiration": True,
+        "fulfillment_mode": "hybrid",
+        "requires_signature": False,
+        "accepted_file_types": ["pdf", "docx", "jpg", "jpeg", "png"],
         "description": "Registro de induccion de seguridad obligatoria.",
     },
 ]
@@ -264,6 +291,10 @@ def _normalize_bool(value: Any, default: bool = False) -> bool:
     return str(value).strip().lower() in ("1", "true", "yes", "on", "si")
 
 
+def _normalize_str_list(value: Any) -> List[str]:
+    return _normalize_text_list(value)
+
+
 def _normalize_int_list(value: Any) -> List[int]:
     source = value if isinstance(value, list) else _normalize_text_list(value)
     normalized: List[int] = []
@@ -320,6 +351,51 @@ def _status_label(status: str) -> str:
     return mapping.get(status, status or "Sin estado")
 
 
+def _employee_status_label(status: str) -> str:
+    mapping = {
+        "draft": "Borrador",
+        "onboarding": "Onboarding",
+        "active": "Activo",
+        "leave": "Con permiso",
+        "inactive": "Desvinculado / inactivo",
+    }
+    return mapping.get(status, status or "Sin estado")
+
+
+def _contract_status_label(status: str) -> str:
+    mapping = {
+        "draft": "Borrador",
+        "active": "Activo",
+        "expired": "Vencido",
+        "terminated": "Terminado",
+    }
+    return mapping.get(status, status or "Sin estado")
+
+
+def _termination_cause_label(value: str) -> str:
+    mapping = {
+        "voluntary_resignation": "Renuncia voluntaria",
+        "business_needs": "Necesidades de la empresa",
+        "misconduct": "Incumplimiento / falta grave",
+        "fixed_term_end": "Termino de plazo fijo",
+        "mutual_agreement": "Mutuo acuerdo",
+        "project_completion": "Termino de servicio o proyecto",
+        "other": "Otra causal",
+    }
+    return mapping.get(value, value or "Sin causal")
+
+
+def _termination_status_label(value: str) -> str:
+    mapping = {
+        "draft": "Borrador",
+        "notified": "Notificada",
+        "in_signature": "En firma",
+        "completed": "Cerrada",
+        "cancelled": "Cancelada",
+    }
+    return mapping.get(value, value or "Sin estado")
+
+
 def provision_user_account(
     company_id: int,
     full_name: str,
@@ -369,12 +445,14 @@ class Department(BaseModel, AuditMixin):
 
     def validate(self):
         super().validate()
+        self.fulfillment_mode = self.fulfillment_mode or "upload_only"
+        self.accepted_file_types = self.accepted_file_types or ["pdf", "jpg", "jpeg", "png"]
         if not (self.name or "").strip():
             raise ValidationError("Department name is required")
         if not (self.code or "").strip():
             raise ValidationError("Department code is required")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, include_content: bool = False) -> Dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name or "",
@@ -529,6 +607,7 @@ class EmployeeProfile(BaseModel, AuditMixin):
             ],
             "driving_license": self.driving_license or "",
             "status": self.status or "onboarding",
+            "status_label": _employee_status_label(self.status or "onboarding"),
             "hire_date": self.hire_date or "",
             "base_salary": self.base_salary or 0.0,
             "notes": self.notes or "",
@@ -578,6 +657,7 @@ class EmployeeContract(BaseModel, AuditMixin):
             "company_id": self.company_id,
             "contract_type": self.contract_type or "",
             "status": self.status or "draft",
+            "status_label": _contract_status_label(self.status or "draft"),
             "start_date": self.start_date or "",
             "end_date": self.end_date or "",
             "salary_amount": self.salary_amount or 0.0,
@@ -642,6 +722,179 @@ class TimeOffRequest(BaseModel, AuditMixin):
         }
 
 
+class EmploymentStatusEvent(BaseModel, AuditMixin):
+    __tablename__ = "hr_employment_status_events"
+    __displayname__ = "new_status"
+
+    employee_id = Column(ColumnType.INTEGER, required=True, label="Employee")
+    company_id = Column(ColumnType.INTEGER, required=True, label="Company")
+    contract_id = Column(ColumnType.INTEGER, label="Contract")
+    previous_status = Column(ColumnType.STRING, label="Previous Status")
+    new_status = Column(ColumnType.STRING, required=True, label="New Status")
+    effective_date = Column(ColumnType.STRING, required=True, label="Effective Date")
+    reason = Column(ColumnType.STRING, label="Reason")
+    source_module = Column(ColumnType.STRING, default="hr", label="Source Module")
+    source_record_id = Column(ColumnType.INTEGER, label="Source Record")
+    notes = Column(ColumnType.TEXT, label="Notes")
+
+    def before_create(self):
+        if not self.effective_date:
+            self.effective_date = _today().isoformat()
+        if not self.source_module:
+            self.source_module = "hr"
+
+    def validate(self):
+        super().validate()
+        if self.previous_status and self.previous_status not in EMPLOYEE_STATUSES:
+            raise ValidationError(
+                f"Previous status must be one of: {', '.join(EMPLOYEE_STATUSES)}"
+            )
+        if self.new_status not in EMPLOYEE_STATUSES:
+            raise ValidationError(f"New status must be one of: {', '.join(EMPLOYEE_STATUSES)}")
+        if self.effective_date and not _parse_date(self.effective_date):
+            raise ValidationError("Effective date must use YYYY-MM-DD format")
+
+    def to_dict(self) -> Dict[str, Any]:
+        employee = EmployeeProfile.find_by_id(self.employee_id) if self.employee_id else None
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "employee_name": employee.full_name if employee else None,
+            "employee_code": employee.employee_code if employee else None,
+            "company_id": self.company_id,
+            "contract_id": self.contract_id,
+            "previous_status": self.previous_status or "",
+            "previous_status_label": _employee_status_label(self.previous_status or ""),
+            "new_status": self.new_status or "",
+            "new_status_label": _employee_status_label(self.new_status or ""),
+            "effective_date": self.effective_date or "",
+            "reason": self.reason or "",
+            "source_module": self.source_module or "hr",
+            "source_record_id": self.source_record_id,
+            "notes": self.notes or "",
+            "created_at": _fmt_dt(self._data.get("created_at")),
+            "updated_at": _fmt_dt(self._data.get("updated_at")),
+        }
+
+
+class EmployeeTermination(BaseModel, AuditMixin):
+    __tablename__ = "hr_terminations"
+    __displayname__ = "cause"
+
+    employee_id = Column(ColumnType.INTEGER, required=True, label="Employee")
+    company_id = Column(ColumnType.INTEGER, required=True, label="Company")
+    contract_id = Column(ColumnType.INTEGER, label="Contract")
+    status = Column(ColumnType.STRING, default="draft", label="Status")
+    cause = Column(ColumnType.STRING, default="other", label="Cause")
+    notice_date = Column(ColumnType.STRING, label="Notice Date")
+    termination_date = Column(ColumnType.STRING, required=True, label="Termination Date")
+    rehire_eligible = Column(ColumnType.BOOLEAN, default=False, label="Rehire Eligible")
+    reason_detail = Column(ColumnType.TEXT, label="Reason Detail")
+    legal_notes = Column(ColumnType.TEXT, label="Legal Notes")
+    document_pack_status = Column(ColumnType.STRING, default="draft", label="Document Pack Status")
+
+    def before_create(self):
+        if not self.status:
+            self.status = "draft"
+        if not self.cause:
+            self.cause = "other"
+        if not self.document_pack_status:
+            self.document_pack_status = "draft"
+
+    def validate(self):
+        super().validate()
+        if self.status not in TERMINATION_STATUSES:
+            raise ValidationError(
+                f"Termination status must be one of: {', '.join(TERMINATION_STATUSES)}"
+            )
+        if self.cause not in TERMINATION_CAUSES:
+            raise ValidationError(
+                f"Termination cause must be one of: {', '.join(TERMINATION_CAUSES)}"
+            )
+        if self.document_pack_status not in TERMINATION_DOCUMENT_STATUSES:
+            raise ValidationError(
+                "Document pack status must be one of: "
+                + ", ".join(TERMINATION_DOCUMENT_STATUSES)
+            )
+        if not _parse_date(self.termination_date):
+            raise ValidationError("Termination date must use YYYY-MM-DD format")
+        if self.notice_date and not _parse_date(self.notice_date):
+            raise ValidationError("Notice date must use YYYY-MM-DD format")
+        if self.notice_date and self.termination_date and self.notice_date > self.termination_date:
+            raise ValidationError("Notice date cannot be after termination date")
+
+    def to_dict(self) -> Dict[str, Any]:
+        employee = EmployeeProfile.find_by_id(self.employee_id) if self.employee_id else None
+        contract = EmployeeContract.find_by_id(self.contract_id) if self.contract_id else None
+        documents = TerminationDocument.search([("termination_id", "=", self.id)]) if self.id else []
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "employee_name": employee.full_name if employee else None,
+            "employee_code": employee.employee_code if employee else None,
+            "company_id": self.company_id,
+            "contract_id": self.contract_id,
+            "contract_type": contract.contract_type if contract else None,
+            "status": self.status or "draft",
+            "status_label": _termination_status_label(self.status or "draft"),
+            "cause": self.cause or "other",
+            "cause_label": _termination_cause_label(self.cause or "other"),
+            "notice_date": self.notice_date or "",
+            "termination_date": self.termination_date or "",
+            "rehire_eligible": bool(self.rehire_eligible),
+            "reason_detail": self.reason_detail or "",
+            "legal_notes": self.legal_notes or "",
+            "document_pack_status": self.document_pack_status or "draft",
+            "documents_count": len(documents),
+            "created_at": _fmt_dt(self._data.get("created_at")),
+            "updated_at": _fmt_dt(self._data.get("updated_at")),
+        }
+
+
+class TerminationDocument(BaseModel, AuditMixin):
+    __tablename__ = "hr_termination_documents"
+    __displayname__ = "document_name"
+
+    termination_id = Column(ColumnType.INTEGER, required=True, label="Termination")
+    employee_id = Column(ColumnType.INTEGER, required=True, label="Employee")
+    company_id = Column(ColumnType.INTEGER, required=True, label="Company")
+    document_type = Column(ColumnType.STRING, default="termination_letter", label="Document Type")
+    document_name = Column(ColumnType.STRING, required=True, label="Document Name")
+    document_url = Column(ColumnType.STRING, label="Document URL")
+    generated_document_id = Column(ColumnType.INTEGER, label="Generated Document")
+    signature_request_id = Column(ColumnType.INTEGER, label="Signature Request")
+    status = Column(ColumnType.STRING, default="draft", label="Status")
+    notes = Column(ColumnType.TEXT, label="Notes")
+
+    def validate(self):
+        super().validate()
+        if self.status not in TERMINATION_DOCUMENT_STATUSES:
+            raise ValidationError(
+                f"Termination document status must be one of: {', '.join(TERMINATION_DOCUMENT_STATUSES)}"
+            )
+        if not (self.document_name or "").strip():
+            raise ValidationError("Termination document name is required")
+
+    def to_dict(self) -> Dict[str, Any]:
+        employee = EmployeeProfile.find_by_id(self.employee_id) if self.employee_id else None
+        return {
+            "id": self.id,
+            "termination_id": self.termination_id,
+            "employee_id": self.employee_id,
+            "employee_name": employee.full_name if employee else None,
+            "company_id": self.company_id,
+            "document_type": self.document_type or "termination_letter",
+            "document_name": self.document_name or "",
+            "document_url": self.document_url or "",
+            "generated_document_id": self.generated_document_id,
+            "signature_request_id": self.signature_request_id,
+            "status": self.status or "draft",
+            "notes": self.notes or "",
+            "created_at": _fmt_dt(self._data.get("created_at")),
+            "updated_at": _fmt_dt(self._data.get("updated_at")),
+        }
+
+
 class AccreditationRequirement(BaseModel, AuditMixin):
     __tablename__ = "hr_accreditation_requirements"
     __displayname__ = "name"
@@ -654,7 +907,32 @@ class AccreditationRequirement(BaseModel, AuditMixin):
     customer_id = Column(ColumnType.INTEGER, label="Customer")
     is_global = Column(ColumnType.BOOLEAN, default=True, label="Is Global")
     is_mandatory = Column(ColumnType.BOOLEAN, default=True, label="Mandatory")
+    fulfillment_mode = Column(
+        ColumnType.STRING,
+        default="upload_only",
+        label="Fulfillment Mode",
+    )
+    accepted_file_types = Column(
+        ColumnType.JSON,
+        default=["pdf", "jpg", "jpeg", "png"],
+        label="Accepted File Types",
+    )
+    requires_signature = Column(
+        ColumnType.BOOLEAN,
+        default=False,
+        label="Requires Signature",
+    )
     tracks_expiration = Column(ColumnType.BOOLEAN, default=False, label="Tracks Expiration")
+    expiration_required = Column(
+        ColumnType.BOOLEAN,
+        default=False,
+        label="Expiration Required",
+    )
+    default_validity_days = Column(
+        ColumnType.INTEGER,
+        default=0,
+        label="Default Validity Days",
+    )
     warning_days = Column(ColumnType.INTEGER, default=30, label="Warning Days")
     display_order = Column(ColumnType.INTEGER, default=0, label="Display Order")
 
@@ -665,6 +943,14 @@ class AccreditationRequirement(BaseModel, AuditMixin):
             self.warning_days = 30
         if self.display_order in (None, ""):
             self.display_order = 0
+        if not self.fulfillment_mode:
+            self.fulfillment_mode = "upload_only"
+        if not self.accepted_file_types:
+            self.accepted_file_types = ["pdf", "jpg", "jpeg", "png"]
+        if self.default_validity_days in (None, ""):
+            self.default_validity_days = 0
+        if self.expiration_required and not self.tracks_expiration:
+            self.tracks_expiration = True
         if self.customer_id:
             self.is_global = False
 
@@ -679,6 +965,17 @@ class AccreditationRequirement(BaseModel, AuditMixin):
                 "Accreditation requirement category must be one of: "
                 + ", ".join(ACCREDITATION_REQUIREMENT_CATEGORIES)
             )
+        if self.fulfillment_mode not in ACCREDITATION_FULFILLMENT_MODES:
+            raise ValidationError(
+                "Fulfillment mode must be one of: "
+                + ", ".join(ACCREDITATION_FULFILLMENT_MODES)
+            )
+        file_types = _normalize_str_list(self.accepted_file_types or [])
+        if not file_types and self.fulfillment_mode in ("upload_only", "hybrid"):
+            raise ValidationError("Accepted file types are required for upload-based requirements")
+        self.accepted_file_types = file_types
+        if _safe_int(self.default_validity_days, 0) < 0:
+            raise ValidationError("Default validity days must be zero or greater")
         if _safe_int(self.warning_days, 0) < 0:
             raise ValidationError("Warning days must be zero or greater")
 
@@ -694,7 +991,12 @@ class AccreditationRequirement(BaseModel, AuditMixin):
             "customer_name": _resolve_customer_name(self.customer_id),
             "is_global": bool(self.is_global),
             "is_mandatory": bool(self.is_mandatory),
+            "fulfillment_mode": self.fulfillment_mode or "upload_only",
+            "accepted_file_types": self.accepted_file_types or [],
+            "requires_signature": bool(self.requires_signature),
             "tracks_expiration": bool(self.tracks_expiration),
+            "expiration_required": bool(self.expiration_required),
+            "default_validity_days": _safe_int(self.default_validity_days, 0) or 0,
             "warning_days": _safe_int(self.warning_days, 0) or 0,
             "display_order": _safe_int(self.display_order, 0) or 0,
             "created_at": _fmt_dt(self._data.get("created_at")),
@@ -711,6 +1013,19 @@ class EmployeeAccreditationDocument(BaseModel, AuditMixin):
     company_id = Column(ColumnType.INTEGER, required=True, label="Company")
     document_name = Column(ColumnType.STRING, required=True, label="Document Name")
     document_url = Column(ColumnType.STRING, label="Document URL")
+    document_origin = Column(
+        ColumnType.STRING,
+        default="upload_only",
+        label="Document Origin",
+    )
+    template_id = Column(ColumnType.INTEGER, label="Template")
+    generated_document_id = Column(ColumnType.INTEGER, label="Generated Document")
+    service_order_id = Column(ColumnType.INTEGER, label="Service Order")
+    file_name = Column(ColumnType.STRING, label="File Name")
+    file_mime = Column(ColumnType.STRING, label="File MIME")
+    file_data = Column(ColumnType.TEXT, label="File Data")
+    uploaded_by = Column(ColumnType.INTEGER, label="Uploaded By")
+    uploaded_at = Column(ColumnType.STRING, label="Uploaded At")
     document_number = Column(ColumnType.STRING, label="Document Number")
     issued_on = Column(ColumnType.STRING, label="Issued On")
     expires_on = Column(ColumnType.STRING, label="Expires On")
@@ -722,13 +1037,27 @@ class EmployeeAccreditationDocument(BaseModel, AuditMixin):
     notes = Column(ColumnType.TEXT, label="Notes")
     source_module = Column(ColumnType.STRING, label="Source Module")
     signature_request_id = Column(ColumnType.INTEGER, label="Signature Request")
+    signature_status = Column(
+        ColumnType.STRING,
+        default="not_required",
+        label="Signature Status",
+    )
+    signed_document_url = Column(ColumnType.STRING, label="Signed Document URL")
 
     def before_create(self):
         if not self.verification_status:
             self.verification_status = "pending_review"
+        if not self.document_origin:
+            self.document_origin = "upload_only"
+        if not self.signature_status:
+            self.signature_status = "not_required"
+        if self.file_data and not self.uploaded_at:
+            self.uploaded_at = utc_now_iso()
 
     def validate(self):
         super().validate()
+        self.document_origin = self.document_origin or "upload_only"
+        self.signature_status = self.signature_status or "not_required"
         if not self.employee_id:
             raise ValidationError("Employee is required for accreditation document")
         if not self.requirement_id:
@@ -740,19 +1069,45 @@ class EmployeeAccreditationDocument(BaseModel, AuditMixin):
                 "Verification status must be one of: "
                 + ", ".join(ACCREDITATION_VERIFICATION_STATUSES)
             )
+        if self.document_origin not in ACCREDITATION_FULFILLMENT_MODES:
+            raise ValidationError(
+                "Document origin must be one of: "
+                + ", ".join(ACCREDITATION_FULFILLMENT_MODES)
+            )
         issued = _parse_date(self.issued_on)
         expires = _parse_date(self.expires_on)
         if issued and expires and expires < issued:
             raise ValidationError("Document expiration must be after issue date")
 
-    def to_dict(self) -> Dict[str, Any]:
+        requirement = (
+            AccreditationRequirement.find_by_id(self.requirement_id)
+            if self.requirement_id
+            else None
+        )
+        if requirement:
+            if requirement.expiration_required and not self.expires_on:
+                raise ValidationError("Expiration date is required for this accreditation document")
+            if self.file_data:
+                accepted = {
+                    str(item or "").strip().lower().lstrip(".")
+                    for item in (requirement.accepted_file_types or [])
+                    if str(item or "").strip()
+                }
+                extension = str(self.file_name or self.document_name or "").rsplit(".", 1)[-1].strip().lower()
+                if accepted and extension and extension not in accepted:
+                    raise ValidationError(
+                        "File type not allowed for this requirement. Allowed: "
+                        + ", ".join(sorted(accepted))
+                    )
+
+    def to_dict(self, include_content: bool = False) -> Dict[str, Any]:
         employee = EmployeeProfile.find_by_id(self.employee_id) if self.employee_id else None
         requirement = (
             AccreditationRequirement.find_by_id(self.requirement_id)
             if self.requirement_id
             else None
         )
-        return {
+        data = {
             "id": self.id,
             "employee_id": self.employee_id,
             "employee_name": employee.full_name if employee else None,
@@ -763,6 +1118,14 @@ class EmployeeAccreditationDocument(BaseModel, AuditMixin):
             "requirement_customer_id": requirement.customer_id if requirement else None,
             "document_name": self.document_name or "",
             "document_url": self.document_url or "",
+            "document_origin": self.document_origin or "upload_only",
+            "template_id": self.template_id,
+            "generated_document_id": self.generated_document_id,
+            "service_order_id": self.service_order_id,
+            "file_name": self.file_name or "",
+            "file_mime": self.file_mime or "",
+            "uploaded_by": self.uploaded_by,
+            "uploaded_at": self.uploaded_at or "",
             "document_number": self.document_number or "",
             "issued_on": self.issued_on or "",
             "expires_on": self.expires_on or "",
@@ -773,9 +1136,14 @@ class EmployeeAccreditationDocument(BaseModel, AuditMixin):
             "notes": self.notes or "",
             "source_module": self.source_module or "",
             "signature_request_id": self.signature_request_id,
+            "signature_status": self.signature_status or "not_required",
+            "signed_document_url": self.signed_document_url or "",
             "created_at": _fmt_dt(self._data.get("created_at")),
             "updated_at": _fmt_dt(self._data.get("updated_at")),
         }
+        if include_content:
+            data["file_data"] = self.file_data or ""
+        return data
 
 
 def seed_default_departments(company_id: int) -> List[Department]:
@@ -815,7 +1183,12 @@ def seed_default_accreditation_requirements(company_id: int) -> List[Accreditati
                 "customer_id": None,
                 "is_global": True,
                 "is_mandatory": True,
+                "fulfillment_mode": item.get("fulfillment_mode") or "upload_only",
+                "accepted_file_types": item.get("accepted_file_types") or ["pdf", "jpg", "jpeg", "png"],
+                "requires_signature": bool(item.get("requires_signature")),
                 "tracks_expiration": bool(item.get("tracks_expiration")),
+                "expiration_required": bool(item.get("expiration_required")),
+                "default_validity_days": _safe_int(item.get("default_validity_days"), 0) or 0,
                 "warning_days": _safe_int(item.get("warning_days"), 0) or 0,
                 "display_order": index,
             }
@@ -878,6 +1251,9 @@ class HRModule(BaseModule):
         self.register_model("hr.employee", EmployeeProfile)
         self.register_model("hr.contract", EmployeeContract)
         self.register_model("hr.time_off_request", TimeOffRequest)
+        self.register_model("hr.employment_status_event", EmploymentStatusEvent)
+        self.register_model("hr.termination", EmployeeTermination)
+        self.register_model("hr.termination_document", TerminationDocument)
         self.register_model("hr.accreditation_requirement", AccreditationRequirement)
         self.register_model("hr.accreditation_document", EmployeeAccreditationDocument)
 
@@ -903,6 +1279,28 @@ class HRModule(BaseModule):
         self.register_route("/hr/leaves", self.create_leave, methods=["POST"], auth_required=True)
         self.register_route("/hr/leaves/{id}", self.update_leave, methods=["PUT"], auth_required=True)
         self.register_route("/hr/leaves/{id}", self.delete_leave, methods=["DELETE"], auth_required=True)
+
+        self.register_route(
+            "/hr/employees/{id}/status-history",
+            self.get_employee_status_history,
+            methods=["GET"],
+            auth_required=True,
+        )
+
+        self.register_route("/hr/terminations", self.list_terminations, methods=["GET"], auth_required=True)
+        self.register_route("/hr/terminations", self.create_termination, methods=["POST"], auth_required=True)
+        self.register_route(
+            "/hr/terminations/{id}", self.get_termination, methods=["GET"], auth_required=True
+        )
+        self.register_route(
+            "/hr/terminations/{id}", self.update_termination, methods=["PUT"], auth_required=True
+        )
+        self.register_route(
+            "/hr/terminations/{id}/documents",
+            self.create_termination_document,
+            methods=["POST"],
+            auth_required=True,
+        )
 
         self.register_route(
             "/hr/accreditation/customers",
@@ -989,11 +1387,78 @@ class HRModule(BaseModule):
             auth_required=True,
         )
 
+        self._backfill_accreditation_metadata()
         self.logger.info("HR module initialized")
 
     def _company_id(self) -> Optional[int]:
         user = self.env.user
         return user.company_id if user else None
+
+    def _backfill_accreditation_metadata(self) -> None:
+        try:
+            requirements = AccreditationRequirement.search([])
+            for requirement in requirements:
+                dirty = False
+                if not requirement.fulfillment_mode:
+                    requirement.fulfillment_mode = (
+                        "template_generated"
+                        if requirement.requires_signature
+                        else "upload_only"
+                    )
+                    dirty = True
+                if not requirement.accepted_file_types:
+                    requirement.accepted_file_types = ["pdf", "jpg", "jpeg", "png"]
+                    dirty = True
+                if requirement.expiration_required and not requirement.tracks_expiration:
+                    requirement.tracks_expiration = True
+                    dirty = True
+                if requirement.default_validity_days in (None, ""):
+                    requirement.default_validity_days = 0
+                    dirty = True
+                if dirty:
+                    requirement.save()
+
+            documents = EmployeeAccreditationDocument.search([])
+            for document in documents:
+                dirty = False
+                if not document.document_origin:
+                    document.document_origin = (
+                        "template_generated"
+                        if document.generated_document_id or document.signature_request_id
+                        else "upload_only"
+                    )
+                    dirty = True
+                if not document.signature_status:
+                    document.signature_status = (
+                        "signed"
+                        if document.signature_request_id and document.verification_status == "approved"
+                        else "pending"
+                        if document.signature_request_id
+                        else "not_required"
+                    )
+                    dirty = True
+                if (
+                    document.generated_document_id
+                    and document.document_url
+                    and document.document_url.startswith("/documents/generated/")
+                ):
+                    document.document_url = (
+                        f"/app/cross-correspondence?generated_document_id={document.generated_document_id}"
+                    )
+                    dirty = True
+                if (
+                    document.generated_document_id
+                    and document.signature_status == "signed"
+                    and not document.signed_document_url
+                ):
+                    document.signed_document_url = (
+                        f"/app/cross-correspondence?generated_document_id={document.generated_document_id}"
+                    )
+                    dirty = True
+                if dirty:
+                    document.save()
+        except Exception as exc:
+            self.logger.warning(f"Accreditation metadata backfill skipped: {exc}")
 
     def _tenant_filter(self) -> List[tuple]:
         user = self.env.user
@@ -1053,6 +1518,125 @@ class HRModule(BaseModule):
         ):
             return None, Response.not_found("Contract not found")
         return contract, None
+
+    def _termination_or_404(
+        self, termination_id: Any
+    ) -> Tuple[Optional[EmployeeTermination], Optional[Response]]:
+        termination = EmployeeTermination.find_by_id(_safe_int(termination_id))
+        if not termination or (
+            self.env.user.role != "superadmin" and termination.company_id != self._company_id()
+        ):
+            return None, Response.not_found("Termination case not found")
+        return termination, None
+
+    def _active_contract_for_employee(
+        self, employee_id: int, preferred_contract_id: Optional[int] = None
+    ) -> Optional[EmployeeContract]:
+        contracts = EmployeeContract.search([("employee_id", "=", employee_id)])
+        contracts.sort(
+            key=lambda item: (
+                1 if item.status == "active" else 0,
+                item.start_date or "",
+                item.id or 0,
+            ),
+            reverse=True,
+        )
+        if preferred_contract_id:
+            preferred = next((item for item in contracts if item.id == preferred_contract_id), None)
+            if preferred:
+                return preferred
+        return contracts[0] if contracts else None
+
+    def _status_events_for_employee(self, employee_id: int) -> List[EmploymentStatusEvent]:
+        events = EmploymentStatusEvent.search([("employee_id", "=", employee_id)])
+        events.sort(
+            key=lambda item: (item.effective_date or "", _fmt_dt(item._data.get("created_at")) or "", item.id or 0),
+            reverse=True,
+        )
+        return events
+
+    def _record_employee_status_event(
+        self,
+        employee: EmployeeProfile,
+        previous_status: Optional[str],
+        new_status: Optional[str],
+        *,
+        contract_id: Optional[int] = None,
+        effective_date: Optional[str] = None,
+        reason: str = "",
+        source_module: str = "hr",
+        source_record_id: Optional[int] = None,
+        notes: str = "",
+    ) -> Optional[EmploymentStatusEvent]:
+        if not employee or not new_status:
+            return None
+        if previous_status == new_status and self._status_events_for_employee(employee.id):
+            return None
+        try:
+            return EmploymentStatusEvent.create(
+                {
+                    "employee_id": employee.id,
+                    "company_id": employee.company_id,
+                    "contract_id": contract_id,
+                    "previous_status": previous_status,
+                    "new_status": new_status,
+                    "effective_date": effective_date or employee.hire_date or _today().isoformat(),
+                    "reason": reason,
+                    "source_module": source_module,
+                    "source_record_id": source_record_id,
+                    "notes": notes,
+                }
+            )
+        except ValidationError:
+            return None
+
+    def _sync_employee_operational_status(
+        self,
+        employee: EmployeeProfile,
+        *,
+        source_module: str,
+        source_record_id: Optional[int],
+        reason: str,
+    ) -> bool:
+        previous_status = employee.status or "onboarding"
+        if previous_status == "inactive":
+            return False
+        approved_leaves = [
+            item
+            for item in TimeOffRequest.search([("employee_id", "=", employee.id)])
+            if item.status == "approved"
+            and (_parse_date(item.start_date) or _today()) <= _today() <= (_parse_date(item.end_date) or _today())
+        ]
+        contracts = EmployeeContract.search([("employee_id", "=", employee.id)])
+        has_active_contract = any(item.status == "active" for item in contracts)
+        has_draft_contract = any(item.status == "draft" for item in contracts)
+
+        if approved_leaves:
+            new_status = "leave"
+        elif has_active_contract:
+            new_status = "active"
+        elif has_draft_contract:
+            new_status = "onboarding"
+        else:
+            new_status = "onboarding" if employee.hire_date else "draft"
+
+        if new_status == previous_status:
+            return False
+
+        contract = self._active_contract_for_employee(employee.id)
+        employee.status = new_status
+        employee.save()
+        self._record_employee_status_event(
+            employee,
+            previous_status,
+            new_status,
+            contract_id=contract.id if contract else None,
+            effective_date=_today().isoformat(),
+            reason=reason,
+            source_module=source_module,
+            source_record_id=source_record_id,
+        )
+        return True
 
     def _leave_or_404(self, leave_id: Any) -> Tuple[Optional[TimeOffRequest], Optional[Response]]:
         leave = TimeOffRequest.find_by_id(_safe_int(leave_id))
@@ -1340,12 +1924,35 @@ class HRModule(BaseModule):
 
         contracts = EmployeeContract.search([("employee_id", "=", employee.id)])
         leaves = TimeOffRequest.search([("employee_id", "=", employee.id)])
+        status_history = self._status_events_for_employee(employee.id)
+        terminations = EmployeeTermination.search([("employee_id", "=", employee.id)])
+        terminations.sort(
+            key=lambda item: (item.termination_date or "", item.id or 0),
+            reverse=True,
+        )
+        termination_documents = [
+            item
+            for termination in terminations
+            for item in TerminationDocument.search([("termination_id", "=", termination.id)])
+        ]
+        accreditation_requirements = self._requirements_for_customer_ids(
+            self._employee_assigned_customer_ids(employee)
+        )
+        accreditation_summary = self._build_accreditation_row(employee, accreditation_requirements)
 
         return Response.ok(
             {
                 **employee.to_dict(),
                 "contracts": [item.to_dict() for item in contracts],
                 "leave_requests": [item.to_dict() for item in leaves],
+                "status_history": [item.to_dict() for item in status_history],
+                "terminations": [item.to_dict() for item in terminations],
+                "termination_documents": [item.to_dict() for item in termination_documents],
+                "accreditation_summary": {
+                    "overall_status": accreditation_summary.get("overall_status"),
+                    "completion_percentage": accreditation_summary.get("completion_percentage"),
+                    "counts": accreditation_summary.get("counts"),
+                },
             }
         )
 
@@ -1442,6 +2049,23 @@ class HRModule(BaseModule):
             response = {"employee": employee.to_dict()}
             if contract:
                 response["contract"] = contract.to_dict()
+            self._record_employee_status_event(
+                employee,
+                None,
+                employee.status or "onboarding",
+                contract_id=contract.id if contract else None,
+                effective_date=employee.hire_date or _today().isoformat(),
+                reason="Alta inicial de trabajador",
+                source_module="hr_employee",
+                source_record_id=employee.id,
+            )
+            if contract:
+                self._sync_employee_operational_status(
+                    employee,
+                    source_module="hr_contract",
+                    source_record_id=contract.id,
+                    reason="Contrato creado desde RRHH",
+                )
             if temp_password:
                 response["temp_password"] = temp_password
             if warning:
@@ -1460,6 +2084,7 @@ class HRModule(BaseModule):
             return error
 
         data = request.data or {}
+        previous_status = employee.status
         if "department_id" in data and data.get("department_id"):
             _, dep_error = self._department_or_404(data.get("department_id"))
             if dep_error:
@@ -1541,6 +2166,19 @@ class HRModule(BaseModule):
 
         try:
             employee.save()
+            if previous_status != employee.status:
+                contract = self._active_contract_for_employee(employee.id)
+                self._record_employee_status_event(
+                    employee,
+                    previous_status,
+                    employee.status,
+                    contract_id=contract.id if contract else None,
+                    effective_date=employee.hire_date or _today().isoformat(),
+                    reason=data.get("status_change_reason") or "Actualizacion manual de estado",
+                    source_module="hr_employee",
+                    source_record_id=employee.id,
+                    notes=data.get("status_change_notes") or "",
+                )
             response = {"employee": employee.to_dict()}
             if temp_password:
                 response["temp_password"] = temp_password
@@ -1558,17 +2196,23 @@ class HRModule(BaseModule):
         employee, error = self._employee_or_404(request.params.get("id"))
         if error:
             return error
-
-        contracts = EmployeeContract.search([("employee_id", "=", employee.id)])
-        leaves = TimeOffRequest.search([("employee_id", "=", employee.id)])
-        accreditation_docs = EmployeeAccreditationDocument.search([("employee_id", "=", employee.id)])
-        if contracts or leaves or accreditation_docs:
-            return Response.bad_request(
-                "Cannot delete employee with contracts, leave requests or accreditation documents linked"
-            )
-
-        employee.delete()
-        return Response.ok({"message": f"Employee '{employee.full_name}' deleted"})
+        previous_status = employee.status
+        employee.status = "inactive"
+        marker = f"Ficha archivada desde RRHH el {_today().isoformat()}."
+        employee.notes = "\n".join([item for item in [employee.notes or "", marker] if item]).strip()
+        employee.save()
+        contract = self._active_contract_for_employee(employee.id)
+        self._record_employee_status_event(
+            employee,
+            previous_status,
+            "inactive",
+            contract_id=contract.id if contract else None,
+            effective_date=_today().isoformat(),
+            reason="Archivo manual de ficha laboral",
+            source_module="hr_employee",
+            source_record_id=employee.id,
+        )
+        return Response.ok({"message": f"Employee '{employee.full_name}' archived as inactive"})
 
     async def list_contracts(self, request: Request) -> Response:
         err = self._require_access()
@@ -1612,12 +2256,17 @@ class HRModule(BaseModule):
             )
 
             if contract.status == "active":
-                employee.status = "active"
                 if not employee.hire_date:
                     employee.hire_date = contract.start_date
                 if contract.salary_amount:
                     employee.base_salary = contract.salary_amount
                 employee.save()
+            self._sync_employee_operational_status(
+                employee,
+                source_module="hr_contract",
+                source_record_id=contract.id,
+                reason="Nuevo contrato registrado",
+            )
 
             return Response.created(contract.to_dict())
         except ValidationError as exc:
@@ -1633,6 +2282,7 @@ class HRModule(BaseModule):
             return error
 
         data = request.data or {}
+        employee = EmployeeProfile.find_by_id(contract.employee_id)
         editable = {
             "contract_type": "contract_type",
             "status": "status",
@@ -1655,15 +2305,31 @@ class HRModule(BaseModule):
 
         try:
             contract.save()
-            employee = EmployeeProfile.find_by_id(contract.employee_id)
             if employee:
-                if contract.status == "active":
-                    employee.status = "active"
-                    if contract.salary_amount:
-                        employee.base_salary = contract.salary_amount
-                elif contract.status == "terminated":
+                if contract.status == "active" and contract.salary_amount:
+                    employee.base_salary = contract.salary_amount
+                    employee.save()
+                if contract.status == "terminated":
+                    previous_status = employee.status
                     employee.status = "inactive"
-                employee.save()
+                    employee.save()
+                    self._record_employee_status_event(
+                        employee,
+                        previous_status,
+                        "inactive",
+                        contract_id=contract.id,
+                        effective_date=contract.end_date or _today().isoformat(),
+                        reason="Contrato marcado como terminado",
+                        source_module="hr_contract",
+                        source_record_id=contract.id,
+                    )
+                else:
+                    self._sync_employee_operational_status(
+                        employee,
+                        source_module="hr_contract",
+                        source_record_id=contract.id,
+                        reason="Contrato actualizado",
+                    )
             return Response.ok(contract.to_dict())
         except ValidationError as exc:
             return Response.bad_request(str(exc))
@@ -1723,9 +2389,12 @@ class HRModule(BaseModule):
                 }
             )
 
-            if leave.status == "approved":
-                employee.status = "leave"
-                employee.save()
+            self._sync_employee_operational_status(
+                employee,
+                source_module="hr_leave",
+                source_record_id=leave.id,
+                reason="Solicitud de permiso registrada",
+            )
 
             return Response.created(leave.to_dict())
         except ValidationError as exc:
@@ -1762,9 +2431,13 @@ class HRModule(BaseModule):
         try:
             leave.save()
             employee = EmployeeProfile.find_by_id(leave.employee_id)
-            if employee and leave.status == "approved":
-                employee.status = "leave"
-                employee.save()
+            if employee:
+                self._sync_employee_operational_status(
+                    employee,
+                    source_module="hr_leave",
+                    source_record_id=leave.id,
+                    reason="Solicitud de permiso actualizada",
+                )
             return Response.ok(leave.to_dict())
         except ValidationError as exc:
             return Response.bad_request(str(exc))
@@ -1779,8 +2452,281 @@ class HRModule(BaseModule):
             return error
         if leave.status == "approved":
             return Response.bad_request("Cannot delete an approved leave request")
+        employee = EmployeeProfile.find_by_id(leave.employee_id) if leave.employee_id else None
         leave.delete()
+        if employee:
+            self._sync_employee_operational_status(
+                employee,
+                source_module="hr_leave",
+                source_record_id=leave.id,
+                reason="Solicitud de permiso eliminada",
+            )
         return Response.ok({"message": "Leave request deleted"})
+
+    async def get_employee_status_history(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        employee, error = self._employee_or_404(request.params.get("id"))
+        if error:
+            return error
+
+        events = self._status_events_for_employee(employee.id)
+        return Response.ok(
+            {
+                "employee": employee.to_dict(),
+                "count": len(events),
+                "results": [item.to_dict() for item in events],
+            }
+        )
+
+    async def list_terminations(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        status = request.get_param("status")
+        employee_id = _safe_int(request.get_param("employee_id"), None)
+        terminations = EmployeeTermination.search(self._tenant_filter())
+        if status:
+            terminations = [item for item in terminations if (item.status or "") == status]
+        if employee_id:
+            terminations = [item for item in terminations if item.employee_id == employee_id]
+        terminations.sort(key=lambda item: (item.termination_date or "", item.id or 0), reverse=True)
+        return Response.ok(
+            {
+                "count": len(terminations),
+                "results": [item.to_dict() for item in terminations],
+            }
+        )
+
+    async def get_termination(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        termination, error = self._termination_or_404(request.params.get("id"))
+        if error:
+            return error
+
+        documents = TerminationDocument.search([("termination_id", "=", termination.id)])
+        return Response.ok(
+            {
+                **termination.to_dict(),
+                "documents": [item.to_dict() for item in documents],
+            }
+        )
+
+    async def create_termination(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        data = request.data or {}
+        employee, error = self._employee_or_404(data.get("employee_id"))
+        if error:
+            return error
+
+        contract_id = _safe_int(data.get("contract_id"), None)
+        contract = None
+        if contract_id:
+            contract, contract_error = self._contract_or_404(contract_id)
+            if contract_error:
+                return contract_error
+            if contract.employee_id != employee.id:
+                return Response.bad_request("Selected contract does not belong to the employee")
+        else:
+            contract = self._active_contract_for_employee(employee.id)
+
+        try:
+            termination = EmployeeTermination.create(
+                {
+                    "employee_id": employee.id,
+                    "company_id": employee.company_id,
+                    "contract_id": contract.id if contract else None,
+                    "status": data.get("status") or "notified",
+                    "cause": data.get("cause") or "other",
+                    "notice_date": data.get("notice_date") or _today().isoformat(),
+                    "termination_date": data.get("termination_date") or _today().isoformat(),
+                    "rehire_eligible": _normalize_bool(data.get("rehire_eligible"), False),
+                    "reason_detail": data.get("reason_detail") or "",
+                    "legal_notes": data.get("legal_notes") or "",
+                    "document_pack_status": data.get("document_pack_status") or "draft",
+                }
+            )
+
+            document = TerminationDocument.create(
+                {
+                    "termination_id": termination.id,
+                    "employee_id": employee.id,
+                    "company_id": employee.company_id,
+                    "document_type": data.get("document_type") or "termination_letter",
+                    "document_name": data.get("document_name")
+                    or f"Termino de contrato - {employee.full_name}",
+                    "document_url": data.get("document_url")
+                    or f"/app/cross-correspondence?employee_id={employee.id}&source_module=hr&source_record_id={termination.id}&target_module=hr",
+                    "generated_document_id": _safe_int(data.get("generated_document_id"), None),
+                    "signature_request_id": _safe_int(data.get("signature_request_id"), None),
+                    "status": data.get("document_status")
+                    or data.get("document_pack_status")
+                    or "draft",
+                    "notes": data.get("document_notes")
+                    or "Documento base de salida preparado desde modulo RRHH.",
+                }
+            )
+            termination.document_pack_status = data.get("document_pack_status") or document.status
+
+            if contract and termination.status == "completed":
+                contract.status = "terminated"
+                contract.end_date = termination.termination_date
+                contract.save()
+
+            if termination.status in ("notified", "in_signature", "completed"):
+                previous_status = employee.status
+                if termination.status == "completed":
+                    employee.status = "inactive"
+                    employee.save()
+                    self._record_employee_status_event(
+                        employee,
+                        previous_status,
+                        "inactive",
+                        contract_id=contract.id if contract else None,
+                        effective_date=termination.termination_date,
+                        reason=f"Desvinculacion: {_termination_cause_label(termination.cause)}",
+                        source_module="hr_termination",
+                        source_record_id=termination.id,
+                        notes=termination.reason_detail,
+                    )
+                else:
+                    self._record_employee_status_event(
+                        employee,
+                        previous_status,
+                        previous_status,
+                        contract_id=contract.id if contract else None,
+                        effective_date=termination.notice_date or termination.termination_date,
+                        reason=f"Aviso de desvinculacion: {_termination_cause_label(termination.cause)}",
+                        source_module="hr_termination",
+                        source_record_id=termination.id,
+                        notes=termination.reason_detail,
+                    )
+
+            termination.save()
+            return Response.created(
+                {
+                    "termination": termination.to_dict(),
+                    "document": document.to_dict(),
+                }
+            )
+        except ValidationError as exc:
+            return Response.bad_request(str(exc))
+
+    async def update_termination(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        termination, error = self._termination_or_404(request.params.get("id"))
+        if error:
+            return error
+
+        employee = EmployeeProfile.find_by_id(termination.employee_id) if termination.employee_id else None
+        contract = EmployeeContract.find_by_id(termination.contract_id) if termination.contract_id else None
+        previous_status = termination.status
+
+        data = request.data or {}
+        editable = {
+            "contract_id": "contract_id",
+            "status": "status",
+            "cause": "cause",
+            "notice_date": "notice_date",
+            "termination_date": "termination_date",
+            "rehire_eligible": "rehire_eligible",
+            "reason_detail": "reason_detail",
+            "legal_notes": "legal_notes",
+            "document_pack_status": "document_pack_status",
+        }
+        for incoming, field_name in editable.items():
+            if incoming not in data:
+                continue
+            value = data[incoming]
+            if incoming == "contract_id":
+                value = _safe_int(value, None)
+            if incoming == "rehire_eligible":
+                value = _normalize_bool(value, False)
+            setattr(termination, field_name, value)
+
+        if termination.contract_id:
+            contract, contract_error = self._contract_or_404(termination.contract_id)
+            if contract_error:
+                return contract_error
+            if employee and contract.employee_id != employee.id:
+                return Response.bad_request("Selected contract does not belong to the employee")
+
+        try:
+            termination.save()
+            if employee and previous_status != termination.status:
+                if termination.status == "completed":
+                    if contract:
+                        contract.status = "terminated"
+                        contract.end_date = termination.termination_date
+                        contract.save()
+                    old_employee_status = employee.status
+                    employee.status = "inactive"
+                    employee.save()
+                    self._record_employee_status_event(
+                        employee,
+                        old_employee_status,
+                        "inactive",
+                        contract_id=contract.id if contract else termination.contract_id,
+                        effective_date=termination.termination_date,
+                        reason=f"Desvinculacion cerrada: {_termination_cause_label(termination.cause)}",
+                        source_module="hr_termination",
+                        source_record_id=termination.id,
+                        notes=termination.reason_detail,
+                    )
+                elif termination.status == "cancelled":
+                    self._sync_employee_operational_status(
+                        employee,
+                        source_module="hr_termination",
+                        source_record_id=termination.id,
+                        reason="Proceso de desvinculacion cancelado",
+                    )
+            return Response.ok(termination.to_dict())
+        except ValidationError as exc:
+            return Response.bad_request(str(exc))
+
+    async def create_termination_document(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        termination, error = self._termination_or_404(request.params.get("id"))
+        if error:
+            return error
+
+        data = request.data or {}
+        try:
+            document = TerminationDocument.create(
+                {
+                    "termination_id": termination.id,
+                    "employee_id": termination.employee_id,
+                    "company_id": termination.company_id,
+                    "document_type": data.get("document_type") or "termination_letter",
+                    "document_name": data.get("document_name")
+                    or f"Documento de salida #{termination.id}",
+                    "document_url": data.get("document_url"),
+                    "generated_document_id": _safe_int(data.get("generated_document_id"), None),
+                    "signature_request_id": _safe_int(data.get("signature_request_id"), None),
+                    "status": data.get("status") or "draft",
+                    "notes": data.get("notes"),
+                }
+            )
+            termination.document_pack_status = document.status
+            termination.save()
+            return Response.created(document.to_dict())
+        except ValidationError as exc:
+            return Response.bad_request(str(exc))
 
     async def list_accreditation_customers(self, request: Request) -> Response:
         err = self._require_access()
@@ -1948,7 +2894,14 @@ class HRModule(BaseModule):
                     "customer_id": customer_id,
                     "is_global": not customer_id if "is_global" not in data else _normalize_bool(data.get("is_global"), not customer_id),
                     "is_mandatory": _normalize_bool(data.get("is_mandatory"), True),
+                    "fulfillment_mode": data.get("fulfillment_mode") or "upload_only",
+                    "accepted_file_types": _normalize_str_list(
+                        data.get("accepted_file_types") or ["pdf", "jpg", "jpeg", "png"]
+                    ),
+                    "requires_signature": _normalize_bool(data.get("requires_signature"), False),
                     "tracks_expiration": _normalize_bool(data.get("tracks_expiration"), False),
+                    "expiration_required": _normalize_bool(data.get("expiration_required"), False),
+                    "default_validity_days": _safe_int(data.get("default_validity_days"), 0) or 0,
                     "warning_days": _safe_int(data.get("warning_days"), 0) or 0,
                     "display_order": _safe_int(data.get("display_order"), 0) or 0,
                 }
@@ -1995,8 +2948,20 @@ class HRModule(BaseModule):
             )
         if "is_mandatory" in data:
             requirement.is_mandatory = _normalize_bool(data.get("is_mandatory"), True)
+        if "fulfillment_mode" in data:
+            requirement.fulfillment_mode = data.get("fulfillment_mode") or "upload_only"
+        if "accepted_file_types" in data:
+            requirement.accepted_file_types = _normalize_str_list(
+                data.get("accepted_file_types") or []
+            )
+        if "requires_signature" in data:
+            requirement.requires_signature = _normalize_bool(data.get("requires_signature"), False)
         if "tracks_expiration" in data:
             requirement.tracks_expiration = _normalize_bool(data.get("tracks_expiration"), False)
+        if "expiration_required" in data:
+            requirement.expiration_required = _normalize_bool(data.get("expiration_required"), False)
+        if "default_validity_days" in data:
+            requirement.default_validity_days = _safe_int(data.get("default_validity_days"), 0) or 0
         if "warning_days" in data:
             requirement.warning_days = _safe_int(data.get("warning_days"), 0) or 0
         if "display_order" in data:
@@ -2085,6 +3050,20 @@ class HRModule(BaseModule):
             None,
         )
         verification_status = data.get("verification_status") or "pending_review"
+        document_origin = data.get("document_origin") or requirement.fulfillment_mode or "upload_only"
+        issued_on = data.get("issued_on")
+        expires_on = data.get("expires_on")
+        if (
+            not expires_on
+            and issued_on
+            and requirement.tracks_expiration
+            and _safe_int(requirement.default_validity_days, 0) > 0
+        ):
+            issued_date = _parse_date(issued_on)
+            if issued_date:
+                expires_on = (
+                    issued_date + timedelta(days=_safe_int(requirement.default_validity_days, 0))
+                ).isoformat()
         verified_by = None
         verified_at = ""
         if verification_status in ("approved", "rejected"):
@@ -2097,15 +3076,38 @@ class HRModule(BaseModule):
             "company_id": employee.company_id,
             "document_name": data.get("document_name") or data.get("file_name") or requirement.name,
             "document_url": data.get("document_url") or data.get("file_url"),
+            "document_origin": document_origin,
+            "template_id": _safe_int(data.get("template_id"), None),
+            "generated_document_id": _safe_int(data.get("generated_document_id"), None),
+            "service_order_id": _safe_int(data.get("service_order_id"), None),
+            "file_name": data.get("file_name") or (existing.file_name if existing else ""),
+            "file_mime": data.get("file_mime") or (existing.file_mime if existing else ""),
+            "file_data": data.get("file_data") or (existing.file_data if existing else ""),
+            "uploaded_by": (
+                self.env.user.id
+                if data.get("file_data") and self.env.user
+                else (existing.uploaded_by if existing else None)
+            ),
+            "uploaded_at": (
+                utc_now_iso()
+                if data.get("file_data")
+                else (existing.uploaded_at if existing else "")
+            ),
             "document_number": data.get("document_number"),
-            "issued_on": data.get("issued_on"),
-            "expires_on": data.get("expires_on"),
+            "issued_on": issued_on,
+            "expires_on": expires_on,
             "verification_status": verification_status,
             "verified_by": verified_by,
             "verified_at": verified_at,
             "notes": data.get("notes"),
             "source_module": data.get("source_module") or "accreditation",
             "signature_request_id": _safe_int(data.get("signature_request_id"), None),
+            "signature_status": data.get("signature_status") or (
+                "pending"
+                if _safe_int(data.get("signature_request_id"), None) or requirement.requires_signature
+                else "not_required"
+            ),
+            "signed_document_url": data.get("signed_document_url") or "",
         }
 
         try:
@@ -2146,11 +3148,17 @@ class HRModule(BaseModule):
         editable = (
             "document_name",
             "document_url",
+            "document_origin",
+            "file_name",
+            "file_mime",
+            "file_data",
             "document_number",
             "issued_on",
             "expires_on",
             "notes",
             "source_module",
+            "signature_status",
+            "signed_document_url",
         )
         for field_name in editable:
             if field_name in data:
@@ -2158,6 +3166,15 @@ class HRModule(BaseModule):
 
         if "signature_request_id" in data:
             document.signature_request_id = _safe_int(data.get("signature_request_id"), None)
+        if "template_id" in data:
+            document.template_id = _safe_int(data.get("template_id"), None)
+        if "generated_document_id" in data:
+            document.generated_document_id = _safe_int(data.get("generated_document_id"), None)
+        if "service_order_id" in data:
+            document.service_order_id = _safe_int(data.get("service_order_id"), None)
+        if "file_data" in data and data.get("file_data"):
+            document.uploaded_by = self.env.user.id if self.env.user else document.uploaded_by
+            document.uploaded_at = utc_now_iso()
         if "verification_status" in data:
             document.verification_status = data.get("verification_status") or "pending_review"
             if document.verification_status in ("approved", "rejected"):
@@ -2175,6 +3192,20 @@ class HRModule(BaseModule):
         )
         if employee and requirement and employee.company_id != requirement.company_id:
             return Response.bad_request("Employee and requirement must belong to the same company")
+
+        if (
+            requirement
+            and "expires_on" not in data
+            and document.issued_on
+            and not document.expires_on
+            and requirement.tracks_expiration
+            and _safe_int(requirement.default_validity_days, 0) > 0
+        ):
+            issued_date = _parse_date(document.issued_on)
+            if issued_date:
+                document.expires_on = (
+                    issued_date + timedelta(days=_safe_int(requirement.default_validity_days, 0))
+                ).isoformat()
 
         try:
             document.save()
@@ -2318,19 +3349,35 @@ class HRModule(BaseModule):
         contracts = EmployeeContract.search(self._tenant_filter())
         leaves = TimeOffRequest.search(self._tenant_filter())
         departments = Department.search(self._tenant_filter())
+        terminations = EmployeeTermination.search(self._tenant_filter())
 
         active_employees = [item for item in employees if item.status == "active"]
         onboarding = [item for item in employees if item.status == "onboarding"]
+        on_leave = [item for item in employees if item.status == "leave"]
+        inactive = [item for item in employees if item.status == "inactive"]
         active_contracts = [item for item in contracts if item.status == "active"]
         pending_leaves = [item for item in leaves if item.status == "pending"]
+        upcoming_contract_end = [
+            item
+            for item in contracts
+            if item.status == "active"
+            and _days_until(item.end_date) is not None
+            and 0 <= (_days_until(item.end_date) or 0) <= 30
+        ]
+        terminations_open = [item for item in terminations if item.status in ("draft", "notified", "in_signature")]
 
         return Response.ok(
             {
                 "employees_total": len(employees),
                 "employees_active": len(active_employees),
                 "employees_onboarding": len(onboarding),
+                "employees_on_leave": len(on_leave),
+                "employees_inactive": len(inactive),
                 "contracts_active": len(active_contracts),
+                "contracts_expiring_30d": len(upcoming_contract_end),
                 "leave_pending": len(pending_leaves),
+                "terminations_open": len(terminations_open),
+                "terminations_total": len(terminations),
                 "departments_total": len(departments),
             }
         )

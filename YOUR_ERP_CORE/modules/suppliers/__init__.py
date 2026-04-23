@@ -1,0 +1,2 @@
+"""Suppliers module package."""
+

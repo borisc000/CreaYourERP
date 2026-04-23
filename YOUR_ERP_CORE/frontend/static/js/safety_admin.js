@@ -6,6 +6,8 @@ const SAFETY_ADMIN = {
         service_profiles: [],
         master_risks: [],
         protocols: [],
+        ppe_catalog: [],
+        equipment_blocks: [],
     },
     rules: [],
     filteredRules: [],
@@ -114,6 +116,8 @@ function renderRulesTable() {
 function renderCatalogPanels() {
     setText('count-master-risks', String((SAFETY_ADMIN.lookups.master_risks || []).length));
     setText('count-protocols', String((SAFETY_ADMIN.lookups.protocols || []).length));
+    setText('count-ppe', String((SAFETY_ADMIN.lookups.ppe_catalog || []).length));
+    setText('count-equipment', String((SAFETY_ADMIN.lookups.equipment_blocks || []).length));
     setText('count-customers', String((SAFETY_ADMIN.lookups.customers || []).length));
     setText('count-sites', String((SAFETY_ADMIN.lookups.client_sites || []).length));
     setText('count-areas', String((SAFETY_ADMIN.lookups.client_areas || []).length));
@@ -139,6 +143,34 @@ function renderCatalogPanels() {
         `).join('') || '<div class="mini-item">Sin protocolos.</div>';
     }
 
+    const ppeList = document.getElementById('ppe-list');
+    if (ppeList) {
+        ppeList.innerHTML = (SAFETY_ADMIN.lookups.ppe_catalog || []).map((item) => `
+            <div class="mini-item">
+                <div style="display:flex;justify-content:space-between;gap:0.5rem;align-items:flex-start;">
+                    <div>
+                        <strong style="display:block;color:#f8fafc;">${esc(item.code || '-')} - ${esc(item.name || '')}</strong>
+                        <span style="color:#94a3b8;">${esc(item.category || 'General')}</span>
+                    </div>
+                    <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+                        <button class="btn btn-ghost btn-sm" onclick="openPPECatalogPrompt(${item.id})">Editar</button>
+                        <button class="btn btn-danger btn-sm" onclick="deletePPECatalogItem(${item.id})">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        `).join('') || '<div class="mini-item">Sin EPP maestro.</div>';
+    }
+
+    const equipmentList = document.getElementById('equipment-list');
+    if (equipmentList) {
+        equipmentList.innerHTML = (SAFETY_ADMIN.lookups.equipment_blocks || []).map((item) => `
+            <div class="mini-item">
+                <strong style="display:block;color:#f8fafc;">${esc(item.code || '-')} - ${esc(item.name || '')}</strong>
+                <span style="color:#94a3b8;">${esc((item.master_risks || []).map((risk) => risk.isp_code || risk.risk_name).join(' · ') || 'Sin riesgos maestros')}</span>
+            </div>
+        `).join('') || '<div class="mini-item">Sin equipos preventivos configurados.</div>';
+    }
+
     const customers = document.getElementById('customers-list');
     if (customers) {
         customers.innerHTML = (SAFETY_ADMIN.lookups.customers || []).map((customer) => `
@@ -161,6 +193,101 @@ function renderCatalogPanels() {
             `;
         }).join('') || '<div class="mini-item">Sin instalaciones.</div>';
     }
+}
+
+function openPPECatalogPrompt(itemId = null) {
+    const current = (SAFETY_ADMIN.lookups.ppe_catalog || []).find((item) => Number(item.id) === Number(itemId));
+    const code = window.prompt('Codigo EPP', current?.code || '');
+    if (code === null) return;
+    const name = window.prompt('Nombre EPP', current?.name || '');
+    if (name === null) return;
+    const category = window.prompt('Categoria', current?.category || '');
+    if (category === null) return;
+    savePPECatalogItem(itemId, { code, name, category, description: current?.description || '' });
+}
+
+async function savePPECatalogItem(itemId, payload) {
+    const res = itemId
+        ? await API.put('/safety/ppe-catalog/' + itemId, payload)
+        : await API.post('/safety/ppe-catalog', payload);
+    if (!res || res.success === false) {
+        showToast((res && res.errors && res.errors[0]) || 'No se pudo guardar el EPP.', 'error');
+        return;
+    }
+    showToast(itemId ? 'EPP actualizado.' : 'EPP creado.');
+    await loadAdminLookups();
+}
+
+async function deletePPECatalogItem(itemId) {
+    const current = (SAFETY_ADMIN.lookups.ppe_catalog || []).find((item) => Number(item.id) === Number(itemId));
+    if (!confirm(`Eliminar el EPP "${current?.name || itemId}"?`)) return;
+    const res = await API.del('/safety/ppe-catalog/' + itemId);
+    if (!res || res.success === false) {
+        showToast((res && res.errors && res.errors[0]) || 'No se pudo eliminar el EPP.', 'error');
+        return;
+    }
+    showToast('EPP archivado.');
+    await loadAdminLookups();
+}
+
+function openEquipmentBlockPrompt(itemId = null) {
+    const current = (SAFETY_ADMIN.lookups.equipment_blocks || []).find((item) => Number(item.id) === Number(itemId));
+    const code = window.prompt('Codigo del equipo', current?.code || '');
+    if (code === null) return;
+    const name = window.prompt('Nombre del equipo / herramienta', current?.name || '');
+    if (name === null) return;
+    const description = window.prompt('Descripcion breve', current?.description || '');
+    if (description === null) return;
+    const riskOptions = (SAFETY_ADMIN.lookups.master_risks || [])
+        .map((risk) => `${risk.id}:${risk.isp_code || '-'} ${risk.risk_name || ''}`)
+        .join('\n');
+    const currentRiskIds = (current?.master_risks || []).map((risk) => risk.id).filter(Boolean).join(',');
+    const riskIdsRaw = window.prompt(`IDs de riesgos maestros separados por coma.\n\nDisponibles:\n${riskOptions}`, currentRiskIds);
+    if (riskIdsRaw === null) return;
+    const controls = window.prompt('Resumen de controles', current?.controls_summary || '');
+    if (controls === null) return;
+    const requiredPpe = window.prompt('EPP requerido separado por coma', (current?.required_ppe || []).join(', '));
+    if (requiredPpe === null) return;
+    const protocolCodes = window.prompt('Protocolos separados por coma', (current?.protocol_codes || []).join(', '));
+    if (protocolCodes === null) return;
+    saveEquipmentBlock(itemId, {
+        code,
+        name,
+        description,
+        master_risk_ids: String(riskIdsRaw || '')
+            .split(',')
+            .map((item) => Number(String(item || '').trim()))
+            .filter((item) => Number.isFinite(item) && item > 0),
+        controls_summary: controls,
+        required_ppe: parsePromptList(requiredPpe),
+        protocol_codes: parsePromptList(protocolCodes),
+        probability: Number(current?.probability || 2),
+        consequence: Number(current?.consequence || 2),
+    });
+}
+
+async function saveEquipmentBlock(itemId, payload) {
+    const res = itemId
+        ? await API.put('/safety/equipment-blocks/' + itemId, payload)
+        : await API.post('/safety/equipment-blocks', payload);
+    if (!res || res.success === false) {
+        showToast((res && res.errors && res.errors[0]) || 'No se pudo guardar el equipo preventivo.', 'error');
+        return;
+    }
+    showToast(itemId ? 'Equipo actualizado.' : 'Equipo creado.');
+    await loadAdminLookups();
+}
+
+async function deleteEquipmentBlock(itemId) {
+    const current = (SAFETY_ADMIN.lookups.equipment_blocks || []).find((item) => Number(item.id) === Number(itemId));
+    if (!confirm(`Eliminar el equipo preventivo "${current?.name || itemId}"?`)) return;
+    const res = await API.del('/safety/equipment-blocks/' + itemId);
+    if (!res || res.success === false) {
+        showToast((res && res.errors && res.errors[0]) || 'No se pudo eliminar el equipo preventivo.', 'error');
+        return;
+    }
+    showToast('Equipo preventivo archivado.');
+    await loadAdminLookups();
 }
 
 function populateMasterRiskSelect(selectedId) {
@@ -418,6 +545,15 @@ function scopeItemLabel(scopeType, item) {
 function parseLines(value) {
     return String(value || '')
         .replace(/\r/g, '\n')
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function parsePromptList(value) {
+    return String(value || '')
+        .replace(/\r/g, '\n')
+        .replace(/,/g, '\n')
         .split('\n')
         .map((item) => item.trim())
         .filter(Boolean);

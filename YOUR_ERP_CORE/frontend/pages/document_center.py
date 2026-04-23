@@ -101,6 +101,10 @@ def document_center_page():
                         <div class="form-group"><label>Cliente</label><select id="dc-worker-customer" onchange="syncWorkerContextSelections()"></select></div>
                     </div>
                     <div class="form-row">
+                        <div class="form-group"><label>ID OC / servicio</label><input id="dc-worker-service-order" type="number" min="0" step="1" placeholder="Opcional" oninput="renderWorkerTemplatePicker()"></div>
+                        <div class="form-group"><label>Codigo requisito acreditacion</label><input id="dc-worker-requirement-code" placeholder="DOC_ID, CONTRATO_FIRMADO..." oninput="renderWorkerTemplatePicker()"></div>
+                    </div>
+                    <div class="form-row">
                         <div class="form-group"><label>Oportunidad activa</label><select id="dc-worker-lead" onchange="syncWorkerContextSelections()"></select></div>
                         <div class="form-group"><label>Carpeta de prevencion</label><select id="dc-worker-folder" onchange="syncWorkerContextSelections()"></select></div>
                     </div>
@@ -310,10 +314,34 @@ def document_center_page():
                     </div>
                 </div>
                 <div class="form-row">
+                    <div class="form-group">
+                        <label>Ambito</label>
+                        <select id="dc-template-scope-type">
+                            <option value="general_empresa">General empresa</option>
+                            <option value="general_cliente">General cliente</option>
+                            <option value="especifica_cliente_oc">Especifica cliente / OC</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Sujeto</label>
+                        <select id="dc-template-subject-type">
+                            <option value="trabajador">Trabajador</option>
+                            <option value="empresa">Empresa</option>
+                            <option value="cliente">Cliente</option>
+                            <option value="oc">OC / Servicio</option>
+                            <option value="mixto">Mixto</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>ID cliente</label><input id="dc-template-customer-id" type="number" min="0" step="1" placeholder="Opcional"></div>
+                    <div class="form-group"><label>ID OC / servicio</label><input id="dc-template-service-order-id" type="number" min="0" step="1" placeholder="Solo si aplica"></div>
+                </div>
+                <div class="form-row">
                     <div class="form-group"><label>Nombre de salida</label><input id="dc-template-filename-pattern" placeholder="Contrato_&lt;&lt;nombre&gt;&gt;"></div>
                     <div class="form-group">
                         <label>Estado</label>
-                        <select id="dc-template-status">
+                        <select id="dc-template-form-status">
                             <option value="active">Activa</option>
                             <option value="draft">Borrador</option>
                             <option value="archived">Archivada</option>
@@ -326,6 +354,7 @@ def document_center_page():
                     <div class="form-group"><label>Codigo requisito acreditacion</label><input id="dc-template-accreditation-code" placeholder="ANEXO_INDEFINIDO"></div>
                 </div>
                 <div class="form-group"><label>Categoria acreditacion</label><input id="dc-template-accreditation-category" placeholder="contractual, safety, training, other"></div>
+                <div class="form-group"><label>Firmantes JSON</label><textarea id="dc-template-signature-roles" rows="3" placeholder='[{"role_key":"trabajador","signer_name":"Trabajador","signer_email":""}]'></textarea></div>
                 <div class="form-group"><label>Descripcion</label><textarea id="dc-template-description"></textarea></div>
                 <div class="form-group">
                     <label>Archivo Word (.docx) *</label>
@@ -334,9 +363,26 @@ def document_center_page():
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-ghost" onclick="closeDocumentCenterModal('dc-template-modal')">Cancelar</button>
+                    <button type="button" class="btn btn-secondary" onclick="openTemplateSignatureLayoutDesigner()">Disenar firma</button>
                     <button type="submit" class="btn btn-primary">Guardar plantilla</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="dc-template-signature-modal">
+        <div class="modal" style="max-width:min(1280px,98vw);width:min(1280px,98vw);">
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
+                <div>
+                    <h2 id="dc-template-signature-title">Diseno de firma</h2>
+                    <p class="text-sm text-muted" id="dc-template-signature-subtitle">Previsualiza la plantilla y arrastra los campos de firma por rol.</p>
+                </div>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <button type="button" class="btn btn-primary" onclick="saveTemplateSignatureLayout()">Guardar layout</button>
+                    <button type="button" class="btn btn-ghost" onclick="closeDocumentCenterModal('dc-template-signature-modal')">Cerrar</button>
+                </div>
+            </div>
+            <div id="dc-template-signature-workspace" style="margin-top:1rem;"></div>
         </div>
     </div>
 

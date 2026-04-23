@@ -25,11 +25,11 @@ const MODULE_ACCESS_ALIASES = {
 const MODULE_CONFIG = {
     crm: {
         label: 'CRM',
-        description: 'Pipeline, clientes y forecast comercial.',
+        description: 'Servicios, clientes y forecast comercial.',
         href: '/app/crm',
         secondary: { label: 'Clientes', href: '/app/crm/customers' },
         accent: '#38bdf8',
-        quickCaption: 'Pipeline y clientes',
+        quickCaption: 'Servicios y clientes',
     },
     recruitment: {
         label: 'Reclutamiento',
@@ -313,7 +313,7 @@ function buildSummaryCards(derived) {
             accent: MODULE_CONFIG.crm.accent,
             eyebrow: 'Comercial',
             value: formatCurrency(derived.crm.pipeline_value),
-            title: 'Pipeline activo',
+            title: 'Servicios activos',
             body: `${formatNumber(derived.crm.open_leads)} oportunidades abiertas y ${formatPercent(derived.crm.conversion_rate)} de conversion.`,
         });
     }
@@ -396,7 +396,7 @@ function buildFlowSteps(derived) {
         steps.push({
             accent: MODULE_CONFIG.crm.accent,
             eyebrow: 'Comercial',
-            title: 'Pipeline',
+            title: 'Servicios',
             value: formatNumber(derived.crm.open_leads),
             meta: `${formatCurrency(derived.crm.pipeline_value)} abiertos`,
         });
@@ -552,9 +552,9 @@ function buildFocusItems(derived) {
             tone: items.length ? 'calm' : 'medium',
             count: toNumber(derived.crm.open_leads),
             title: `${formatNumber(derived.crm.open_leads)} oportunidades abiertas`,
-            body: `El pipeline mantiene ${formatCurrency(derived.crm.pipeline_value)} activos y ${formatPercent(derived.crm.conversion_rate)} de conversion.`,
+            body: `Los servicios mantienen ${formatCurrency(derived.crm.pipeline_value)} activos y ${formatPercent(derived.crm.conversion_rate)} de conversion.`,
             href: '/app/crm',
-            cta: 'Entrar al pipeline',
+            cta: 'Entrar a servicios',
         });
     }
 
@@ -804,9 +804,9 @@ function moduleCardModel(key, derived) {
     switch (key) {
         case 'crm':
             return {
-                title: 'Pipeline comercial',
+                title: 'Servicios comerciales',
                 metric: formatCurrency(derived.crm.pipeline_value),
-                metricLabel: 'Pipeline abierto',
+                metricLabel: 'Servicios abiertos',
                 facts: [
                     { label: 'Oportunidades abiertas', value: formatNumber(derived.crm.open_leads) },
                     { label: 'Clientes', value: formatNumber(derived.crm.total_customers) },
@@ -905,14 +905,14 @@ function buildPipelinePanel(derived) {
                 <div class="dashboard-stage-value">${escapeHtml(formatCurrency(stage.value))}</div>
             </div>
         `).join('')
-        : '<div class="empty empty-compact">No hay pipeline activo para mostrar.</div>';
+        : '<div class="empty empty-compact">No hay servicios activos para mostrar.</div>';
 
     return `
         <section class="card dashboard-detail-card">
             <div class="dashboard-section-head compact">
                 <div>
                     <div class="dashboard-section-kicker">Comercial</div>
-                    <h3>Pipeline activo</h3>
+                    <h3>Servicios activos</h3>
                     <p>${escapeHtml(formatNumber(derived.crm.open_leads))} abiertas y ${escapeHtml(formatCurrency(derived.crm.pipeline_value))} en juego.</p>
                 </div>
                 <a href="/app/crm" class="btn btn-ghost btn-sm">Abrir</a>
@@ -1069,7 +1069,7 @@ function renderHeroActions() {
     const actions = visible.length
         ? visible.map((key, index) => ({
             href: MODULE_CONFIG[key].href,
-            label: key === 'crm' ? 'Abrir pipeline' : MODULE_CONFIG[key].label,
+            label: key === 'crm' ? 'Abrir servicios' : MODULE_CONFIG[key].label,
             className: index === 0
                 ? 'btn btn-primary'
                 : index === 1

@@ -126,7 +126,7 @@ class Settings:
     # MÓDULOS A CARGAR
     modules_to_load: List[str] = os.getenv(
         "MODULES_TO_LOAD",
-        "base,signature"
+        "base,signature,document_center,crm,quotes,billing,reports,hr,job_profiles,attendance,payroll,recruitment,safety,inventory,riohs"
     ).split(",")
     
     # PAGINACIÓN
@@ -275,7 +275,7 @@ SMTP_USER=noreply@example.com
 SMTP_PASSWORD=app-password-here
 SMTP_USE_TLS=True
 
-MODULES_TO_LOAD=base,signature,sales,hr
+MODULES_TO_LOAD=base,signature,document_center,crm,quotes,billing,reports,hr,job_profiles,attendance,payroll,recruitment,safety,inventory,riohs
 
 LOG_LEVEL=DEBUG
 
