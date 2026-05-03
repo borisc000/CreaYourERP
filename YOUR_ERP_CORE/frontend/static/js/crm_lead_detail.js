@@ -40,6 +40,19 @@ const STEP1_APPROVAL_STATUS = {
     BLOCKED: 'blocked',
 };
 
+const PREVENTION_TRAFFIC_LABELS = {
+    green: 'Verde',
+    yellow: 'Atencion',
+    red: 'Critico',
+};
+
+const CREW_AUTHORIZATION_META = {
+    pending: { label: 'Pendiente', tone: 'secondary' },
+    authorized: { label: 'Autorizado', tone: 'success' },
+    requires_revalidation: { label: 'Revalidar', tone: 'warning' },
+    rejected: { label: 'Rechazado', tone: 'danger' },
+};
+
 // ── Generar Cotización ────────────────────────────────────────
 function generateQuote() {
     const id = window._LEAD_ID;
@@ -83,6 +96,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ── Render All ────────────────────────────────────────────────
 function renderAll() {
     renderHeader();
+    renderServiceStatusStrip();
     renderStageBar();
     renderLeftColumn();
     renderQuotesTab();
@@ -198,6 +212,50 @@ async function loadLeadGanttPlan(leadId) {
 }
 
 // ── Header (PRJ badge, title, status) ────────────────────────
+function getTonePalette(tone) {
+    const map = {
+        success: { bg: '#052e16', border: '#166534', text: '#86efac' },
+        warning: { bg: '#422006', border: '#a16207', text: '#fcd34d' },
+        danger: { bg: '#450a0a', border: '#b91c1c', text: '#fca5a5' },
+        info: { bg: '#172554', border: '#1d4ed8', text: '#93c5fd' },
+        secondary: { bg: '#111827', border: '#475569', text: '#cbd5e1' },
+    };
+    return map[tone] || map.secondary;
+}
+
+function renderServiceStatusStrip() {
+    const host = document.getElementById('detail-service-status-strip');
+    const serviceIdEl = document.getElementById('detail-service-id');
+    if (!host) return;
+
+    const serviceContext = LD.dossier?.service_context || {};
+    const statuses = LD.dossier?.service_statuses || {};
+    const items = [
+        ['Comercial', statuses.commercial],
+        ['Operacion', statuses.operational],
+        ['Finanzas', statuses.financial],
+    ];
+
+    if (serviceIdEl) {
+        const fallbackServiceId = LD.lead?.project_code || `SRV-${LD.lead?.id || window._LEAD_ID}`;
+        serviceIdEl.textContent = `Servicio ${serviceContext.service_id || fallbackServiceId} · Oportunidad #${LD.lead?.id || window._LEAD_ID}`;
+    }
+
+    host.innerHTML = items.map(([label, item]) => {
+        const palette = getTonePalette(item?.tone || 'secondary');
+        return `
+            <div style="border-radius:14px;padding:0.8rem 0.9rem;background:${palette.bg};border:1px solid ${palette.border};">
+                <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:0.3rem;">
+                    ${label}
+                </div>
+                <div style="font-size:0.92rem;font-weight:700;color:${palette.text};">
+                    ${esc(item?.label || 'Pendiente')}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
 function renderHeader() {
     const l  = LD.lead;
     const d  = LD.dossier;
@@ -552,9 +610,10 @@ function renderPreopTab() {
     if (procedureSelect && document.activeElement !== procedureSelect) {
         const selectedValue = String(plan.procedure_id || procedureSelect.value || '');
         const options = (plan.lookups?.procedures || []).map(proc => {
-            const label = `${proc.procedure_code || 'PTS'} | ${proc.name || 'Procedimiento'} | ${proc.step_count || 0} pasos`;
+            const label = `${proc.procedure_label || `${proc.procedure_code || 'PTS'} | ${proc.name || 'Procedimiento'}`} | ${proc.step_count || 0} pasos`;
             const selected = String(proc.id) === selectedValue ? 'selected' : '';
-            return `<option value="${proc.id}" ${selected}>${esc(label)}</option>`;
+            const disabled = proc.is_importable === false ? 'disabled' : '';
+            return `<option value="${proc.id}" ${selected} ${disabled}>${esc(label)}</option>`;
         }).join('');
         procedureSelect.innerHTML = '<option value="">Seleccionar procedimiento PTS</option>' + options;
         if (selectedValue) procedureSelect.value = selectedValue;
@@ -749,6 +808,10 @@ function renderPreopGanttWindow(windowData, containerId, labelId) {
                 <strong title="${esc(task.task_name || '')}">${esc(task.task_name || 'Actividad')}</strong>
                 <small>${esc(task.block_code || task.block_name || 'Bloque libre')}</small>
                 <small>${esc(task.phase_label || '')} | ${esc(task.owner_name || 'Sin responsable')}</small>
+                <div class="preop-row-dates">
+                    <span>Inicio: ${esc(fmtDateShort(task.planned_start_date))}</span>
+                    <span>Termino: ${esc(fmtDateShort(task.planned_end_date))}</span>
+                </div>
             </div>
             <div class="preop-row-bars" style="background-size:${colWidth}% 100%;">
                 <div class="preop-bar"
@@ -1024,7 +1087,95 @@ function renderEjeTab() {
         }
     }
 
+    renderPreventionSection();
     renderLeadReportsPanel(reports);
+}
+
+function preventionTrafficLabel(value) {
+    return PREVENTION_TRAFFIC_LABELS[String(value || '').trim().toLowerCase()] || 'Sin carpeta';
+}
+
+function renderPreventionSection() {
+    const folder = LD.dossier?.prevention_folder || null;
+    const summary = LD.dossier?.prevention_summary || {};
+    const badgeEl = document.getElementById('prevention-summary-badge');
+    const copyEl = document.getElementById('prevention-summary-copy');
+    const buttonEl = document.getElementById('btn-open-prevention-folder');
+
+    setText('prevention-readiness', `${Number(summary.readiness_pct || 0).toFixed(1)}%`);
+    setText('prevention-traffic', preventionTrafficLabel(summary.traffic_light));
+    setText(
+        'prevention-profile',
+        folder
+            ? (folder.service_profile_name || folder.procedure_name || 'Perfil por definir')
+            : 'Sin perfil asignado'
+    );
+
+    if (buttonEl) {
+        buttonEl.textContent = folder ? 'Abrir carpeta preventiva' : 'Crear carpeta preventiva';
+    }
+
+    if (badgeEl) {
+        const tone = summary.traffic_light === 'green'
+            ? 'success'
+            : (summary.traffic_light === 'yellow' ? 'warning' : 'danger');
+        badgeEl.innerHTML = summary.exists
+            ? `<span class="crew-status-chip ${crewToneClass(tone)}">${Number(summary.readiness_pct || 0).toFixed(0)}% listo</span>`
+            : `<span class="crew-status-chip ${crewToneClass('secondary')}">Sin carpeta</span>`;
+    }
+
+    if (!copyEl) return;
+    if (!summary.exists) {
+        copyEl.textContent = 'Esta oportunidad aun no tiene carpeta preventiva instanciada. Creala desde aqui para conectar procedimiento, perfil y controles de terreno.';
+        return;
+    }
+
+    const bits = [
+        `${preventionTrafficLabel(summary.traffic_light)} · ${Number(summary.readiness_pct || 0).toFixed(1)}% de readiness`,
+        `${summary.procedure_count || 0} procedimiento(s)`,
+        `${summary.assigned_employee_count || 0} trabajador(es) vinculados`,
+    ];
+    copyEl.textContent = bits.join(' · ');
+}
+
+async function openLeadPreventionFolder() {
+    if (!LD.lead?.id) {
+        showToast('No hay una oportunidad cargada.', 'error');
+        return;
+    }
+
+    const existingFolder = LD.dossier?.prevention_folder;
+    if (existingFolder?.id) {
+        window.location.href = `/app/safety/folders/${existingFolder.id}`;
+        return;
+    }
+
+    try {
+        showToast('Creando carpeta preventiva...', 'info');
+        const response = await API.post('/safety/folders', { lead_id: LD.lead.id });
+        if (response?.success === false || response?.detail) {
+            throw new Error(getApiErrorMessage(response, 'No fue posible crear la carpeta preventiva.'));
+        }
+        const folder = response?.data || response;
+        await refreshDossier(false);
+        window.location.href = `/app/safety/folders/${folder.id}`;
+    } catch (error) {
+        await refreshDossier(false);
+        if (LD.dossier?.prevention_folder?.id) {
+            window.location.href = `/app/safety/folders/${LD.dossier.prevention_folder.id}`;
+            return;
+        }
+        showToast(error?.message || 'No fue posible abrir Prevencion.', 'error');
+    }
+}
+
+function openServiceMirror() {
+    const mirrorUrl = LD.dossier?.service_context?.mirror_url || LD.dossier?.service?.mirror_url || '';
+    if (!mirrorUrl) {
+        showToast('El servicio aún no tiene vista espejo disponible.', 'info');
+        return;
+    }
+    window.open(mirrorUrl, '_blank', 'noopener');
 }
 
 function getLatestLeadReport() {
@@ -1104,7 +1255,7 @@ function validateStep1() {
  * Usuario hizo clic en [Aprobar Despliegue].
  * Permite avanzar directo, o bajo confirmacion si hay advertencias.
  */
-function aprobarDespliegue() {
+async function aprobarDespliegue() {
     const btn = document.getElementById('btn-aprobar-despliegue');
     const state = getStep1ApprovalState();
 
@@ -1123,7 +1274,7 @@ function aprobarDespliegue() {
         return;
     }
 
-    finalizeStep1Approval(STEP1_APPROVAL_STATUS.READY);
+    await finalizeStep1Approval(STEP1_APPROVAL_STATUS.READY);
 }
 
 /**
@@ -1799,6 +1950,7 @@ async function refreshDossier(fullRender = true) {
             renderAll();
         } else {
             renderHeader();
+            renderServiceStatusStrip();
             renderStageBar();
             renderLeftColumn();
             renderQuotesTab();
@@ -2187,10 +2339,39 @@ function syncStep1Summary(mode = STEP1_APPROVAL_STATUS.READY) {
     }
 }
 
-function finalizeStep1Approval(mode = STEP1_APPROVAL_STATUS.READY) {
+async function finalizeStep1Approval(mode = STEP1_APPROVAL_STATUS.READY) {
+    if (currentServiceOrderId && (window._currentCrewList?.length || 0) > 0) {
+        try {
+            const response = await API.post(`/api/accreditation/service-orders/${currentServiceOrderId}/crew/authorize`, {
+                mode,
+                authorized_by: API.getUser()?.id || null,
+            });
+            if (response?.success === false || response?.detail) {
+                throw new Error(getApiErrorMessage(response, 'No fue posible registrar la autorizacion de la cuadrilla.'));
+            }
+            const crew = Array.isArray(response?.crew)
+                ? response.crew
+                : (Array.isArray(response?.data?.crew) ? response.data.crew : []);
+            if (crew.length) {
+                window._currentCrewList = crew;
+                window._currentCrewEmployeeIds = new Set(crew.map((member) => Number(member.employee_id)));
+                renderCrewSummary(window._currentCrewList, window._currentCrewChecks || []);
+            }
+        } catch (error) {
+            showToast(error?.message || 'No fue posible registrar la autorizacion.', 'error');
+            return;
+        }
+    }
+
     window._step1ApprovalOutcome = mode;
     syncStep1Summary(mode);
     advanceStep(1);
+    updateAprobarButton(mode, window._currentCrewList?.length || 0, {
+        message: mode === STEP1_APPROVAL_STATUS.WARNING
+            ? 'La cuadrilla quedo autorizada con observaciones para este servicio.'
+            : 'La cuadrilla quedo autorizada para este servicio.',
+        reasons: [],
+    });
     showToast(
         mode === STEP1_APPROVAL_STATUS.WARNING
             ? 'Despliegue aprobado con advertencias - Paso 2 desbloqueado'
@@ -2230,16 +2411,16 @@ function closeStep1ApprovalModalBackdrop(event) {
     if (!erpModalAllowsBackdropClose(event, 'step1ApprovalModal')) return;
 }
 
-function confirmStep1ApprovalWarning() {
+async function confirmStep1ApprovalWarning() {
     closeStep1ApprovalModal();
-    finalizeStep1Approval(STEP1_APPROVAL_STATUS.WARNING);
+    await finalizeStep1Approval(STEP1_APPROVAL_STATUS.WARNING);
 }
 
 /**
  * Initialize accreditation for this lead.
  * Called on page load to find or create the service order.
  */
-async function initAccreditation(leadId) {
+async function legacyInitAccreditation(leadId) {
     if (!leadId) return;
 
     try {
@@ -2280,7 +2461,7 @@ async function initAccreditation(leadId) {
 /**
  * Load and render the crew list in step 1.
  */
-async function loadCrewList() {
+async function legacyLoadCrewList() {
     if (!currentServiceOrderId) return;
 
     const container = document.getElementById('crew-list-container');
@@ -2326,7 +2507,7 @@ async function loadCrewList() {
 /**
  * Load and render the accreditation matrix for all crew members.
  */
-async function loadAccreditationMatrix() {
+async function legacyLoadAccreditationMatrix() {
     if (!currentServiceOrderId) return;
 
     const container = document.getElementById('accreditation-matrix-container');
@@ -2436,7 +2617,7 @@ async function loadAccreditationMatrix() {
 /**
  * Toggle expandable per-worker document detail.
  */
-async function toggleWorkerDetail(employeeId) {
+async function legacyToggleWorkerDetail(employeeId) {
     const detailEl = document.getElementById(`worker-detail-${employeeId}`);
     const chevron = document.getElementById(`chevron-${employeeId}`);
     if (!detailEl) return;
@@ -2499,7 +2680,7 @@ async function toggleWorkerDetail(employeeId) {
 /**
  * Open worker selector modal and load employees list.
  */
-function normalizeWorkerSelectorEmployee(employee) {
+function legacyNormalizeWorkerSelectorEmployee(employee) {
     const fullName = String(employee.full_name || '').trim();
     const nameParts = fullName ? fullName.split(/\s+/) : [];
     const firstName = employee.first_name || nameParts.slice(0, 1).join(' ') || '';
@@ -2513,7 +2694,7 @@ function normalizeWorkerSelectorEmployee(employee) {
     };
 }
 
-async function openWorkerSelector(leadId) {
+async function legacyOpenWorkerSelector(leadId) {
     selectedWorkerIds.clear();
     const searchEl = document.getElementById('worker-search');
     if (searchEl) searchEl.value = '';
@@ -2543,22 +2724,22 @@ async function openWorkerSelector(leadId) {
     }
 }
 
-function closeWorkerSelectorModal() {
+function legacyCloseWorkerSelectorModal() {
     const modal = document.getElementById('workerSelectorModal');
     if (modal) modal.classList.remove('open');
 }
 
-function closeWorkerSelectorBackdrop(event) {
+function legacyCloseWorkerSelectorBackdrop(event) {
     if (!erpModalAllowsBackdropClose(event, 'workerSelectorModal')) return;
 }
 
-function getWorkerInitials(workerName) {
+function legacyGetWorkerInitials(workerName) {
     const tokens = String(workerName || '').trim().split(/\s+/).filter(Boolean);
     if (!tokens.length) return 'TR';
     return tokens.slice(0, 2).map(token => token.charAt(0).toUpperCase()).join('');
 }
 
-function renderEmployeeList(employees) {
+function legacyRenderEmployeeList(employees) {
     const listEl = document.getElementById('worker-selector-list');
     if (!listEl) return;
 
@@ -2591,7 +2772,7 @@ function renderEmployeeList(employees) {
     listEl.innerHTML = html || '<div class="empty">Sin resultados para el filtro aplicado.</div>';
 }
 
-function filterWorkers(query) {
+function legacyFilterWorkers(query) {
     if (!window._allEmployees) return;
     const q = (query || '').toLowerCase();
     const filtered = window._allEmployees.filter(e =>
@@ -2602,7 +2783,7 @@ function filterWorkers(query) {
     renderEmployeeList(filtered);
 }
 
-function toggleWorkerSelection(empId) {
+function legacyToggleWorkerSelection(empId) {
     if (selectedWorkerIds.has(empId)) {
         selectedWorkerIds.delete(empId);
     } else {
@@ -2614,7 +2795,7 @@ function toggleWorkerSelection(empId) {
     }
 }
 
-function updateSelectedCount() {
+function legacyUpdateSelectedCount() {
     const el = document.getElementById('selected-count-badge');
     if (el) el.textContent = `${selectedWorkerIds.size} seleccionado(s)`;
 }
@@ -2622,7 +2803,7 @@ function updateSelectedCount() {
 /**
  * Add selected workers to the crew of the current service order.
  */
-async function addSelectedWorkers(leadId) {
+async function legacyAddSelectedWorkers(leadId) {
     if (!currentServiceOrderId || selectedWorkerIds.size === 0) return;
 
     const role = document.getElementById('worker-role-select')?.value || 'operador';
@@ -2655,7 +2836,7 @@ async function addSelectedWorkers(leadId) {
 /**
  * Remove a worker from the crew.
  */
-async function removeWorker(employeeId) {
+async function legacyRemoveWorker(employeeId) {
     if (!currentServiceOrderId) return;
 
     try {
@@ -2673,7 +2854,7 @@ async function removeWorker(employeeId) {
 /**
  * Generate missing documents for a single worker.
  */
-async function generateMissingForWorker(employeeId) {
+async function legacyGenerateMissingForWorker(employeeId) {
     if (!currentServiceOrderId) return;
 
     try {
@@ -2693,7 +2874,7 @@ async function generateMissingForWorker(employeeId) {
 /**
  * Generate all missing documents for all crew members.
  */
-async function generateAllMissingDocs(leadId) {
+async function legacyGenerateAllMissingDocs(leadId) {
     if (!currentServiceOrderId) return;
 
     try {
@@ -2713,7 +2894,7 @@ async function generateAllMissingDocs(leadId) {
 /**
  * Force recompute accreditation state for all crew.
  */
-async function recomputeAccreditation(leadId) {
+async function legacyRecomputeAccreditation(leadId) {
     if (!currentServiceOrderId) return;
 
     try {
@@ -2730,7 +2911,7 @@ async function recomputeAccreditation(leadId) {
  * Update "Aprobar Despliegue" button based on accreditation status.
  * Enabled only when ALL workers are compliant (or no workers → disabled).
  */
-function updateAprobarButton(allCompliant, totalWorkers) {
+function legacyUpdateAprobarButton(allCompliant, totalWorkers) {
     const btn = document.getElementById('btn-aprobar-despliegue');
     const warning = document.getElementById('step1-warning');
 
@@ -2762,7 +2943,7 @@ function updateAprobarButton(allCompliant, totalWorkers) {
 
 // Auto-refresh accreditation every 20 seconds while on the page
 let accreditationRefreshInterval = null;
-function startAccreditationRefresh() {
+function legacyStartAccreditationRefresh() {
     if (accreditationRefreshInterval) clearInterval(accreditationRefreshInterval);
     accreditationRefreshInterval = setInterval(() => {
         if (currentServiceOrderId) loadAccreditationMatrix();
@@ -2819,6 +3000,88 @@ function getWorkerEmail(worker) {
 
 function crewToneClass(tone) {
     return `tone-${tone || 'secondary'}`;
+}
+
+function legacyGetCrewAuthorizationMeta(member) {
+    const status = String(member?.authorization_status || 'pending').trim().toLowerCase();
+    if (status === 'authorized' && member?.authorization_mode === STEP1_APPROVAL_STATUS.WARNING) {
+        return { label: 'Autorizado con observaciones', tone: 'warning' };
+    }
+    return CREW_AUTHORIZATION_META[status] || CREW_AUTHORIZATION_META.pending;
+}
+
+function legacyGetCrewAuthorizationSummary(crew = []) {
+    const activeCrew = (crew || []).filter((member) => String(member?.status || '').toLowerCase() !== 'removed');
+    const total = activeCrew.length;
+    const authorized = activeCrew.filter((member) => String(member?.authorization_status || '').toLowerCase() === 'authorized').length;
+    const requiresRevalidation = activeCrew.filter((member) => String(member?.authorization_status || '').toLowerCase() === 'requires_revalidation').length;
+    const hasWarningMode = activeCrew.some((member) => member?.authorization_mode === STEP1_APPROVAL_STATUS.WARNING);
+    return {
+        total,
+        authorized,
+        requiresRevalidation,
+        hasWarningMode,
+        allAuthorized: total > 0 && authorized === total,
+    };
+}
+
+function legacySyncAuthorizedCrewState() {
+    const summary = getCrewAuthorizationSummary(window._currentCrewList || []);
+    if (!summary.total || !summary.allAuthorized || summary.requiresRevalidation > 0) {
+        return false;
+    }
+
+    const mode = summary.hasWarningMode ? STEP1_APPROVAL_STATUS.WARNING : STEP1_APPROVAL_STATUS.READY;
+    syncStep1Summary(mode);
+    restoreStepDone(1);
+    updateAprobarButton(mode, summary.total, {
+        message: summary.hasWarningMode
+            ? 'La cuadrilla ya fue autorizada con observaciones para este servicio.'
+            : 'La cuadrilla ya fue autorizada para este servicio.',
+        reasons: [],
+    });
+    return true;
+}
+
+function getCrewAuthorizationMeta(member) {
+    const status = String(member?.authorization_status || 'pending').trim().toLowerCase();
+    if (status === 'authorized' && member?.authorization_mode === STEP1_APPROVAL_STATUS.WARNING) {
+        return { label: 'Autorizado con observaciones', tone: 'warning' };
+    }
+    return CREW_AUTHORIZATION_META[status] || CREW_AUTHORIZATION_META.pending;
+}
+
+function getCrewAuthorizationSummary(crew = []) {
+    const activeCrew = (crew || []).filter((member) => String(member?.status || '').toLowerCase() !== 'removed');
+    const total = activeCrew.length;
+    const authorized = activeCrew.filter((member) => String(member?.authorization_status || '').toLowerCase() === 'authorized').length;
+    const requiresRevalidation = activeCrew.filter((member) => String(member?.authorization_status || '').toLowerCase() === 'requires_revalidation').length;
+    const hasWarningMode = activeCrew.some((member) => member?.authorization_mode === STEP1_APPROVAL_STATUS.WARNING);
+    return {
+        total,
+        authorized,
+        requiresRevalidation,
+        hasWarningMode,
+        allAuthorized: total > 0 && authorized === total,
+    };
+}
+
+function syncAuthorizedCrewState() {
+    const summary = getCrewAuthorizationSummary(window._currentCrewList || []);
+    if (!summary.total || !summary.allAuthorized || summary.requiresRevalidation > 0) {
+        return false;
+    }
+
+    const mode = summary.hasWarningMode ? STEP1_APPROVAL_STATUS.WARNING : STEP1_APPROVAL_STATUS.READY;
+    syncStep1Summary(mode);
+    restoreStepDone(1);
+    updateAprobarButton(mode, summary.total, {
+        message: summary.hasWarningMode
+            ? 'La cuadrilla ya fue autorizada con observaciones para este servicio.'
+            : 'La cuadrilla ya fue autorizada para este servicio.',
+        reasons: [],
+    });
+    return true;
 }
 
 function bindWorkerSelectorInteractions() {
@@ -2995,6 +3258,9 @@ async function loadCrewList() {
                                     <span class="crew-status-chip ${crewToneClass(member.status === 'active' ? 'success' : 'secondary')}">
                                         ${esc(member.status_label || getCrewStatusLabel(member.status))}
                                     </span>
+                                    <span class="crew-status-chip ${crewToneClass(getCrewAuthorizationMeta(member).tone)}">
+                                        ${esc(getCrewAuthorizationMeta(member).label)}
+                                    </span>
                                 </div>
                             </div>
                             <div class="crew-member-actions">
@@ -3005,6 +3271,7 @@ async function loadCrewList() {
                 }).join('')}
             </div>
         `;
+        syncAuthorizedCrewState();
     } catch (error) {
         window._currentCrewList = [];
         window._currentCrewEmployeeIds = new Set();
@@ -3049,14 +3316,16 @@ async function loadAccreditationMatrix() {
                     : 'Asigna trabajadores para ver su estado de acreditacion.',
                 'secondary'
             );
-            updateAprobarButton(STEP1_APPROVAL_STATUS.WARNING, window._currentCrewList?.length || 0, {
-                message: window._currentCrewList?.length
-                    ? 'La cuadrilla aun no tiene resultados de acreditacion calculados. Puedes continuar bajo confirmacion.'
-                    : 'No hay personal asignado. Puedes continuar bajo confirmacion.',
-                reasons: window._currentCrewList?.length
-                    ? ['La cuadrilla existe, pero todavia no hay resultados calculados de acreditacion.']
-                    : ['No hay personal asignado a esta oportunidad.'],
-            });
+            if (!syncAuthorizedCrewState()) {
+                updateAprobarButton(STEP1_APPROVAL_STATUS.WARNING, window._currentCrewList?.length || 0, {
+                    message: window._currentCrewList?.length
+                        ? 'La cuadrilla aun no tiene resultados de acreditacion calculados. Puedes continuar bajo confirmacion.'
+                        : 'No hay personal asignado. Puedes continuar bajo confirmacion.',
+                    reasons: window._currentCrewList?.length
+                        ? ['La cuadrilla existe, pero todavia no hay resultados calculados de acreditacion.']
+                        : ['No hay personal asignado a esta oportunidad.'],
+                });
+            }
             return;
         }
 
@@ -3130,19 +3399,21 @@ async function loadAccreditationMatrix() {
             </div>
         `;
 
-        updateAprobarButton(
-            allCompliant ? STEP1_APPROVAL_STATUS.READY : STEP1_APPROVAL_STATUS.WARNING,
-            total,
-            allCompliant
-                ? {
-                    message: 'La cuadrilla cumple con la acreditacion requerida.',
-                    reasons: [],
-                }
-                : {
-                    message: 'Hay personal con documentacion pendiente. Puedes continuar bajo confirmacion.',
-                    reasons: ['Existen trabajadores con documentacion pendiente o acreditacion incompleta.'],
-                }
-        );
+        if (!syncAuthorizedCrewState()) {
+            updateAprobarButton(
+                allCompliant ? STEP1_APPROVAL_STATUS.READY : STEP1_APPROVAL_STATUS.WARNING,
+                total,
+                allCompliant
+                    ? {
+                        message: 'La cuadrilla cumple con la acreditacion requerida.',
+                        reasons: [],
+                    }
+                    : {
+                        message: 'Hay personal con documentacion pendiente. Puedes continuar bajo confirmacion.',
+                        reasons: ['Existen trabajadores con documentacion pendiente o acreditacion incompleta.'],
+                    }
+            );
+        }
     } catch (error) {
         if (generateBtn) generateBtn.style.display = 'none';
         renderAccreditationState(error?.message || 'Error cargando la acreditacion.', 'danger');

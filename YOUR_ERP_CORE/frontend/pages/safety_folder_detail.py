@@ -78,17 +78,17 @@ def safety_folder_detail_page(folder_id: str):
         </div>
     </div>
 
-    <div class="workspace-nav card">
-        <a href="#section-config">Configuracion</a>
-        <a href="#section-documents">Documentos</a>
-        <a href="#section-irl">IRL</a>
-        <a href="#section-matrix">MIPER</a>
-        <a href="#section-ppe">EPP</a>
-        <a href="#section-talks">Charlas</a>
-        <a href="#section-checklists">Checklists</a>
+    <div class="workspace-nav card" role="tablist">
+        <button type="button" class="workspace-tab active" data-section="section-config" onclick="switchSafetyTab('section-config')">Configuracion</button>
+        <button type="button" class="workspace-tab" data-section="section-matrix" onclick="switchSafetyTab('section-matrix')">Matriz</button>
+        <button type="button" class="workspace-tab" data-section="section-documents" onclick="switchSafetyTab('section-documents')">Documentos</button>
+        <button type="button" class="workspace-tab" data-section="section-ppe" onclick="switchSafetyTab('section-ppe')">EPP</button>
+        <button type="button" class="workspace-tab" data-section="section-irl" onclick="switchSafetyTab('section-irl')">IRL</button>
+        <button type="button" class="workspace-tab" data-section="section-talks" onclick="switchSafetyTab('section-talks')">Charlas</button>
+        <button type="button" class="workspace-tab" data-section="section-checklists" onclick="switchSafetyTab('section-checklists')">Checklists</button>
     </div>
 
-    <section id="section-config" class="card section-card">
+    <section id="section-config" class="card section-card active-section">
         <div class="section-head">
             <div>
                 <div class="section-kicker">Alcance operativo</div>
@@ -645,7 +645,7 @@ def safety_folder_detail_page(folder_id: str):
                 <div class="form-group">
                     <label>Plantilla documental</label>
                     <select id="ppe-document-template"></select>
-                    <span class="field-hint">Opcional. Si seleccionas una plantilla, la entrega llamara al modulo de correspondencia y dejara el documento vinculado.</span>
+                    <span class="field-hint">La plantilla EPP base queda seleccionada por defecto y genera el documento en correspondencia.</span>
                 </div>
             </div>
             <div class="form-group">
@@ -710,6 +710,7 @@ def safety_folder_detail_page(folder_id: str):
             </table>
         </div>
         <div class="editor-card">
+            <div id="talk-library" class="library-grid" style="margin-bottom:1rem;"></div>
             <div class="inline-form-grid">
                 <input type="hidden" id="talk-id">
                 <div class="form-group">
@@ -762,6 +763,7 @@ def safety_folder_detail_page(folder_id: str):
             </table>
         </div>
         <div class="editor-card">
+            <div id="checklist-library" class="library-grid" style="margin-bottom:1rem;"></div>
             <div class="inline-form-grid">
                 <input type="hidden" id="checklist-id">
                 <div class="form-group">
@@ -824,15 +826,21 @@ def safety_folder_detail_page(folder_id: str):
 .hero-summary-card small, .matrix-insight-card small {{ color:#cbd5e1; font-size:0.78rem; }}
 .hero-side {{ display:grid; gap:1rem; align-content:start; justify-items:end; }}
 .section-kicker {{ color:#60a5fa; text-transform:uppercase; letter-spacing:0.08em; font-size:0.72rem; font-weight:700; margin-bottom:0.35rem; }}
-.workspace-nav {{ padding:0.8rem; background:linear-gradient(180deg, rgba(15,23,42,0.92), rgba(2,6,23,0.88)); }}
-.workspace-nav a {{ display:inline-flex; align-items:center; justify-content:center; padding:0.55rem 0.9rem; border-radius:999px; border:1px solid #1f2937; color:#cbd5e1; text-decoration:none; font-size:0.82rem; font-weight:700; }}
-.workspace-nav a:hover {{ border-color:#3b82f6; color:#eff6ff; background:rgba(37,99,235,0.16); }}
-.section-card {{ padding:1.2rem; display:grid; gap:1rem; }}
+.workspace-nav {{ position:sticky; top:0.75rem; z-index:6; display:flex; flex-wrap:wrap; gap:0.55rem; padding:0.75rem; background:linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.92)); }}
+.workspace-tab {{ display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:0.55rem 0.9rem; border-radius:999px; border:1px solid #1f2937; background:#0f172a; color:#cbd5e1; text-decoration:none; font-size:0.82rem; font-weight:700; cursor:pointer; }}
+.workspace-tab:hover, .workspace-tab.active {{ border-color:#3b82f6; color:#eff6ff; background:rgba(37,99,235,0.2); }}
+.section-card {{ padding:1.2rem; display:none; gap:1rem; }}
+.section-card.active-section {{ display:grid; }}
 .blockers-box, .editor-card, .composer-help, .deliverable-box {{ border:1px solid #1e293b; border-radius:16px; background:rgba(15,23,42,0.86); }}
 .blockers-box {{ min-width:280px; padding:0.9rem 1rem; color:#e2e8f0; font-size:0.84rem; line-height:1.45; }}
 .deliverable-box {{ min-width:280px; padding:0.9rem 1rem; display:grid; gap:0.7rem; }}
 .deliverable-copy {{ color:#cbd5e1; font-size:0.84rem; line-height:1.45; }}
 .editor-card {{ padding:1rem; }}
+.library-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:0.8rem; }}
+.library-card {{ border:1px solid rgba(96,165,250,0.16); border-radius:14px; background:rgba(8,15,31,0.72); padding:0.85rem; display:grid; gap:0.55rem; }}
+.library-card strong {{ color:#f8fafc; font-size:0.9rem; }}
+.library-card span {{ color:#94a3b8; font-size:0.78rem; line-height:1.4; }}
+.library-card button {{ justify-self:start; }}
 .inline-form-grid {{ grid-template-columns:repeat(auto-fit,minmax(185px,1fr)); }}
 .matrix-insight-grid {{ grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }}
 .matrix-preview-panel {{ display:grid; grid-template-columns:minmax(0,1.2fr) auto; gap:1rem; align-items:center; padding:1rem 1.1rem; border:1px solid rgba(148,163,184,0.14); border-radius:18px; background:linear-gradient(135deg, rgba(15,23,42,0.96), rgba(15,23,42,0.82)); }}

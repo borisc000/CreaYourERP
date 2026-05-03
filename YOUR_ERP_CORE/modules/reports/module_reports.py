@@ -16,6 +16,7 @@ Depende de:
 - crm  (leads, ActivityLog)
 """
 
+import base64
 import hashlib
 import os
 import secrets
@@ -25,6 +26,8 @@ from typing import Dict, Any, List, Optional
 from core.YOUR_ERP_core_framework import BaseModule, Request, Response, ValidationError
 from core.YOUR_ERP_orm import BaseModel, Column, ColumnType, AuditMixin
 from core.time_utils import utc_now_iso, utc_strftime
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
 
 # ============================================================================
@@ -70,6 +73,10 @@ class Report(BaseModel, AuditMixin):
     estado       = Column(ColumnType.STRING,  default='ABIERTO', label="Estado")
     active       = Column(ColumnType.BOOLEAN, default=True,   label="Activo")
     public_token = Column(ColumnType.STRING, label="Token Público de Verificación")
+    service_id   = Column(ColumnType.INTEGER, label="Servicio canónico")
+    signature_request_id = Column(ColumnType.INTEGER, label="Solicitud de firma")
+    signature_status = Column(ColumnType.STRING, default='not_requested', label="Estado firma")
+    signed_at    = Column(ColumnType.DATETIME, label="Fecha firma")
 
     # Timestamps
     emision      = Column(ColumnType.DATETIME, label="Fecha Emisión")
@@ -102,6 +109,10 @@ class Report(BaseModel, AuditMixin):
             'report_number': _format_report_number(self.id),
             'mirror_url':   _build_verification_path(token),
             'public_api_url': _build_public_api_path(token),
+            'service_id':   getattr(self, 'service_id', None),
+            'signature_request_id': getattr(self, 'signature_request_id', None),
+            'signature_status': getattr(self, 'signature_status', None) or 'not_requested',
+            'signed_at':    _fmt(getattr(self, 'signed_at', None)),
             'emision':      _fmt(self._data.get('emision')),
             'fdate':        _fmt(self._data.get('fdate')),
             'apr':          self.apr or '',
@@ -402,6 +413,51 @@ def _report_authenticity_code(report: Report) -> str:
     return hashlib.sha256(fingerprint.encode('utf-8')).hexdigest()[:16].upper()
 
 
+def _render_report_pdf_bytes(report: Report, checkpoints: List["ReportCheckpoint"]) -> bytes:
+    """Render PDF liviano del reporte para flujo de firma."""
+    from io import BytesIO
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    margin_x = 48
+    cursor_y = height - 56
+
+    def _line(text: str = "", size: int = 10, gap: int = 15):
+        nonlocal cursor_y
+        if cursor_y < 72:
+            pdf.showPage()
+            cursor_y = height - 56
+        pdf.setFont("Helvetica", size)
+        pdf.drawString(margin_x, cursor_y, str(text or ""))
+        cursor_y -= gap
+
+    pdf.setTitle(report.servicio or f"Reporte {report.id}")
+    _line(f"Reporte de Terreno {_format_report_number(report.id)}", 15, 22)
+    _line(f"Servicio: {report.servicio or ''}", 11, 16)
+    _line(f"Estado: {report.estado or 'ABIERTO'}", 10, 15)
+    _line(f"Empresa/Faena: {report.empresa or ''}", 10, 15)
+    _line(f"Mandante: {report.mandante or ''}", 10, 15)
+    _line(f"Supervisor: {report.supervisor or ''}", 10, 15)
+    _line(f"APR: {report.apr or ''}", 10, 15)
+    _line(f"Administrador de contrato: {report.adm or ''}", 10, 15)
+    _line(f"Área / Sector: {(report.area or '')} / {(report.sector or '')}", 10, 18)
+    _line("Checkpoints", 12, 18)
+    for index, checkpoint in enumerate(checkpoints, start=1):
+        _line(f"{index}. {checkpoint.tipo or 'HITO'} - {_fmt(checkpoint._data.get('emision')) or ''}", 10, 15)
+        description = str(checkpoint.descripcion or '').strip().replace('\r', ' ').replace('\n', ' ')
+        while description:
+            chunk = description[:105]
+            description = description[105:]
+            _line(f"   {chunk}", 9, 13)
+
+    _line("", 10, 18)
+    _line("Firma digital solicitada desde ERP Servicios.", 10, 14)
+    pdf.showPage()
+    pdf.save()
+    return buffer.getvalue()
+
+
 # ============================================================================
 # MÓDULO
 # ============================================================================
@@ -445,6 +501,7 @@ class ReportsModule(BaseModule):
         self.register_route('/reports/{id}',         self.get_report,        methods=['GET'],   auth_required=True)
         self.register_route('/reports/{id}',         self.update_report,     methods=['PUT'],   auth_required=True)
         self.register_route('/reports/{id}/close',   self.close_report,      methods=['PUT'],   auth_required=True)
+        self.register_route('/reports/{id}/signature-request', self.request_report_signature, methods=['POST'], auth_required=True)
 
         # -- Checkpoints ---------------------------------------------------
         self.register_route('/reports/{id}/checkpoints',          self.create_checkpoint, methods=['POST'], auth_required=True)
@@ -470,12 +527,35 @@ class ReportsModule(BaseModule):
         self.register_route('/areas/{area_id}/risks', self.update_area_risks, methods=['PUT'], auth_required=True)
         self.register_route('/sectors/{sector_id}/risks', self.get_sector_risks, methods=['GET'], auth_required=True)
         self.register_route('/sectors/{sector_id}/risks', self.update_sector_risks, methods=['PUT'], auth_required=True)
+        try:
+            from modules.reports.listeners import setup_reports_listeners
+            setup_reports_listeners()
+        except Exception:
+            pass
 
     # ── Helpers privados ─────────────────────────────────────────────────
 
     def _company_id(self) -> Optional[int]:
         user = self.env.user
         return user.company_id if user else None
+
+    def _require_service_action(self, action: str, *, report: Optional[Report] = None, lead: Any = None) -> Optional[Response]:
+        from modules.crm.module_crm import find_service_for_lead, service_action_allowed
+
+        user = self.env.user
+        if not user:
+            return Response.unauthorized("Authentication required")
+        service = None
+        if report and getattr(report, 'service_id', None):
+            service = find_service_for_lead(getattr(report, 'lead_id', None), getattr(report, 'company_id', None))
+        if lead and not service:
+            service = find_service_for_lead(getattr(lead, 'id', None), getattr(lead, 'company_id', None))
+        company_id = getattr(report, 'company_id', None) or getattr(lead, 'company_id', None)
+        if company_id and company_id != self._company_id() and getattr(user, 'role', None) != 'superadmin':
+            return Response.forbidden("No tienes acceso a este servicio")
+        if not service_action_allowed(user, action):
+            return Response.forbidden(f"No tienes permiso para {action}")
+        return None
 
     def _load_customer(self, customer_id: int):
         try:
@@ -670,9 +750,52 @@ class ReportsModule(BaseModule):
             return None
         return None
 
+    def _service_order_context_for_lead(self, lead) -> Dict[str, Any]:
+        if not lead:
+            return {}
+        try:
+            from modules.accreditation.models import CrewAssignment, ServiceOrder
+            from modules.hr.module_hr import EmployeeProfile
+        except Exception:
+            return {}
+
+        orders = ServiceOrder.search([
+            ('company_id', '=', self._company_id()),
+            ('lead_id', '=', getattr(lead, 'id', None)),
+        ])
+        orders = [order for order in orders if (order.status or '') != 'cancelled']
+        orders.sort(key=lambda order: (order.id or 0), reverse=True)
+        order = orders[0] if orders else None
+        if not order:
+            return {}
+
+        role_names: Dict[str, str] = {}
+        assignments = CrewAssignment.search([
+            ('service_order_id', '=', order.id),
+            ('status', '!=', 'removed'),
+        ])
+        for assignment in assignments:
+            role = _safe_str(getattr(assignment, 'role', '')).lower()
+            if not role or role in role_names:
+                continue
+            employee = EmployeeProfile.find_by_id(getattr(assignment, 'employee_id', None))
+            if not employee:
+                continue
+            role_names[role] = _safe_str(getattr(employee, 'full_name', None))
+
+        return {
+            'service_order_id': order.id,
+            'service_order_title': _safe_str(getattr(order, 'title', None)),
+            'service_order_location': _safe_str(getattr(order, 'location', None)),
+            'supervisor': role_names.get('supervisor') or role_names.get('crew_lead') or '',
+            'apr': role_names.get('prevencionista') or '',
+            'adm': role_names.get('administrator') or '',
+        }
+
     def _resolve_report_defaults(self, lead, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         from modules.crm.module_crm import Customer, Mandante, ServiceType
 
+        service_order_context = self._service_order_context_for_lead(lead)
         customer = Customer.find_by_id(lead.customer_id) if getattr(lead, 'customer_id', None) else None
         if customer and customer.company_id != self._company_id():
             customer = None
@@ -699,13 +822,13 @@ class ReportsModule(BaseModule):
             area = self._area_record(getattr(sector, 'area_id', None))
             area_id = area.id if area else None
 
-        final_servicio = _safe_str(raw_data.get('servicio')) or _safe_str(getattr(lead, 'service_name', None)) or _safe_str(getattr(lead, 'title', None))
+        final_servicio = _safe_str(raw_data.get('servicio')) or _safe_str(getattr(lead, 'service_name', None)) or service_order_context.get('service_order_title') or _safe_str(getattr(lead, 'title', None))
         final_empresa = _safe_str(raw_data.get('empresa')) or _safe_str(getattr(lead, 'empresa_faena', None)) or _safe_str(getattr(customer, 'name', None))
-        final_apr = _safe_str(raw_data.get('apr')) or _safe_str(getattr(lead, 'apr_name', None))
-        final_supervisor = _safe_str(raw_data.get('supervisor')) or _safe_str(getattr(lead, 'supervisor_name', None))
-        final_adm = _safe_str(raw_data.get('adm')) or _safe_str(getattr(lead, 'contract_admin_name', None))
+        final_apr = _safe_str(raw_data.get('apr')) or _safe_str(getattr(lead, 'apr_name', None)) or service_order_context.get('apr', '')
+        final_supervisor = _safe_str(raw_data.get('supervisor')) or _safe_str(getattr(lead, 'supervisor_name', None)) or service_order_context.get('supervisor', '')
+        final_adm = _safe_str(raw_data.get('adm')) or _safe_str(getattr(lead, 'contract_admin_name', None)) or service_order_context.get('adm', '')
         final_area = _safe_str(raw_data.get('area')) or _safe_str(getattr(area, 'nombre', None))
-        final_sector = _safe_str(raw_data.get('sector')) or _safe_str(getattr(sector, 'nombre', None))
+        final_sector = _safe_str(raw_data.get('sector')) or _safe_str(getattr(sector, 'nombre', None)) or service_order_context.get('service_order_location', '')
         final_mandante = _safe_str(raw_data.get('mandante')) or _safe_str(getattr(mandante, 'name', None))
         final_service_type = _safe_str(raw_data.get('tiposervicio')) or _safe_str(getattr(service_type, 'name', None))
 
@@ -763,9 +886,135 @@ class ReportsModule(BaseModule):
         except Exception:
             pass
 
+    def _resolve_report_signature_target(self, report: Report) -> Dict[str, Any]:
+        """Buscar el firmante mandante esperado para el reporte."""
+        if not report:
+            return {}
+        try:
+            from modules.crm.module_crm import Customer, Lead, Mandante, Service
+        except Exception:
+            return {}
+
+        lead = Lead.find_by_id(report.lead_id) if getattr(report, 'lead_id', None) else None
+        service = Service.find_by_id(report.service_id) if getattr(report, 'service_id', None) else None
+        mandante_id = getattr(service, 'mandante_id', None) or getattr(lead, 'mandante_id', None)
+        customer_id = getattr(service, 'customer_id', None) or getattr(lead, 'customer_id', None)
+
+        mandante = Mandante.find_by_id(mandante_id) if mandante_id else None
+        if mandante and getattr(mandante, 'email', None):
+            return {
+                'name': _safe_str(getattr(mandante, 'name', None)) or _safe_str(getattr(report, 'mandante', None)) or 'Mandante',
+                'email': _safe_str(getattr(mandante, 'email', None)) or '',
+                'source': 'mandante',
+            }
+
+        customer = Customer.find_by_id(customer_id) if customer_id else None
+        if customer and getattr(customer, 'email', None):
+            return {
+                'name': _safe_str(getattr(customer, 'contact_name', None)) or _safe_str(getattr(customer, 'name', None)) or 'Cliente',
+                'email': _safe_str(getattr(customer, 'email', None)) or '',
+                'source': 'cliente',
+            }
+
+        return {
+            'name': _safe_str(getattr(report, 'mandante', None)) or '',
+            'email': '',
+            'source': '',
+        }
+
+    def _upsert_closure_document(
+        self,
+        report: Report,
+        checkpoints: List["ReportCheckpoint"],
+        *,
+        uploaded_by: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Guardar el PDF de cierre como documento interno hasta que exista el firmado."""
+        try:
+            from modules.crm.module_crm import Document, Service
+        except Exception:
+            return None
+
+        pdf_bytes = _render_report_pdf_bytes(report, checkpoints)
+        output_dir = os.path.join(UPLOADS_ROOT, 'reports_closure', str(report.id))
+        os.makedirs(output_dir, exist_ok=True)
+        file_name = f"reporte_{report.id}_cierre.pdf"
+        file_path = os.path.join(output_dir, file_name)
+        with open(file_path, 'wb') as handle:
+            handle.write(pdf_bytes)
+
+        service = Service.find_by_id(report.service_id) if getattr(report, 'service_id', None) else None
+        existing = Document.search([
+            ('company_id', '=', report.company_id),
+            ('service_id', '=', report.service_id),
+        ]) if getattr(report, 'service_id', None) else []
+        relevant = [
+            item for item in existing
+            if (getattr(item, 'document_type', None) or getattr(item, 'category', None) or '') == 'reporte_cierre'
+        ]
+        for item in relevant:
+            if bool(getattr(item, 'is_current', True)):
+                item.is_current = False
+                item.save()
+
+        parent = relevant[0] if relevant else None
+        version = max([int(getattr(item, 'version', 1) or 1) for item in relevant], default=0) + 1
+        doc = Document.create({
+            'filename': file_name,
+            'file_path': file_path,
+            'mime_type': 'application/pdf',
+            'model_name': 'Service' if service else 'Lead',
+            'record_id': service.id if service else report.lead_id,
+            'company_id': report.company_id,
+            'uploaded_by': uploaded_by or 0,
+            'category': 'operativo',
+            'service_id': getattr(service, 'id', None),
+            'document_type': 'reporte_cierre',
+            'version': version,
+            'is_current': True,
+            'parent_document_id': parent.id if parent else None,
+            'metadata_json': {
+                'publish_to_mirror': False,
+                'source_module': 'reports',
+                'source_record_id': report.id,
+                'status': 'pending_signature',
+                'replaced_by': 'reporte_firmado',
+            },
+        })
+        return {
+            'id': doc.id,
+            'filename': doc.filename,
+            'document_type': doc.document_type,
+            'version': doc.version,
+            'status': 'pending_signature',
+        }
+
     def _build_report_payload(self, report: Report, include_checkpoints: bool = False) -> Dict[str, Any]:
         """Serializar reporte asegurando token y datos agregados."""
         data = report.to_dict()
+        data['signature_target'] = self._resolve_report_signature_target(report)
+        signature_request_id = getattr(report, 'signature_request_id', None)
+        if signature_request_id:
+            try:
+                from modules.signature.module_signature import SignatureRequest
+
+                sig_req = SignatureRequest.find_by_id(signature_request_id)
+                if sig_req:
+                    data['signature'] = {
+                        'id': sig_req.id,
+                        'status': sig_req.status,
+                        'public_url': f"/app/sign/{sig_req.signer_public_token()}",
+                        'signed_at': sig_req.signed_at.isoformat() if getattr(sig_req, 'signed_at', None) else None,
+                        'integrity_payload': {
+                            'signed_document_hash': (sig_req.integrity_payload or {}).get('signed_document_hash') or getattr(sig_req, 'signed_document_hash', None),
+                            'digital_key_fingerprint': (sig_req.integrity_payload or {}).get('digital_key_fingerprint') or getattr(sig_req, 'digital_key_fingerprint', None),
+                            'signature_hash': (sig_req.integrity_payload or {}).get('signature_hash') or getattr(sig_req, 'signature_hash', None),
+                        },
+                    }
+                    data['signature_status'] = sig_req.status
+                    data['signed_at'] = sig_req.signed_at.isoformat() if getattr(sig_req, 'signed_at', None) else data.get('signed_at')
+            except Exception:
+                pass
         if not include_checkpoints:
             return data
 
@@ -828,12 +1077,15 @@ class ReportsModule(BaseModule):
             return Response.bad_request("lead_id es requerido")
 
         # Validar Lead existe y es del mismo company
-        from modules.crm.module_crm import Lead
+        from modules.crm.module_crm import Lead, ensure_service_for_lead
         lead = Lead.find_by_id(int(lead_id))
         if not lead:
             return Response.not_found("Oportunidad no encontrada")
         if lead.company_id != self._company_id():
             return Response.forbidden("No tienes acceso a esta oportunidad")
+        err = self._require_service_action('service.edit_context', lead=lead)
+        if err:
+            return err
 
         try:
             resolved = self._resolve_report_defaults(lead, raw_data)
@@ -848,9 +1100,12 @@ class ReportsModule(BaseModule):
             if lead_dirty:
                 lead.save()
 
+            service = ensure_service_for_lead(lead, create_projection=True)
+
             report = Report.create({
                 'company_id':   self._company_id(),
                 'lead_id':      int(lead_id),
+                'service_id':   service.id if service else None,
                 'estado':       'ABIERTO',
                 'active':       True,
                 'public_token': _generate_report_public_token(),
@@ -918,6 +1173,9 @@ class ReportsModule(BaseModule):
             return Response.not_found("Reporte no encontrado")
         if report.company_id != self._company_id():
             return Response.forbidden("No tienes acceso a este reporte")
+        err = self._require_service_action('service.view_internal', report=report)
+        if err:
+            return err
 
         return Response.ok(self._build_report_payload(report, include_checkpoints=True))
 
@@ -939,6 +1197,9 @@ class ReportsModule(BaseModule):
             return Response.not_found("Reporte no encontrado")
         if report.company_id != self._company_id():
             return Response.forbidden("No tienes acceso a este reporte")
+        err = self._require_service_action('service.edit_operational_control', report=report)
+        if err:
+            return err
         if report.estado == 'CERRADO':
             return Response.bad_request("No se puede modificar un reporte CERRADO")
 
@@ -957,7 +1218,17 @@ class ReportsModule(BaseModule):
 
         try:
             report.save()
-            return Response.ok(self._build_report_payload(report))
+            payload = self._build_report_payload(report)
+            try:
+                payload['closure_document'] = self._upsert_closure_document(
+                    report,
+                    cps,
+                    uploaded_by=request.user_id,
+                )
+            except Exception as exc:
+                payload['closure_document_error'] = str(exc)
+
+            return Response.ok(payload)
         except ValidationError as e:
             return Response.bad_request(str(e))
 
@@ -979,6 +1250,9 @@ class ReportsModule(BaseModule):
             return Response.not_found("Reporte no encontrado")
         if report.company_id != self._company_id():
             return Response.forbidden("No tienes acceso a este reporte")
+        err = self._require_service_action('service.close_operational_step', report=report)
+        if err:
+            return err
         if report.estado == 'CERRADO':
             return Response.bad_request("El reporte ya está cerrado")
 
@@ -1005,6 +1279,107 @@ class ReportsModule(BaseModule):
         except ValidationError as e:
             return Response.bad_request(str(e))
 
+    async def request_report_signature(self, request: Request) -> Response:
+        """Generar una solicitud de firma embebida sobre un reporte cerrado."""
+        if not self.env.user:
+            return Response.unauthorized("Authentication required")
+
+        report_id = self._extract_id(request)
+        if not report_id:
+            return Response.bad_request("ID de reporte inválido")
+
+        report = Report.find_by_id(report_id)
+        if not report:
+            return Response.not_found("Reporte no encontrado")
+        if report.company_id != self._company_id():
+            return Response.forbidden("No tienes acceso a este reporte")
+        err = self._require_service_action('service.request_report_signature', report=report)
+        if err:
+            return err
+        if report.estado != 'CERRADO':
+            return Response.bad_request("La firma solo se puede solicitar sobre reportes cerrados")
+
+        try:
+            from modules.signature.module_signature import SignatureRequest
+        except Exception:
+            return Response.error("El módulo de firma no está disponible")
+
+        if getattr(report, 'signature_request_id', None):
+            existing = SignatureRequest.find_by_id(report.signature_request_id)
+            if existing:
+                report.signature_status = existing.status
+                report.save()
+                return Response.ok({
+                    'report_id': report.id,
+                    'signature_request_id': existing.id,
+                    'signature_status': existing.status,
+                    'public_url': f"/app/sign/{existing.signer_public_token()}",
+                    'signature_target': self._resolve_report_signature_target(report),
+                    'already_exists': True,
+                })
+
+        checkpoints = ReportCheckpoint.search([('report_id', '=', report.id)])
+        checkpoints.sort(key=lambda item: item.id or 0)
+        if not checkpoints:
+            return Response.bad_request("No se puede firmar un reporte sin checkpoints")
+
+        signers = request.get_data('signers') or []
+        signer_email = str(
+            request.get_data('request_to_email')
+            or request.get_data('signer_email')
+            or (signers[0].get('signer_email') if isinstance(signers, list) and signers and isinstance(signers[0], dict) else '')
+            or ''
+        ).strip()
+        signature_target = self._resolve_report_signature_target(report)
+        if not signer_email:
+            signer_email = signature_target.get('email') or ''
+        if not signer_email:
+            return Response.bad_request("Debes indicar un firmante o registrar email del mandante/cliente en CRM")
+        if not signers:
+            signers = [{
+                'role_key': 'mandante',
+                'signer_name': signature_target.get('name') or getattr(report, 'mandante', None) or signer_email,
+                'signer_email': signer_email,
+                'signing_order': 1,
+            }]
+
+        pdf_bytes = _render_report_pdf_bytes(report, checkpoints)
+        sig_req = SignatureRequest.create({
+            'name': f"Firma reporte {_format_report_number(report.id)}",
+            'description': f"Solicitud de firma del reporte de terreno {_format_report_number(report.id)}",
+            'request_from': request.user_id,
+            'request_to_email': signer_email,
+            'document_name': f"reporte_{report.id}.pdf",
+            'document_data': base64.b64encode(pdf_bytes).decode('utf-8'),
+            'signature_positions': request.get_data('signature_positions', []),
+            'layout_confirmed': request.get_data('layout_confirmed', True),
+            'company_id': report.company_id,
+            'source_module': 'reports',
+            'source_model': 'Report',
+            'source_record_id': report.id,
+        })
+        sig_req.sync_signers(signers)
+
+        auto_send = str(request.get_data('auto_send', 'false')).lower() in ('1', 'true', 'yes', 'on')
+        if auto_send:
+            try:
+                sig_req.send_request()
+            except Exception:
+                pass
+
+        report.signature_request_id = sig_req.id
+        report.signature_status = sig_req.status
+        report.save()
+
+        return Response.created({
+            'report_id': report.id,
+            'signature_request_id': sig_req.id,
+            'signature_status': sig_req.status,
+            'public_url': f"/app/sign/{sig_req.signer_public_token()}",
+            'signature_target': signature_target,
+            'auto_sent': auto_send,
+        })
+
     # ====================================================================
     # POST /reports/{id}/checkpoints — Crear checkpoint
     # ====================================================================
@@ -1021,7 +1396,7 @@ class ReportsModule(BaseModule):
             return Response.not_found("Reporte de verificación no encontrado")
 
         from modules.base.module_base import Company, User
-        from modules.crm.module_crm import ActivityLog, Customer, Document, Lead, Mandante
+        from modules.crm.module_crm import ActivityLog, Customer, Document, Lead, Mandante, _document_is_publicly_visible
 
         lead = Lead.find_by_id(report.lead_id) if report.lead_id else None
         if not lead:
@@ -1048,6 +1423,8 @@ class ReportsModule(BaseModule):
         documents = []
         for doc in docs_a + docs_b:
             if doc.id in seen_docs:
+                continue
+            if not _document_is_publicly_visible(doc):
                 continue
             seen_docs.add(doc.id)
             documents.append({

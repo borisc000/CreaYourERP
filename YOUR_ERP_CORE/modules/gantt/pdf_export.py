@@ -411,7 +411,7 @@ def build_gantt_pdf(plan_payload: Dict[str, Any], scope: str = "project_span") -
     legend_height = 16
     footer_height = 18
     label_width = 258 if use_a3 else 220
-    row_height = 36 if len(tasks) <= 12 else 32
+    row_height = 44 if len(tasks) <= 12 else 40
     inner_padding = 12
     period_header_height = 34
     stack_gap = 4
@@ -807,9 +807,11 @@ def build_gantt_pdf(plan_payload: Dict[str, Any], scope: str = "project_span") -
                         visible_periods = max((end_index - start_index) + 1, 1)
                         bar_x = grid_x + (start_index * period_width) + 2
                         bar_width = max((visible_periods * period_width) - 4, 10)
-                        bar_height = min(16, row_height - 12)
-                        bar_y = row_y + ((row_height - bar_height) / 2)
+                        bar_height = min(14, row_height - 24)
+                        bar_y = row_y + row_height - bar_height - 9
                         bar_color = _safe_color(task.get("bar_color"))
+                        task_start = _parse_date(task.get("planned_start_date"))
+                        task_end = _parse_date(task.get("planned_end_date"), task_start)
 
                         pdf.setFillColor(_lighten(bar_color, 0.12))
                         pdf.roundRect(bar_x, bar_y, bar_width, bar_height, bar_height / 2, stroke=0, fill=1)
@@ -835,6 +837,22 @@ def build_gantt_pdf(plan_payload: Dict[str, Any], scope: str = "project_span") -
                                 6.4,
                             )
                             pdf.drawString(bar_x + 6, bar_y + 5, inside_label)
+
+                        date_label = f"Inicio {_fmt_date(task_start)}  |  Termino {_fmt_date(task_end)}"
+                        pdf.setFillColor(colors.HexColor("#475569"))
+                        pdf.setFont("Helvetica-Bold", 5.6)
+                        if bar_width > 72:
+                            pdf.drawCentredString(
+                                bar_x + (bar_width / 2),
+                                row_y + 8,
+                                _truncate(date_label, bar_width - 4, "Helvetica-Bold", 5.6),
+                            )
+                        else:
+                            pdf.drawString(
+                                max(grid_x + 2, min(bar_x, grid_x + usable_grid_width - 78)),
+                                row_y + 8,
+                                _truncate(date_label, 76, "Helvetica-Bold", 5.6),
+                            )
 
             pdf.setStrokeColor(colors.HexColor("#e2e8f0"))
             pdf.line(left_x, body_y, left_x + label_width + usable_grid_width, body_y)

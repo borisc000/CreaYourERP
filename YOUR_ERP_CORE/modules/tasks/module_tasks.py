@@ -23,6 +23,11 @@ TASK_STATUSES: Dict[str, str] = {
 }
 
 ACTIVE_ASSIGNABLE_EMPLOYEE_STATUSES = {"draft", "onboarding", "active", "leave"}
+TASK_ATTACHMENT_TYPES: Dict[str, str] = {
+    "evidence": "Evidencia del trabajo",
+    "support": "Documento de apoyo",
+}
+MAX_TASK_ATTACHMENT_DATA_LENGTH = 8_000_000
 
 
 def _clean_str(value: Any, default: str = "") -> str:
@@ -205,6 +210,9 @@ class TaskActivity(BaseModel, AuditMixin):
         is_done = _clean_str(self.status) == "done"
         is_overdue = bool(due_date and due_date < today and not is_done)
         due_in_days = (due_date - today).days if due_date else None
+        attachments = TaskAttachment.search([("task_id", "=", self.id)]) if self.id else []
+        evidence_count = len([item for item in attachments if item.attachment_type == "evidence"])
+        support_count = len([item for item in attachments if item.attachment_type == "support"])
 
         return {
             "id": self.id,
@@ -225,7 +233,83 @@ class TaskActivity(BaseModel, AuditMixin):
             "completed_at": _fmt_dt(self.completed_at),
             "is_overdue": is_overdue,
             "due_in_days": due_in_days,
+            "attachments_count": len(attachments),
+            "evidence_count": evidence_count,
+            "support_count": support_count,
+            "attachments": [item.to_dict(include_data=False) for item in attachments],
         }
+
+
+class TaskAttachment(BaseModel, AuditMixin):
+    """File attached to a task as work evidence or pre-work support material."""
+
+    __tablename__ = "task_attachments"
+    __displayname__ = "file_name"
+
+    task_id = Column(ColumnType.INTEGER, required=True, label="Task")
+    company_id = Column(ColumnType.INTEGER, required=True, label="Company")
+    attachment_type = Column(ColumnType.STRING, required=True, label="Attachment Type")
+    file_name = Column(ColumnType.STRING, required=True, label="File Name")
+    mime_type = Column(ColumnType.STRING, label="MIME Type")
+    file_data = Column(ColumnType.TEXT, required=True, label="File Data")
+    notes = Column(ColumnType.TEXT, label="Notes")
+    uploaded_by_user_id = Column(ColumnType.INTEGER, label="Uploaded By User")
+
+    def validate(self):
+        super().validate()
+
+        self.task_id = _safe_int(self.task_id)
+        self.company_id = _safe_int(self.company_id)
+        self.attachment_type = _clean_str(self.attachment_type, "support")
+        self.file_name = _clean_str(self.file_name)
+        self.mime_type = _clean_str(self.mime_type, "application/octet-stream")
+        self.file_data = _clean_str(self.file_data)
+        self.notes = _clean_str(self.notes)
+        self.uploaded_by_user_id = _safe_int(self.uploaded_by_user_id)
+
+        if not self.task_id:
+            raise ValidationError("Task is required")
+        if not self.company_id:
+            raise ValidationError("Company is required")
+        if self.attachment_type not in TASK_ATTACHMENT_TYPES:
+            raise ValidationError(
+                "Attachment type must be one of: " + ", ".join(TASK_ATTACHMENT_TYPES.keys())
+            )
+        if not self.file_name:
+            raise ValidationError("File name is required")
+        if not self.file_data:
+            raise ValidationError("File data is required")
+        if len(self.file_data) > MAX_TASK_ATTACHMENT_DATA_LENGTH:
+            raise ValidationError("File is too large")
+
+        task = TaskActivity.find_by_id(self.task_id)
+        if not task:
+            raise ValidationError("Task was not found")
+        if task.company_id != self.company_id:
+            raise ValidationError("Attachment and task must belong to the same company")
+
+    def to_dict(self, include_data: bool = False) -> Dict[str, Any]:
+        payload = {
+            "id": self.id,
+            "task_id": self.task_id,
+            "company_id": self.company_id,
+            "attachment_type": self.attachment_type or "support",
+            "attachment_type_label": TASK_ATTACHMENT_TYPES.get(
+                self.attachment_type or "support",
+                self.attachment_type or "support",
+            ),
+            "file_name": self.file_name or "",
+            "mime_type": self.mime_type or "application/octet-stream",
+            "notes": self.notes or "",
+            "uploaded_by_user_id": self.uploaded_by_user_id,
+            "uploaded_by_user_name": _resolve_user_name(self.uploaded_by_user_id),
+            "created_at": _fmt_dt(self._data.get("created_at")),
+            "is_image": _clean_str(self.mime_type).startswith("image/")
+            or _clean_str(self.file_data).startswith("data:image/"),
+        }
+        if include_data:
+            payload["file_data"] = self.file_data or ""
+        return payload
 
 
 class TasksModule(BaseModule):
@@ -239,6 +323,7 @@ class TasksModule(BaseModule):
 
     def init_module(self):
         self.register_model("tasks.activity", TaskActivity)
+        self.register_model("tasks.attachment", TaskAttachment)
 
         self.register_route("/tasks/dashboard", self.get_dashboard, methods=["GET"], auth_required=True)
         self.register_route(
@@ -264,6 +349,30 @@ class TasksModule(BaseModule):
         self.register_route(
             "/tasks/activities/{id}",
             self.delete_activity,
+            methods=["DELETE"],
+            auth_required=True,
+        )
+        self.register_route(
+            "/tasks/activities/{id}/attachments",
+            self.list_attachments,
+            methods=["GET"],
+            auth_required=True,
+        )
+        self.register_route(
+            "/tasks/activities/{id}/attachments",
+            self.create_attachment,
+            methods=["POST"],
+            auth_required=True,
+        )
+        self.register_route(
+            "/tasks/attachments/{id}",
+            self.get_attachment,
+            methods=["GET"],
+            auth_required=True,
+        )
+        self.register_route(
+            "/tasks/attachments/{id}",
+            self.delete_attachment,
             methods=["DELETE"],
             auth_required=True,
         )
@@ -342,6 +451,21 @@ class TasksModule(BaseModule):
             return None, Response.not_found("Tarea no encontrada")
 
         return task, None
+
+    def _attachment_or_error(self, attachment_id: Any) -> Tuple[Optional[TaskAttachment], Optional[Response]]:
+        parsed_id = _safe_int(attachment_id)
+        if not parsed_id:
+            return None, Response.not_found("Adjunto no encontrado")
+
+        attachment = TaskAttachment.find_by_id(parsed_id)
+        if not attachment:
+            return None, Response.not_found("Adjunto no encontrado")
+
+        task, task_error = self._task_or_error(attachment.task_id)
+        if task_error:
+            return None, task_error
+
+        return attachment, None
 
     def _sorted_tasks(self) -> List[TaskActivity]:
         tasks = TaskActivity.search(self._tenant_filter())
@@ -603,5 +727,79 @@ class TasksModule(BaseModule):
             return task_error
 
         task_code = task.task_code or f"Tarea {task.id}"
+        for attachment in TaskAttachment.search([("task_id", "=", task.id)]):
+            attachment.delete()
         task.delete()
         return Response.ok({"message": f"{task_code} eliminada"})
+
+    async def list_attachments(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        task, task_error = self._task_or_error(request.params.get("id"))
+        if task_error:
+            return task_error
+
+        attachment_type = _clean_str(request.get_param("type"))
+        attachments = TaskAttachment.search([("task_id", "=", task.id)])
+        if attachment_type:
+            attachments = [item for item in attachments if item.attachment_type == attachment_type]
+        attachments.sort(key=lambda item: (_sort_dt_value(item._data.get("created_at")), item.id or 0), reverse=True)
+        return Response.ok(
+            {
+                "count": len(attachments),
+                "results": [item.to_dict(include_data=False) for item in attachments],
+            }
+        )
+
+    async def create_attachment(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        task, task_error = self._task_or_error(request.params.get("id"))
+        if task_error:
+            return task_error
+
+        data = request.data or {}
+        try:
+            attachment = TaskAttachment.create(
+                {
+                    "task_id": task.id,
+                    "company_id": task.company_id,
+                    "attachment_type": data.get("attachment_type") or data.get("type") or "support",
+                    "file_name": data.get("file_name") or data.get("filename"),
+                    "mime_type": data.get("mime_type") or data.get("content_type") or "application/octet-stream",
+                    "file_data": data.get("file_data") or data.get("data"),
+                    "notes": data.get("notes"),
+                    "uploaded_by_user_id": request.user_id,
+                }
+            )
+            return Response.created(attachment.to_dict(include_data=False))
+        except ValidationError as exc:
+            return Response.bad_request(str(exc))
+
+    async def get_attachment(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        attachment, attachment_error = self._attachment_or_error(request.params.get("id"))
+        if attachment_error:
+            return attachment_error
+
+        return Response.ok(attachment.to_dict(include_data=True))
+
+    async def delete_attachment(self, request: Request) -> Response:
+        err = self._require_access()
+        if err:
+            return err
+
+        attachment, attachment_error = self._attachment_or_error(request.params.get("id"))
+        if attachment_error:
+            return attachment_error
+
+        file_name = attachment.file_name or f"Adjunto {attachment.id}"
+        attachment.delete()
+        return Response.ok({"message": f"{file_name} eliminado"})

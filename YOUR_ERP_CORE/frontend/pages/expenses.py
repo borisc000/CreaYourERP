@@ -221,8 +221,9 @@ def expenses_page():
                     <input id="expenses-record-net" type="number" min="0" step="1" placeholder="0" oninput="syncExpenseAmountPreview()">
                 </div>
                 <div class="form-group">
-                    <label>IVA / impuesto</label>
+                    <label>IVA / impuesto <span id="expenses-record-tax-label" class="field-hint" style="display:inline;color:#94a3b8;margin-left:0.35rem;"></span></label>
                     <input id="expenses-record-tax" type="number" min="0" step="1" placeholder="0" oninput="syncExpenseAmountPreview()">
+                    <span class="field-hint" id="expenses-record-tax-hint">Se completa automaticamente desde la configuracion tributaria cuando no ingresas un valor manual.</span>
                 </div>
                 <div class="form-group">
                     <label>Total *</label>
@@ -762,7 +763,110 @@ def expenses_page():
     line-height:1.7;
 }
 .expenses-modal-xl {
-    max-width:980px;
+    max-width:1100px;
+}
+#expenses-record-modal .expenses-modal-xl {
+    width:min(1100px, calc(100vw - 32px));
+    max-height:88vh;
+    overflow:auto;
+    padding:0;
+    border:1px solid rgba(71,85,105,0.85);
+    background:#0f172a;
+}
+#expenses-record-modal h2 {
+    position:sticky;
+    top:0;
+    z-index:2;
+    margin:0;
+    padding:1.15rem 1.35rem;
+    border-bottom:1px solid rgba(51,65,85,0.9);
+    background:rgba(15,23,42,0.96);
+    color:#f8fafc;
+}
+#expenses-record-modal form {
+    display:grid;
+    gap:1rem;
+    padding:1.25rem;
+}
+#expenses-record-modal .form-row,
+#expenses-record-modal .expenses-amount-grid,
+#expenses-record-modal form > .form-group {
+    border:1px solid rgba(51,65,85,0.9);
+    border-radius:14px;
+    background:rgba(15,23,42,0.7);
+    padding:1rem;
+}
+#expenses-record-modal .form-row {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0,1fr));
+    gap:1rem;
+}
+#expenses-record-modal .form-group {
+    margin:0;
+}
+#expenses-record-modal label {
+    color:#cbd5e1;
+    font-weight:700;
+    font-size:0.82rem;
+}
+#expenses-record-modal input,
+#expenses-record-modal select,
+#expenses-record-modal textarea {
+    width:100%;
+    margin-top:0.45rem;
+    border-radius:12px;
+    border:1px solid #334155;
+    background:#111827;
+    color:#e2e8f0;
+}
+#expenses-record-modal input:focus,
+#expenses-record-modal select:focus,
+#expenses-record-modal textarea:focus {
+    border-color:#38bdf8;
+    box-shadow:0 0 0 3px rgba(56,189,248,0.14);
+    outline:none;
+}
+#expenses-record-modal .expenses-amount-grid {
+    align-items:stretch;
+}
+#expenses-record-modal .expenses-amount-grid .form-group:last-child {
+    border-radius:12px;
+    border:1px solid rgba(56,189,248,0.35);
+    background:rgba(14,165,233,0.08);
+    padding:0.85rem;
+}
+#expenses-record-modal .expenses-support-grid {
+    align-items:stretch;
+}
+#expenses-record-modal .expenses-support-card {
+    border-radius:14px;
+    background:rgba(15,23,42,0.72);
+    min-height:280px;
+}
+#expenses-record-modal .expenses-support-card textarea {
+    min-height:220px;
+    resize:vertical;
+    line-height:1.55;
+}
+#expenses-record-description {
+    min-height:220px;
+}
+#expenses-record-notes {
+    min-height:120px;
+    resize:vertical;
+    line-height:1.55;
+}
+#expenses-record-modal .expenses-support-preview {
+    min-height:170px;
+}
+#expenses-record-modal .modal-actions {
+    position:sticky;
+    bottom:0;
+    z-index:2;
+    margin:0 -1.25rem -1.25rem;
+    padding:1rem 1.25rem;
+    border-top:1px solid rgba(51,65,85,0.9);
+    background:rgba(15,23,42,0.96);
 }
 .expenses-backup-json {
     white-space:pre-wrap;

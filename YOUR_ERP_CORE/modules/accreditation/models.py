@@ -19,8 +19,18 @@ from core.YOUR_ERP_orm import BaseModel, Column, ColumnType, AuditMixin
 # ============================================================================
 
 SERVICE_ORDER_STATUSES = ("active", "completed", "cancelled")
-CREW_ROLES = ("supervisor", "operator", "helper")
+CREW_ROLES = (
+    "supervisor",
+    "prevencionista",
+    "administrator",
+    "crew_lead",
+    "operator",
+    "helper",
+    "worker",
+)
 CREW_STATUSES = ("assigned", "active", "removed")
+AUTHORIZATION_STATUSES = ("pending", "authorized", "requires_revalidation", "rejected")
+AUTHORIZATION_MODES = ("ready", "warning")
 LEVEL_STATUSES = ("pending", "compliant", "non_compliant")
 OVERALL_STATUSES = ("compliant", "attention", "non_compliant")
 DOC_GEN_STATUSES = (
@@ -45,6 +55,7 @@ class ServiceOrder(BaseModel, AuditMixin):
     __tablename__ = "accreditation_service_orders"
     __displayname__ = "title"
 
+    service_id = Column(ColumnType.INTEGER, label="Canonical Service")
     lead_id = Column(ColumnType.INTEGER, required=True, label="Lead")
     customer_id = Column(ColumnType.INTEGER, label="Customer")
     company_id = Column(ColumnType.INTEGER, required=True, label="Company")
@@ -78,6 +89,11 @@ class CrewAssignment(BaseModel, AuditMixin):
     assigned_by = Column(ColumnType.INTEGER, label="Assigned By")
     assigned_at = Column(ColumnType.DATETIME, label="Assigned At")
     status = Column(ColumnType.STRING, default="assigned", label="Status")
+    authorization_status = Column(ColumnType.STRING, default="pending", label="Authorization Status")
+    authorization_mode = Column(ColumnType.STRING, label="Authorization Mode")
+    authorized_at = Column(ColumnType.DATETIME, label="Authorized At")
+    authorized_by = Column(ColumnType.INTEGER, label="Authorized By")
+    revalidation_reason = Column(ColumnType.TEXT, label="Revalidation Reason")
     notes = Column(ColumnType.TEXT, label="Notes")
 
     def validate(self):
@@ -86,6 +102,10 @@ class CrewAssignment(BaseModel, AuditMixin):
             raise ValueError(f"Invalid role: {self.role}")
         if self.status and self.status not in CREW_STATUSES:
             raise ValueError(f"Invalid status: {self.status}")
+        if self.authorization_status and self.authorization_status not in AUTHORIZATION_STATUSES:
+            raise ValueError(f"Invalid authorization_status: {self.authorization_status}")
+        if self.authorization_mode and self.authorization_mode not in AUTHORIZATION_MODES:
+            raise ValueError(f"Invalid authorization_mode: {self.authorization_mode}")
 
 
 class AccreditationCheck(BaseModel, AuditMixin):

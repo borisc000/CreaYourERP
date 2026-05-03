@@ -11,11 +11,14 @@ import base64
 import csv
 import io
 import json
+import os
 import re
+import shutil
 import tempfile
 import unicodedata
 import zipfile
 from datetime import datetime
+from pathlib import Path
 from subprocess import DEVNULL, run
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -26,8 +29,18 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import simpleSplit
 from reportlab.pdfgen import canvas
 
+try:
+    from pypdf import PdfReader, PdfWriter
+except Exception:  # pragma: no cover - dependency fallback for older installs
+    try:
+        from PyPDF2 import PdfReader, PdfWriter
+    except Exception:  # pragma: no cover
+        PdfReader = None
+        PdfWriter = None
+
 from core.YOUR_ERP_core_framework import BaseModule, Request, Response, ValidationError
 from core.YOUR_ERP_orm import AuditMixin, BaseModel, Column, ColumnType
+from core.config import settings
 from core.time_utils import utc_now, utc_now_iso, utc_strftime
 from modules.signature.signature_support import (
     default_signature_positions,
@@ -56,6 +69,8 @@ PLACEHOLDER_VALIDATION_STATUSES = ("pending", "valid", "invalid")
 EVENT_TYPES = (
     "generated",
     "viewed",
+    "download_source",
+    "download_doc",
     "download_docx",
     "download_pdf",
     "approved",
@@ -66,17 +81,35 @@ EVENT_TYPES = (
     "error",
 )
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+DOC_MIME = "application/msword"
 PDF_MIME = "application/pdf"
+SUPPORTED_TEMPLATE_FORMATS = ("docx", "doc", "pdf")
+WORD_TEMPLATE_FORMATS = ("docx", "doc")
+CONVERSION_STATUSES = ("pending", "ready", "failed", "not_required")
+MIME_BY_FORMAT = {
+    "docx": DOCX_MIME,
+    "doc": DOC_MIME,
+    "pdf": PDF_MIME,
+}
+EXTENSION_BY_MIME = {
+    DOCX_MIME: "docx",
+    DOC_MIME: "doc",
+    PDF_MIME: "pdf",
+    "application/x-msword": "doc",
+}
 PLACEHOLDER_RE = re.compile(r"<<\s*([^<>]+?)\s*>>")
 RAW_PLACEHOLDER_RE = re.compile(r"<<\s*([^<>]+?)\s*>>")
-DOCX_XML_PATHS = (
+DOCX_XML_EXACT_PATHS = (
     "word/document.xml",
-    "word/header1.xml",
-    "word/header2.xml",
-    "word/header3.xml",
-    "word/footer1.xml",
-    "word/footer2.xml",
-    "word/footer3.xml",
+    "word/footnotes.xml",
+    "word/endnotes.xml",
+    "word/comments.xml",
+    "word/glossary/document.xml",
+)
+DOCX_XML_PREFIXES = (
+    "word/header",
+    "word/footer",
+    "word/commentsExtended",
 )
 WORD_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
@@ -201,6 +234,150 @@ def _b64decode(data: str) -> bytes:
     return base64.b64decode(data.encode("utf-8"))
 
 
+def _minimal_docx_from_paragraphs(paragraphs: List[str]) -> bytes:
+    body_parts: List[str] = []
+    for paragraph in paragraphs:
+        safe = (
+            str(paragraph or "")
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+        body_parts.append(
+            '<w:p><w:r><w:t xml:space="preserve">'
+            + safe
+            + "</w:t></w:r></w:p>"
+        )
+    document_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:body>"
+        + "".join(body_parts)
+        + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>'
+        + "</w:body></w:document>"
+    )
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        "</Types>"
+    )
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+        "</Relationships>"
+    )
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", content_types)
+        archive.writestr("_rels/.rels", rels)
+        archive.writestr("word/document.xml", document_xml)
+    return buffer.getvalue()
+
+
+def _hash_bytes(data: bytes) -> str:
+    return sha256_hex(data or b"")
+
+
+def _normalize_template_format(value: Any, fallback: str = "docx") -> str:
+    fmt = str(value or "").strip().lower().lstrip(".")
+    if fmt in SUPPORTED_TEMPLATE_FORMATS:
+        return fmt
+    return fallback if fallback in SUPPORTED_TEMPLATE_FORMATS else "docx"
+
+
+def _format_from_upload(filename: Any = "", mime_type: Any = "") -> str:
+    suffix = Path(str(filename or "")).suffix.lower().lstrip(".")
+    if suffix in SUPPORTED_TEMPLATE_FORMATS:
+        return suffix
+    return EXTENSION_BY_MIME.get(str(mime_type or "").strip().lower(), "docx")
+
+
+def _mime_for_format(fmt: str) -> str:
+    return MIME_BY_FORMAT.get(_normalize_template_format(fmt), DOCX_MIME)
+
+
+def _converter_error_message() -> str:
+    return (
+        "LibreOffice/soffice is required for faithful Word/PDF conversion. "
+        "Configure DOCUMENT_CONVERTER_PATH or install LibreOffice and add soffice to PATH."
+    )
+
+
+def _resolve_soffice_path() -> Optional[str]:
+    configured = str(getattr(settings, "document_converter_path", "") or os.getenv("DOCUMENT_CONVERTER_PATH", "")).strip()
+    if configured and Path(configured).exists():
+        return configured
+    found = shutil.which("soffice") or shutil.which("soffice.exe")
+    if found:
+        return found
+    for candidate in (
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
+        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        "/usr/bin/soffice",
+        "/usr/local/bin/soffice",
+        "/opt/libreoffice/program/soffice",
+    ):
+        if Path(candidate).exists():
+            return candidate
+    return None
+
+
+def _convert_with_soffice(source_bytes: bytes, source_ext: str, target_ext: str) -> bytes:
+    source_ext = _normalize_template_format(source_ext, "docx")
+    target_ext = _normalize_template_format(target_ext, "pdf")
+    soffice_path = _resolve_soffice_path()
+    if not soffice_path:
+        raise ValidationError(_converter_error_message())
+    if not source_bytes:
+        raise ValidationError("Source document is empty")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        source_path = Path(tmp_dir) / f"source.{source_ext}"
+        source_path.write_bytes(source_bytes)
+        result = run(
+            [
+                soffice_path,
+                "--headless",
+                "--convert-to",
+                target_ext,
+                "--outdir",
+                tmp_dir,
+                str(source_path),
+            ],
+            stdout=DEVNULL,
+            stderr=DEVNULL,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise ValidationError(f"LibreOffice could not convert {source_ext.upper()} to {target_ext.upper()}")
+        converted_path = Path(tmp_dir) / f"source.{target_ext}"
+        if not converted_path.exists():
+            matches = list(Path(tmp_dir).glob(f"*.{target_ext}"))
+            converted_path = matches[0] if matches else converted_path
+        if not converted_path.exists():
+            raise ValidationError(f"Converted {target_ext.upper()} file was not created")
+        return converted_path.read_bytes()
+
+
+def _is_docx_xml_part(path: str) -> bool:
+    if path in DOCX_XML_EXACT_PATHS:
+        return True
+    if not (path.startswith("word/") and path.endswith(".xml")):
+        return False
+    return any(path.startswith(prefix) for prefix in DOCX_XML_PREFIXES)
+
+
+def _safe_parse_xml(data: bytes) -> Optional[ET.Element]:
+    try:
+        return ET.fromstring(data)
+    except Exception:
+        return None
+
+
 def _extract_placeholders(text: str) -> List[str]:
     found = []
     seen = set()
@@ -250,11 +427,13 @@ def _extract_docx_preview_and_keys(template_bytes: bytes) -> Tuple[List[str], st
     seen = set()
 
     with zipfile.ZipFile(io.BytesIO(template_bytes), "r") as zip_file:
-        for path in DOCX_XML_PATHS:
-            if path not in zip_file.namelist():
+        for path in zip_file.namelist():
+            if not _is_docx_xml_part(path):
                 continue
             xml_bytes = zip_file.read(path)
-            root = ET.fromstring(xml_bytes)
+            root = _safe_parse_xml(xml_bytes)
+            if root is None:
+                continue
             for paragraph in root.findall(".//w:p", NS):
                 texts = [node.text or "" for node in paragraph.findall(".//w:t", NS)]
                 paragraph_text = "".join(texts).strip()
@@ -268,6 +447,53 @@ def _extract_docx_preview_and_keys(template_bytes: bytes) -> Tuple[List[str], st
     return placeholders, "\n".join(preview_chunks[:120])
 
 
+def _replace_placeholders_in_text_nodes(
+    text_nodes: List[ET.Element],
+    values: Dict[str, Any],
+) -> Tuple[str, bool]:
+    if not text_nodes:
+        return "", False
+    original_text = "".join(node.text or "" for node in text_nodes)
+    matches = list(PLACEHOLDER_RE.finditer(original_text))
+    if not matches:
+        return original_text, False
+
+    node_texts = [node.text or "" for node in text_nodes]
+
+    def _node_for_offset(offset: int) -> Tuple[int, int]:
+        cursor = 0
+        for index, text in enumerate(node_texts):
+            next_cursor = cursor + len(text)
+            if offset <= next_cursor:
+                return index, max(0, offset - cursor)
+            cursor = next_cursor
+        return len(node_texts) - 1, len(node_texts[-1])
+
+    for match in reversed(matches):
+        replacement = _replace_placeholders(match.group(0), values)
+        start_node, start_offset = _node_for_offset(match.start())
+        end_node, end_offset = _node_for_offset(match.end())
+        if start_node == end_node:
+            text = node_texts[start_node]
+            node_texts[start_node] = text[:start_offset] + replacement + text[end_offset:]
+            continue
+
+        start_text = node_texts[start_node]
+        end_text = node_texts[end_node]
+        node_texts[start_node] = start_text[:start_offset] + replacement
+        for index in range(start_node + 1, end_node):
+            node_texts[index] = ""
+        node_texts[end_node] = end_text[end_offset:]
+
+    for node, text in zip(text_nodes, node_texts):
+        node.text = text
+        if text.startswith(" ") or text.endswith(" "):
+            node.set(XML_SPACE, "preserve")
+        elif XML_SPACE in node.attrib:
+            node.attrib.pop(XML_SPACE, None)
+    return "".join(node_texts), True
+
+
 def _merge_docx(template_bytes: bytes, values: Dict[str, Any]) -> Tuple[bytes, str]:
     input_zip = zipfile.ZipFile(io.BytesIO(template_bytes), "r")
     output_buffer = io.BytesIO()
@@ -276,7 +502,7 @@ def _merge_docx(template_bytes: bytes, values: Dict[str, Any]) -> Tuple[bytes, s
     with zipfile.ZipFile(output_buffer, "w", zipfile.ZIP_DEFLATED) as output_zip:
         for item in input_zip.infolist():
             data = input_zip.read(item.filename)
-            if item.filename in DOCX_XML_PATHS:
+            if _is_docx_xml_part(item.filename):
                 try:
                     root = ET.fromstring(data)
                     for paragraph in root.findall(".//w:p", NS):
@@ -284,13 +510,9 @@ def _merge_docx(template_bytes: bytes, values: Dict[str, Any]) -> Tuple[bytes, s
                         if not text_nodes:
                             continue
                         original_text = "".join(node.text or "" for node in text_nodes)
-                        replaced_text = _replace_placeholders(original_text, values)
-                        if replaced_text != original_text:
-                            text_nodes[0].text = replaced_text
-                            if replaced_text.startswith(" ") or replaced_text.endswith(" "):
-                                text_nodes[0].set(XML_SPACE, "preserve")
-                            for node in text_nodes[1:]:
-                                node.text = ""
+                        replaced_text, changed = _replace_placeholders_in_text_nodes(text_nodes, values)
+                        if not changed:
+                            replaced_text = original_text
                         if replaced_text.strip():
                             preview_chunks.append(replaced_text.strip())
                     data = ET.tostring(root, encoding="utf-8", xml_declaration=True)
@@ -300,6 +522,55 @@ def _merge_docx(template_bytes: bytes, values: Dict[str, Any]) -> Tuple[bytes, s
 
     input_zip.close()
     return output_buffer.getvalue(), "\n".join(preview_chunks[:200])
+
+
+def _extract_pdf_fields(pdf_bytes: bytes) -> List[str]:
+    if not pdf_bytes or PdfReader is None:
+        return []
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        fields = reader.get_fields() or {}
+        return [str(name) for name in fields.keys() if str(name or "").strip()]
+    except Exception:
+        return []
+
+
+def _merge_pdf_fields(pdf_bytes: bytes, values: Dict[str, Any]) -> Tuple[bytes, str]:
+    if not pdf_bytes:
+        raise ValidationError("PDF template is empty")
+    if PdfReader is None or PdfWriter is None:
+        raise ValidationError("pypdf is required to process PDF templates")
+
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    writer = PdfWriter()
+    normalized_values = {
+        _normalize_key(key): "" if value is None else str(value)
+        for key, value in (values or {}).items()
+        if str(key or "").strip()
+    }
+    raw_fields = reader.get_fields() or {}
+    field_values: Dict[str, str] = {}
+    preview_lines: List[str] = []
+    for field_name in raw_fields.keys():
+        value = values.get(field_name)
+        if value in (None, ""):
+            value = normalized_values.get(_normalize_key(field_name), "")
+        value = "" if value is None else str(value)
+        field_values[str(field_name)] = value
+        preview_lines.append(f"{field_name}: {value}")
+
+    for page in reader.pages:
+        writer.add_page(page)
+    if field_values:
+        try:
+            writer.set_need_appearances_writer(True)
+        except Exception:
+            pass
+        for page in writer.pages:
+            writer.update_page_form_field_values(page, field_values)
+    output = io.BytesIO()
+    writer.write(output)
+    return output.getvalue(), "\n".join(preview_lines[:200])
 
 
 def _render_pdf_from_text(title: str, preview_text: str, extra_lines: Optional[List[str]] = None) -> bytes:
@@ -343,33 +614,11 @@ def _render_pdf_from_text(title: str, preview_text: str, extra_lines: Optional[L
     return buffer.getvalue()
 
 
-def _try_convert_docx_with_soffice(docx_bytes: bytes) -> Optional[bytes]:
-    try:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            docx_path = f"{tmp_dir}\\source.docx"
-            with open(docx_path, "wb") as docx_file:
-                docx_file.write(docx_bytes)
-
-            result = run(
-                ["soffice", "--headless", "--convert-to", "pdf", docx_path, "--outdir", tmp_dir],
-                stdout=DEVNULL,
-                stderr=DEVNULL,
-                check=False,
-            )
-            if result.returncode != 0:
-                return None
-            pdf_path = f"{tmp_dir}\\source.pdf"
-            with open(pdf_path, "rb") as pdf_file:
-                return pdf_file.read()
-    except Exception:
-        return None
-
-
 def _build_pdf(title: str, docx_bytes: bytes, preview_text: str, extra_lines: Optional[List[str]] = None) -> bytes:
-    converted = _try_convert_docx_with_soffice(docx_bytes)
-    if converted:
-        return converted
-    return _render_pdf_from_text(title, preview_text, extra_lines=extra_lines)
+    try:
+        return _convert_with_soffice(docx_bytes, "docx", "pdf")
+    except Exception:
+        return _render_pdf_from_text(title, preview_text, extra_lines=extra_lines)
 
 
 def _normalize_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -579,6 +828,13 @@ class DocumentTemplate(BaseModel, AuditMixin):
     filename_pattern = Column(ColumnType.STRING, label="Filename Pattern")
     original_filename = Column(ColumnType.STRING, label="Original Filename")
     template_mime = Column(ColumnType.STRING, default=DOCX_MIME, label="Template MIME")
+    source_format = Column(ColumnType.STRING, default="docx", label="Source Format")
+    original_template_data = Column(ColumnType.TEXT, label="Original Template Data")
+    original_file_hash = Column(ColumnType.STRING, label="Original File Hash")
+    original_file_size = Column(ColumnType.INTEGER, default=0, label="Original File Size")
+    conversion_status = Column(ColumnType.STRING, default="pending", label="Conversion Status")
+    conversion_error = Column(ColumnType.TEXT, label="Conversion Error")
+    available_formats = Column(ColumnType.JSON, default=[], label="Available Formats")
     template_data = Column(ColumnType.TEXT, required=True, label="Template Data")
     template_pdf_data = Column(ColumnType.TEXT, label="Template PDF Data")
     template_pdf_layout = Column(ColumnType.JSON, default=[], label="Template PDF Layout")
@@ -606,6 +862,19 @@ class DocumentTemplate(BaseModel, AuditMixin):
         self.scope_type = self.scope_type or "general_empresa"
         self.subject_type = self.subject_type or "trabajador"
         self.placeholder_validation_status = self.placeholder_validation_status or "pending"
+        self.source_format = _normalize_template_format(self.source_format or _format_from_upload(self.original_filename, self.template_mime))
+        self.template_mime = self.template_mime or _mime_for_format(self.source_format)
+        if not self.original_template_data and self.template_data:
+            self.original_template_data = self.template_data
+        if not self.original_file_hash and self.original_template_data:
+            try:
+                original_bytes = _b64decode(self.original_template_data)
+                self.original_file_hash = _hash_bytes(original_bytes)
+                self.original_file_size = len(original_bytes)
+            except Exception:
+                self.original_file_hash = self.original_file_hash or ""
+        self.available_formats = self.available_formats or []
+        self.conversion_status = self.conversion_status or "pending"
         if self.status not in TEMPLATE_STATUSES:
             raise ValidationError(f"Template status must be one of: {', '.join(TEMPLATE_STATUSES)}")
         if self.target_module not in TARGET_MODULES:
@@ -620,6 +889,12 @@ class DocumentTemplate(BaseModel, AuditMixin):
             raise ValidationError(
                 "Placeholder validation status must be one of: "
                 + ", ".join(PLACEHOLDER_VALIDATION_STATUSES)
+            )
+        if self.source_format not in SUPPORTED_TEMPLATE_FORMATS:
+            raise ValidationError(f"Template format must be one of: {', '.join(SUPPORTED_TEMPLATE_FORMATS)}")
+        if self.conversion_status not in CONVERSION_STATUSES:
+            raise ValidationError(
+                "Conversion status must be one of: " + ", ".join(CONVERSION_STATUSES)
             )
         if not self.template_data:
             raise ValidationError("Template file is required")
@@ -658,6 +933,12 @@ class DocumentTemplate(BaseModel, AuditMixin):
             "filename_pattern": self.filename_pattern or "",
             "original_filename": self.original_filename or "",
             "template_mime": self.template_mime or DOCX_MIME,
+            "source_format": self.source_format or "docx",
+            "original_file_hash": self.original_file_hash or "",
+            "original_file_size": self.original_file_size or 0,
+            "conversion_status": self.conversion_status or "pending",
+            "conversion_error": self.conversion_error or "",
+            "available_formats": self.available_formats or [],
             "template_pdf_layout": self.template_pdf_layout or [],
             "signature_layout": self.signature_layout or [],
             "signature_roles": self.signature_roles or [],
@@ -672,6 +953,7 @@ class DocumentTemplate(BaseModel, AuditMixin):
         }
         if include_content:
             data["template_data"] = self.template_data
+            data["original_template_data"] = self.original_template_data
             data["template_pdf_data"] = self.template_pdf_data
         return data
 
@@ -767,9 +1049,18 @@ class GeneratedDocument(BaseModel, AuditMixin):
     source_label = Column(ColumnType.STRING, label="Source Label")
     target_module = Column(ColumnType.STRING, default="general", label="Target Module")
     target_record_id = Column(ColumnType.INTEGER, label="Target Record")
+    source_format = Column(ColumnType.STRING, default="docx", label="Source Format")
+    original_file_hash = Column(ColumnType.STRING, label="Original File Hash")
+    available_formats = Column(ColumnType.JSON, default=[], label="Available Formats")
     merge_payload = Column(ColumnType.JSON, default={}, label="Merge Payload")
     docx_data = Column(ColumnType.TEXT, label="DOCX Data")
+    doc_data = Column(ColumnType.TEXT, label="DOC Data")
     pdf_data = Column(ColumnType.TEXT, label="PDF Data")
+    docx_hash = Column(ColumnType.STRING, label="DOCX Hash")
+    doc_hash = Column(ColumnType.STRING, label="DOC Hash")
+    pdf_hash = Column(ColumnType.STRING, label="PDF Hash")
+    conversion_status = Column(ColumnType.STRING, default="ready", label="Conversion Status")
+    conversion_error = Column(ColumnType.TEXT, label="Conversion Error")
     pdf_layout = Column(ColumnType.JSON, default=[], label="PDF Layout")
     pdf_layout_hash = Column(ColumnType.STRING, label="PDF Layout Hash")
     template_signature_layout_snapshot = Column(
@@ -801,6 +1092,9 @@ class GeneratedDocument(BaseModel, AuditMixin):
         super().validate()
         self.template_scope_type = self.template_scope_type or "general_empresa"
         self.subject_type = self.subject_type or "trabajador"
+        self.source_format = _normalize_template_format(self.source_format or "docx")
+        self.available_formats = self.available_formats or []
+        self.conversion_status = self.conversion_status or "ready"
         if self.status not in GENERATED_DOCUMENT_STATUSES:
             raise ValidationError(
                 "Generated document status must be one of: "
@@ -815,6 +1109,12 @@ class GeneratedDocument(BaseModel, AuditMixin):
         if self.subject_type not in TEMPLATE_SUBJECT_TYPES:
             raise ValidationError(
                 f"Subject type must be one of: {', '.join(TEMPLATE_SUBJECT_TYPES)}"
+            )
+        if self.source_format not in SUPPORTED_TEMPLATE_FORMATS:
+            raise ValidationError(f"Source format must be one of: {', '.join(SUPPORTED_TEMPLATE_FORMATS)}")
+        if self.conversion_status not in CONVERSION_STATUSES:
+            raise ValidationError(
+                "Conversion status must be one of: " + ", ".join(CONVERSION_STATUSES)
             )
         self._refresh_pdf_signature_layout()
 
@@ -869,8 +1169,16 @@ class GeneratedDocument(BaseModel, AuditMixin):
             "source_label": self.source_label or "",
             "target_module": self.target_module or "general",
             "target_record_id": self.target_record_id,
+            "source_format": self.source_format or "docx",
+            "original_file_hash": self.original_file_hash or "",
+            "available_formats": self.available_formats or [],
             "merge_payload": self.merge_payload or {},
             "preview_text": self.preview_text or "",
+            "docx_hash": self.docx_hash or "",
+            "doc_hash": self.doc_hash or "",
+            "pdf_hash": self.pdf_hash or "",
+            "conversion_status": self.conversion_status or "ready",
+            "conversion_error": self.conversion_error or "",
             "pdf_layout": self.pdf_layout or [],
             "template_signature_layout_snapshot": self.template_signature_layout_snapshot or [],
             "signature_roles_snapshot": self.signature_roles_snapshot or [],
@@ -893,6 +1201,7 @@ class GeneratedDocument(BaseModel, AuditMixin):
         }
         if include_content:
             data["docx_data"] = self.docx_data
+            data["doc_data"] = self.doc_data
             data["pdf_data"] = self.pdf_data
         return data
 
@@ -1074,6 +1383,91 @@ class DocumentCenterModule(BaseModule):
             return []
         return [("company_id", "=", self._company_id())]
 
+    def _ensure_safety_epp_template(self) -> Optional[DocumentTemplate]:
+        company_id = self._company_id()
+        if not company_id:
+            return None
+        existing = [
+            item
+            for item in DocumentTemplate.search([("company_id", "=", company_id)])
+            if (item.status or "") == "active"
+            and (item.target_module or "") == "safety"
+            and (
+                _normalize_key(item.document_type or "") == "epp"
+                or _normalize_key(item.category or "") == "epp"
+                or "epp" in [_normalize_key(tag) for tag in (item.tags or [])]
+            )
+        ]
+        if existing:
+            existing.sort(key=lambda item: (item.id or 0))
+            return existing[0]
+
+        paragraphs = [
+            "REGISTRO DE ENTREGA Y REPOSICION DE EPP",
+            "Empresa: <<company_legal_name>>",
+            "Proyecto / Codigo: <<project_code>>",
+            "Cliente / Mandante: <<customer_name>>",
+            "Trabajador: <<employee_name>>",
+            "RUT / Identificador: <<employee_rut>>",
+            "Cargo: <<position_title>>",
+            "Fecha de entrega: <<delivery_date>>",
+            "Elementos entregados:",
+            "<<delivery_items_multiline>>",
+            "Observaciones:",
+            "<<notes>>",
+            "Declaro recibir los elementos de proteccion personal indicados, comprometiendome a usarlos, cuidarlos y reportar deterioros o perdidas.",
+            "Firma trabajador: ______________________________",
+            "Firma supervisor / prevencion: ______________________________",
+        ]
+        docx_bytes = _minimal_docx_from_paragraphs(paragraphs)
+        preview_text = "\n".join(paragraphs)
+        placeholder_keys = _extract_placeholders(preview_text)
+        pdf_bytes = _build_pdf(
+            "Registro de entrega de EPP",
+            docx_bytes,
+            preview_text,
+            extra_lines=["Plantilla base fija y adaptable para carpetas de prevencion."],
+        )
+        template = DocumentTemplate.create(
+            {
+                "name": "Registro entrega EPP - Prevencion",
+                "description": "Plantilla base adaptable para generar entrega o reposicion de EPP desde carpetas de prevencion.",
+                "category": "epp",
+                "document_type": "epp",
+                "target_module": "safety",
+                "scope_type": "general_empresa",
+                "subject_type": "trabajador",
+                "status": "active",
+                "company_id": company_id,
+                "requires_signature": False,
+                "auto_register_accreditation": False,
+                "accreditation_requirement_code": "EPP_ENTREGA",
+                "accreditation_category": "safety",
+                "filename_pattern": "EPP_<<employee_name>>_<<delivery_date>>",
+                "original_filename": "registro_entrega_epp.docx",
+                "template_mime": DOCX_MIME,
+                "source_format": "docx",
+                "original_template_data": _b64encode(docx_bytes),
+                "original_file_hash": _hash_bytes(docx_bytes),
+                "original_file_size": len(docx_bytes),
+                "conversion_status": "ready",
+                "conversion_error": "",
+                "available_formats": ["docx", "pdf", "source"],
+                "template_data": _b64encode(docx_bytes),
+                "template_pdf_data": _b64encode(pdf_bytes),
+                "template_pdf_layout": extract_pdf_layout(pdf_bytes),
+                "signature_layout": [],
+                "signature_roles": [],
+                "signature_layout_confirmed": True,
+                "placeholder_keys": placeholder_keys,
+                "placeholder_validation_status": "valid",
+                "invalid_placeholders": [],
+                "preview_text": preview_text,
+                "tags": ["epp", "safety", "prevencion"],
+            }
+        )
+        return template
+
     def _require_access(self) -> Optional[Response]:
         user = self.env.user
         if not user:
@@ -1154,31 +1548,65 @@ class DocumentCenterModule(BaseModule):
         placeholder_keys: Optional[List[str]] = None,
         preview_text: Optional[str] = None,
     ) -> None:
-        raw_template_bytes = template_bytes or _b64decode(template.template_data or "")
-        next_placeholder_keys = placeholder_keys
-        next_preview_text = preview_text
-        if next_placeholder_keys is None or next_preview_text is None:
-            next_placeholder_keys, next_preview_text = _extract_docx_preview_and_keys(raw_template_bytes)
-
-        template.placeholder_keys = next_placeholder_keys or []
-        template.preview_text = next_preview_text or ""
-        template.invalid_placeholders = _extract_invalid_placeholders(template.preview_text or "")
-        template.placeholder_validation_status = (
-            "invalid" if template.invalid_placeholders else "valid"
+        source_format = _normalize_template_format(
+            template.source_format or _format_from_upload(template.original_filename, template.template_mime)
         )
-
-        pdf_bytes = _build_pdf(
-            template.name or "Plantilla",
-            raw_template_bytes,
-            template.preview_text or "",
-            extra_lines=[
-                "Vista previa de plantilla",
-                f"Ambito: {template.scope_type or 'general_empresa'}",
-                f"Sujeto: {template.subject_type or 'trabajador'}",
-            ],
+        template.source_format = source_format
+        template.template_mime = template.template_mime or _mime_for_format(source_format)
+        original_bytes = (
+            template_bytes
+            or _b64decode(template.original_template_data or template.template_data or "")
         )
-        template.template_pdf_data = _b64encode(pdf_bytes)
-        template.template_pdf_layout = extract_pdf_layout(pdf_bytes)
+        if original_bytes:
+            template.original_template_data = template.original_template_data or _b64encode(original_bytes)
+            template.original_file_hash = _hash_bytes(original_bytes)
+            template.original_file_size = len(original_bytes)
+
+        available_formats = {"source"}
+        template.conversion_error = ""
+        if source_format == "pdf":
+            pdf_bytes = original_bytes
+            fields = _extract_pdf_fields(pdf_bytes)
+            template.template_data = _b64encode(pdf_bytes)
+            template.template_pdf_data = _b64encode(pdf_bytes)
+            template.template_pdf_layout = extract_pdf_layout(pdf_bytes)
+            template.placeholder_keys = fields
+            template.preview_text = "\n".join([f"Campo PDF: {field}" for field in fields]) or "PDF sin campos editables"
+            template.invalid_placeholders = []
+            template.placeholder_validation_status = "valid"
+            template.conversion_status = "not_required"
+            available_formats.add("pdf")
+        else:
+            docx_bytes = original_bytes
+            if source_format == "doc":
+                docx_bytes = _convert_with_soffice(original_bytes, "doc", "docx")
+                available_formats.add("doc")
+            next_placeholder_keys = placeholder_keys
+            next_preview_text = preview_text
+            if next_placeholder_keys is None or next_preview_text is None:
+                next_placeholder_keys, next_preview_text = _extract_docx_preview_and_keys(docx_bytes)
+            template.template_data = _b64encode(docx_bytes)
+            template.placeholder_keys = next_placeholder_keys or []
+            template.preview_text = next_preview_text or ""
+            template.invalid_placeholders = _extract_invalid_placeholders(template.preview_text or "")
+            template.placeholder_validation_status = (
+                "invalid" if template.invalid_placeholders else "valid"
+            )
+            pdf_bytes = _build_pdf(
+                template.name or "Plantilla",
+                docx_bytes,
+                template.preview_text or "",
+                extra_lines=[
+                    "Vista previa de plantilla",
+                    f"Ambito: {template.scope_type or 'general_empresa'}",
+                    f"Sujeto: {template.subject_type or 'trabajador'}",
+                ],
+            )
+            template.template_pdf_data = _b64encode(pdf_bytes)
+            template.template_pdf_layout = extract_pdf_layout(pdf_bytes)
+            template.conversion_status = "ready"
+            available_formats.update({"docx", "pdf"})
+        template.available_formats = sorted(available_formats)
         template.signature_roles = _normalize_signature_roles(template.signature_roles or [])
         if template.requires_signature:
             template.signature_layout = normalize_signature_positions(
@@ -1804,6 +2232,8 @@ class DocumentCenterModule(BaseModule):
         customer_id = _safe_int(request.get_param("customer_id"), None)
         service_order_id = _safe_int(request.get_param("service_order_id"), None)
         requirement_code = request.get_param("requirement_code")
+        if (target_module or "").strip().lower() == "safety":
+            self._ensure_safety_epp_template()
         templates = DocumentTemplate.search(self._tenant_filter())
         if status:
             templates = [item for item in templates if (item.status or "") == status]
@@ -1843,7 +2273,10 @@ class DocumentCenterModule(BaseModule):
         data = request.data or {}
         try:
             template_bytes = _b64decode(data.get("template_data") or "")
-            placeholder_keys, preview_text = _extract_docx_preview_and_keys(template_bytes)
+            source_format = _format_from_upload(
+                data.get("original_filename") or "template.docx",
+                data.get("template_mime") or "",
+            )
             template = DocumentTemplate.create(
                 {
                     "name": data.get("name"),
@@ -1866,33 +2299,54 @@ class DocumentCenterModule(BaseModule):
                     or "",
                     "accreditation_category": data.get("accreditation_category") or "other",
                     "filename_pattern": data.get("filename_pattern") or data.get("name"),
-                    "original_filename": data.get("original_filename") or "template.docx",
-                    "template_mime": data.get("template_mime") or DOCX_MIME,
+                    "original_filename": data.get("original_filename") or f"template.{source_format}",
+                    "template_mime": data.get("template_mime") or _mime_for_format(source_format),
+                    "source_format": source_format,
+                    "original_template_data": data.get("template_data"),
+                    "original_file_hash": _hash_bytes(template_bytes),
+                    "original_file_size": len(template_bytes),
+                    "conversion_status": "pending",
+                    "conversion_error": "",
+                    "available_formats": ["source"],
                     "template_data": data.get("template_data"),
                     "signature_layout": data.get("signature_layout") or [],
                     "signature_roles": _normalize_signature_roles(data.get("signature_roles") or []),
                     "signature_layout_confirmed": _normalize_bool(
                         data.get("signature_layout_confirmed"), False
                     ),
-                    "placeholder_keys": placeholder_keys,
-                    "placeholder_validation_status": "valid",
+                    "placeholder_keys": [],
+                    "placeholder_validation_status": "pending",
                     "invalid_placeholders": [],
-                    "preview_text": preview_text,
+                    "preview_text": "",
                     "tags": data.get("tags") or [],
                 }
             )
             self._refresh_template_preview_metadata(
                 template,
                 template_bytes=template_bytes,
-                placeholder_keys=placeholder_keys,
-                preview_text=preview_text,
             )
             template.save()
             return Response.created(template.to_dict())
         except ValidationError as exc:
             return Response.bad_request(str(exc))
         except Exception as exc:
-            return Response.bad_request(f"Could not read Word template: {exc}")
+            template = locals().get("template")
+            if template:
+                template.conversion_status = "failed"
+                template.conversion_error = str(exc)
+                template.status = "draft"
+                template.available_formats = ["source"]
+                template.save()
+                return Response.created(
+                    {
+                        **template.to_dict(),
+                        "warning": (
+                            "Template was preserved as draft, but conversion failed. "
+                            f"{exc}"
+                        ),
+                    }
+                )
+            return Response.bad_request(f"Could not read template file: {exc}")
 
     async def get_template(self, request: Request) -> Response:
         err = self._require_access()
@@ -1966,18 +2420,32 @@ class DocumentCenterModule(BaseModule):
         if data.get("template_data"):
             try:
                 template_bytes = _b64decode(data.get("template_data"))
-                placeholder_keys, preview_text = _extract_docx_preview_and_keys(template_bytes)
+                source_format = _format_from_upload(
+                    data.get("original_filename") or template.original_filename or "",
+                    data.get("template_mime") or template.template_mime or "",
+                )
+                template.source_format = source_format
+                template.original_template_data = data.get("template_data")
+                template.original_file_hash = _hash_bytes(template_bytes)
+                template.original_file_size = len(template_bytes)
+                template.available_formats = ["source"]
+                template.conversion_status = "pending"
+                template.conversion_error = ""
                 template.template_data = data.get("template_data")
-                template.placeholder_keys = placeholder_keys
-                template.preview_text = preview_text
                 self._refresh_template_preview_metadata(
                     template,
                     template_bytes=template_bytes,
-                    placeholder_keys=placeholder_keys,
-                    preview_text=preview_text,
                 )
             except Exception as exc:
-                return Response.bad_request(f"Could not read Word template: {exc}")
+                template.conversion_status = "failed"
+                template.conversion_error = str(exc)
+                template.status = "draft"
+                template.available_formats = ["source"]
+                template.save()
+                return Response.bad_request(
+                    "Template file was preserved as draft, but conversion failed: "
+                    f"{exc}"
+                )
         elif refresh_preview:
             try:
                 self._refresh_template_preview_metadata(template)
@@ -2086,6 +2554,8 @@ class DocumentCenterModule(BaseModule):
         target_module = (request.get_param("target_module") or "").strip().lower()
         customer_id = _safe_int(request.get_param("customer_id"), None)
 
+        if target_module == "safety":
+            self._ensure_safety_epp_template()
         templates = DocumentTemplate.search(self._tenant_filter())
         templates = [item for item in templates if (item.status or "") == "active"]
         if target_module:

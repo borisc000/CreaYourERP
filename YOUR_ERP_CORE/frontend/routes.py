@@ -222,6 +222,12 @@ async def report_verification(public_token: str):
     return report_verification_page(public_token)
 
 
+@router.get("/services/verify/{public_token}", response_class=HTMLResponse)
+async def service_verification(public_token: str):
+    from frontend.pages.service_verification import service_verification_page
+    return service_verification_page(public_token)
+
+
 @router.get("/reports/{report_id}", response_class=HTMLResponse)
 async def report_workspace(report_id: int):
     from frontend.pages.report_workspace import report_workspace_page

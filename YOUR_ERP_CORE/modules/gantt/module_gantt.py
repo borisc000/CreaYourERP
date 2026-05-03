@@ -909,7 +909,20 @@ class GanttModule(BaseModule):
                         "name": procedure.name or "",
                         "version": procedure.version or "",
                         "status": procedure.status or "draft",
+                        "status_label": (procedure.status or "draft").replace("_", " ").title(),
                         "step_count": step_count,
+                        "is_importable": step_count > 0 and (procedure.status or "") in ("active", "approved", "review"),
+                        "procedure_label": " | ".join(
+                            [
+                                bit
+                                for bit in [
+                                    procedure.procedure_code or "PTS",
+                                    procedure.name or "Procedimiento",
+                                    procedure.version or "",
+                                ]
+                                if bit
+                            ]
+                        ),
                     }
                 )
             return payloads
@@ -1148,6 +1161,8 @@ class GanttModule(BaseModule):
         steps = SafetyProcedureStep.search([("procedure_id", "=", procedure.id)])
         steps = [step for step in steps if step.active]
         steps.sort(key=lambda item: (_safe_int(item.display_order, 10) or 10, item.id or 0))
+        if not steps:
+            return Response.bad_request("El procedimiento seleccionado no tiene actividades BOT activas para importar")
 
         created_count = 0
         for index, step in enumerate(steps, start=1):

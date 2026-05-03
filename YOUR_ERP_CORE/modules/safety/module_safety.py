@@ -103,6 +103,123 @@ DEFAULT_PPE_CATALOG = [
     {"code": "ARNES", "name": "Arnes de seguridad", "category": "alturas"},
 ]
 
+CHECKLIST_LIBRARY = [
+    {
+        "code": "chk_andamios_armado",
+        "name": "Checklist armado, uso y desarme de andamios",
+        "type": "Andamios",
+        "tags": ["andamios", "altura", "critico"],
+        "items": [
+            "Personal competente y autorizado para armado/desarme",
+            "Componentes inspeccionados, compatibles y sin dano visible",
+            "Base nivelada, firme y con placas de apoyo cuando corresponda",
+            "Accesos, plataformas, barandas y rodapies completos",
+            "Area inferior segregada y senalizada",
+            "Tarjeta de andamio instalada y estado visible",
+            "Herramientas aseguradas contra caida de objetos",
+            "Checklist final firmado por supervisor o prevencion",
+        ],
+    },
+    {
+        "code": "chk_vehiculos_preuso",
+        "name": "Checklist verificacion de vehiculos",
+        "type": "Vehiculos",
+        "tags": ["vehiculos", "conduccion", "preuso"],
+        "items": [
+            "Licencia y autorizacion del conductor vigentes",
+            "Documentacion del vehiculo vigente y disponible",
+            "Luces, frenos, neumaticos y direccion sin observaciones",
+            "Extintor, botiquin, triangulos/conos y kit de emergencia disponibles",
+            "Parabrisas, espejos y cinturones en buen estado",
+            "Carga estibada y sin interferir visibilidad",
+            "Ruta y zonas de estacionamiento definidas",
+            "Novedades registradas antes de iniciar el traslado",
+        ],
+    },
+    {
+        "code": "chk_herramientas_control",
+        "name": "Checklist control de herramientas",
+        "type": "Herramientas",
+        "tags": ["herramientas", "preuso", "control"],
+        "items": [
+            "Herramienta adecuada para la tarea y sin modificaciones",
+            "Protecciones, mangos, carcasa y accesorios en buen estado",
+            "Cables, enchufes y extensiones sin cortes ni empalmes inseguros",
+            "Discos, brocas o consumibles compatibles y vigentes",
+            "EPP definido segun energia, proyeccion, corte o ruido",
+            "Herramientas en altura con sistema de amarre cuando aplique",
+            "Herramientas defectuosas retiradas, rotuladas y registradas",
+            "Area ordenada al cierre y herramientas devueltas",
+        ],
+    },
+]
+
+TALK_LIBRARY = [
+    {
+        "code": "talk_orden_aseo",
+        "topic": "Orden y limpieza del area",
+        "category": "general",
+        "tags": ["general", "housekeeping"],
+        "notes": "Revisar rutas despejadas, retiro de residuos, acopios seguros y responsabilidad diaria del equipo.",
+    },
+    {
+        "code": "talk_epp",
+        "topic": "Uso correcto de EPP",
+        "category": "general",
+        "tags": ["general", "epp"],
+        "notes": "Confirmar EPP obligatorio, estado, ajuste, recambio y reporte de elementos deteriorados.",
+    },
+    {
+        "code": "talk_linea_fuego",
+        "topic": "Linea de fuego y energia peligrosa",
+        "category": "general",
+        "tags": ["general", "energia", "linea_fuego"],
+        "notes": "Identificar trayectorias de energia, puntos de atrapamiento, cargas suspendidas y barreras.",
+    },
+    {
+        "code": "talk_reporte_incidentes",
+        "topic": "Reporte de incidentes y desviaciones",
+        "category": "general",
+        "tags": ["general", "reporte"],
+        "notes": "Reforzar aviso temprano, registro de casi accidentes y cierre de acciones correctivas.",
+    },
+    {
+        "code": "talk_fatiga",
+        "topic": "Fatiga, pausas y autocuidado",
+        "category": "general",
+        "tags": ["general", "fatiga"],
+        "notes": "Revisar hidratacion, pausas, alerta a somnolencia y comunicacion de condiciones personales.",
+    },
+    {
+        "code": "talk_altura",
+        "topic": "Trabajo en altura y control de caidas",
+        "category": "tematica",
+        "tags": ["altura", "spdc"],
+        "notes": "Verificar autorizacion, puntos de anclaje, rescate, control de bordes y herramientas aseguradas.",
+    },
+    {
+        "code": "talk_andamios",
+        "topic": "Uso seguro de andamios",
+        "category": "tematica",
+        "tags": ["andamios", "altura"],
+        "notes": "Revisar tarjeta, plataformas, barandas, acceso seguro, carga maxima y prohibicion de modificar.",
+    },
+    {
+        "code": "talk_vehiculos",
+        "topic": "Conduccion defensiva en faena",
+        "category": "tematica",
+        "tags": ["vehiculos", "conduccion"],
+        "notes": "Controlar velocidad, peatones, puntos ciegos, estacionamiento, checklist y uso de cinturon.",
+    },
+    {
+        "code": "talk_herramientas",
+        "topic": "Herramientas manuales y electricas",
+        "category": "tematica",
+        "tags": ["herramientas"],
+        "notes": "Inspeccionar protecciones, cables, discos/accesorios, postura de trabajo y retiro por falla.",
+    },
+]
+
 
 def _fmt_dt(value: Any) -> Optional[str]:
     if value is None:
@@ -7440,6 +7557,10 @@ class SafetyModule(BaseModule):
                 "talks": [talk.to_dict() for talk in self._talks_for_folder(folder.id)],
                 "checklists": [checklist.to_dict() for checklist in self._checklists_for_folder(folder.id)],
                 "lookups": self._lookups_payload(),
+                "libraries": {
+                    "checklists": CHECKLIST_LIBRARY,
+                    "talks": TALK_LIBRARY,
+                },
             }
         )
 

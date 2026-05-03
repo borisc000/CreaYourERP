@@ -23,6 +23,7 @@ import aiosmtplib
 from core.YOUR_ERP_core_framework import (
     BaseModule, Request, Response, ValidationError
 )
+from core.event_bus import EventBus
 from core.YOUR_ERP_orm import BaseModel, Column, ColumnType, AuditMixin
 from core.config import settings
 from core.time_utils import ensure_utc_datetime, utc_now
@@ -1544,6 +1545,16 @@ class SignatureModule(BaseModule):
                 request.user_agent,
                 notes=f"Backup email status: {backup_status.get('status')}",
             )
+            if sig_req.status == 'signed':
+                EventBus.emit('signature.completed', {
+                    'signature_request_id': sig_req.id,
+                    'source_module': getattr(sig_req, 'source_module', None),
+                    'source_model': getattr(sig_req, 'source_model', None),
+                    'source_record_id': getattr(sig_req, 'source_record_id', None),
+                    'signed_at': sig_req.signed_at.isoformat() if getattr(sig_req, 'signed_at', None) else None,
+                    'signed_document_hash': getattr(sig_req, 'signed_document_hash', None),
+                    'digital_key_fingerprint': getattr(sig_req, 'digital_key_fingerprint', None),
+                })
             
             return Response.ok({
                 "message": "Document signed successfully",

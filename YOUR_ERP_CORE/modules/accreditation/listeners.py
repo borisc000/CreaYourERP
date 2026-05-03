@@ -17,8 +17,47 @@ from modules.accreditation.models import (
 )
 from modules.accreditation.service import AccreditationService
 import logging
+import io
+import zipfile
 
 logger = logging.getLogger(__name__)
+
+
+def _build_fallback_docx(title, template, personalization):
+    """Build a minimal DOCX when a legacy/test template payload is not usable."""
+    from docx import Document
+
+    document = Document()
+    document.add_heading(str(title or "Acreditacion"), level=1)
+    preview_text = str(getattr(template, "preview_text", "") or "").strip()
+    if preview_text:
+        for line in preview_text.splitlines():
+            document.add_paragraph(line)
+    else:
+        document.add_paragraph(str(getattr(template, "name", "") or "Documento de acreditacion"))
+    for key, value in (personalization or {}).items():
+        if isinstance(value, (dict, list, tuple, set)):
+            continue
+        document.add_paragraph(f"{key}: {'' if value is None else value}")
+
+    buffer = io.BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
+
+
+def _resolve_template_docx(template, personalization, b64decode):
+    """Return a valid DOCX payload, tolerating legacy plain/demo template data."""
+    raw_template_data = getattr(template, "template_data", "") or ""
+    try:
+        template_bytes = b64decode(raw_template_data)
+    except Exception as exc:
+        logger.warning("Template payload is not valid base64; using fallback DOCX: %s", exc)
+        return _build_fallback_docx(getattr(template, "name", None), template, personalization)
+
+    if not zipfile.is_zipfile(io.BytesIO(template_bytes)):
+        logger.warning("Template payload is not a DOCX zip; using fallback DOCX")
+        return _build_fallback_docx(getattr(template, "name", None), template, personalization)
+    return template_bytes
 
 
 def setup_accreditation_listeners():
@@ -139,6 +178,7 @@ def setup_accreditation_listeners():
                 _b64decode,
                 _b64encode,
                 _build_pdf,
+                _render_pdf_from_text,
                 _merge_docx,
                 _slugify,
             )
@@ -153,18 +193,31 @@ def setup_accreditation_listeners():
                 logger.error(f"Template {template_id} not found")
                 return
 
-            template_bytes = _b64decode(getattr(template, "template_data", "") or "")
+            template_bytes = _resolve_template_docx(
+                template,
+                personalization or {},
+                _b64decode,
+            )
             merged_docx, preview_text = _merge_docx(template_bytes, personalization or {})
             output_name = f"{template.name or 'Acreditacion'} - trabajador {employee_id}"
-            pdf_bytes = _build_pdf(
-                output_name,
-                merged_docx,
-                preview_text,
-                extra_lines=[
-                    f"Solicitud acreditacion #{doc_gen_request_id}",
-                    f"Servicio/OC: {service_order_id or '-'}",
-                ],
-            )
+            pdf_extra_lines = [
+                f"Solicitud acreditacion #{doc_gen_request_id}",
+                f"Servicio/OC: {service_order_id or '-'}",
+            ]
+            try:
+                pdf_bytes = _build_pdf(
+                    output_name,
+                    merged_docx,
+                    preview_text,
+                    extra_lines=pdf_extra_lines,
+                )
+            except Exception as exc:
+                logger.warning("Could not convert accreditation DOCX to PDF; using preview PDF: %s", exc)
+                pdf_bytes = _render_pdf_from_text(
+                    output_name,
+                    preview_text,
+                    extra_lines=pdf_extra_lines,
+                )
 
             # Create GeneratedDocument in Document Center
             generated_doc = GeneratedDocument.create({
@@ -255,6 +308,19 @@ def setup_accreditation_listeners():
         gen_request = DocumentGenerationRequest.find_by_id(doc_gen_request_id)
         if not gen_request:
             return
+
+        if requires_signature:
+            EventBus.emit("correspondence.approved_for_signature", {
+                "source": "accreditation",
+                "correspondence_id": doc_gen_request_id,
+                "generated_document_id": data.get("generated_document_id"),
+                "contract_id": data.get("service_order_id"),
+                "template_id": data.get("template_id") or gen_request.template_id,
+                "company_id": data.get("company_id") or gen_request.company_id,
+                "employee_id": data.get("employee_id") or gen_request.employee_id,
+                "service_order_id": data.get("service_order_id") or gen_request.service_order_id,
+                "personalization_data": gen_request.personalization_data or {},
+            })
 
         _auto_register_accreditation(
             gen_request,

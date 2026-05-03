@@ -1097,6 +1097,8 @@ async function openQuotePanel(quoteId) {
 function renderQuotePanel(payload) {
     const quote = payload?.quote || {};
     const meta = payload?.control_meta || quote.control_meta || {};
+    const editable = payload?.control_editable !== false;
+    const redirectUrl = payload?.control_redirect_url || quote.control_redirect_url || '';
 
     setText('quote-control-title', valueOrFallback(quote.quote_number, 'Cotizacion'));
     setText('quote-control-subtitle', `${valueOrFallback(quote.description, 'Sin descripcion')} | ${valueOrFallback(quote.company_name, 'Sin empresa')}`);
@@ -1140,10 +1142,23 @@ function renderQuotePanel(payload) {
             const input = form.elements[fieldName];
             if (!input) return;
             input.value = meta[fieldName] ?? '';
+            input.disabled = !editable;
         });
     }
 
-    setText('quote-control-save-status', 'Los datos manuales solo rellenan huecos operativos y no pisan los modulos fuente.');
+    const saveButton = document.getElementById('quote-control-save');
+    if (saveButton) {
+        saveButton.disabled = !editable;
+        saveButton.title = editable ? '' : 'La edicion viva ya se administra desde el servicio';
+    }
+    setText(
+        'quote-control-save-status',
+        editable
+            ? 'Los datos manuales solo rellenan huecos operativos y no pisan los modulos fuente.'
+            : (redirectUrl
+                ? `La cotizacion ya fue adjudicada. El control vivo se administra desde Servicios: ${redirectUrl}`
+                : 'La cotizacion ya fue adjudicada. El control vivo se administra desde Servicios.')
+    );
 }
 
 function renderReadonlyCard(label, content) {
@@ -1174,6 +1189,11 @@ async function saveQuoteControlPanel() {
     if (!QS.panelQuoteId) return;
     const form = document.getElementById('quote-control-form');
     if (!form) return;
+    const saveButton = document.getElementById('quote-control-save');
+    if (saveButton && saveButton.disabled) {
+        showToast('Esta cotizacion ya administra su control operativo desde Servicios', 'warning');
+        return;
+    }
 
     const formData = new FormData(form);
     const controlMeta = {};

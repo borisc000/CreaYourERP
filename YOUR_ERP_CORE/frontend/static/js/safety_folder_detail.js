@@ -8,8 +8,22 @@ const SAFETY_DETAIL = {
 document.addEventListener('DOMContentLoaded', async () => {
     if (!API.requireAuth()) return;
     highlightNav('/app/safety');
+    switchSafetyTab(window.location.hash?.replace('#', '') || 'section-config', false);
     await loadSafetyDossier();
 });
+
+function switchSafetyTab(sectionId, updateHash = true) {
+    const target = sectionId || 'section-config';
+    document.querySelectorAll('.section-card').forEach((section) => {
+        section.classList.toggle('active-section', section.id === target);
+    });
+    document.querySelectorAll('.workspace-tab').forEach((tab) => {
+        tab.classList.toggle('active', tab.dataset.section === target);
+    });
+    if (updateHash) {
+        history.replaceState(null, '', '#' + target);
+    }
+}
 
 async function loadSafetyDossier() {
     const folderId = window._SAFETY_FOLDER_ID;
@@ -86,6 +100,8 @@ function renderSafetyDossier() {
     renderGeneratedSafetyDocuments();
     renderTalks();
     renderChecklists();
+    renderTalkLibrary();
+    renderChecklistLibrary();
     resetDocumentForm();
     resetIRLForm();
     resetPPEForm();
@@ -162,9 +178,13 @@ function renderConfigSection(folder, lookups) {
 
     const ppeTemplateSel = document.getElementById('ppe-document-template');
     if (ppeTemplateSel) {
-        ppeTemplateSel.innerHTML = '<option value="">No generar documento</option>' + (SAFETY_DETAIL.documentTemplates || [])
+        const ppeTemplates = getPPEDocumentTemplates();
+        ppeTemplateSel.innerHTML = '<option value="">No generar documento</option>' + ppeTemplates
             .map((template) => `<option value="${template.id}">${esc(template.name || 'Plantilla')} - ${esc(template.document_type || template.category || 'general')}</option>`)
             .join('');
+        if (ppeTemplates.length && !ppeTemplateSel.value) {
+            ppeTemplateSel.value = String(ppeTemplates[0].id);
+        }
     }
 
     const irlEmployeeSel = document.getElementById('irl-employee');
@@ -1050,6 +1070,22 @@ function openGeneratedSafetyDocument(documentId) {
     window.location.href = `/app/cross-correspondence?generated_document_id=${encodeURIComponent(documentId)}`;
 }
 
+function getPPEDocumentTemplates() {
+    return (SAFETY_DETAIL.documentTemplates || []).filter((template) => {
+        const haystack = [
+            template.category,
+            template.document_type,
+            template.name,
+            ...(template.tags || []),
+        ].join(' ').toLowerCase();
+        return haystack.includes('epp') || haystack.includes('proteccion personal');
+    });
+}
+
+function defaultPPETemplateId() {
+    return getPPEDocumentTemplates()[0]?.id || '';
+}
+
 function editPPEDelivery(id) {
     const delivery = (SAFETY_DETAIL.dossier.ppe_deliveries || []).find((item) => item.id === id);
     if (!delivery) return;
@@ -1068,7 +1104,7 @@ function resetPPEForm() {
     setValue('ppe-status', 'delivered');
     setValue('ppe-items', '');
     setValue('ppe-notes', '');
-    setValue('ppe-document-template', '');
+    setValue('ppe-document-template', defaultPPETemplateId());
 }
 
 async function savePPEDelivery() {
@@ -1080,7 +1116,7 @@ async function savePPEDelivery() {
         status: document.getElementById('ppe-status')?.value || 'delivered',
         items: parseLines(document.getElementById('ppe-items')?.value || ''),
         notes: document.getElementById('ppe-notes')?.value || '',
-        document_template_id: document.getElementById('ppe-document-template')?.value || '',
+        document_template_id: document.getElementById('ppe-document-template')?.value || defaultPPETemplateId() || '',
     };
     if (!payload.employee_id) {
         showToast('Selecciona un trabajador.', 'error');
@@ -1142,6 +1178,33 @@ function renderTalks() {
             </td>
         </tr>
     `).join('');
+}
+
+function renderTalkLibrary() {
+    const container = document.getElementById('talk-library');
+    if (!container) return;
+    const talks = SAFETY_DETAIL.dossier?.libraries?.talks || [];
+    if (!talks.length) {
+        container.innerHTML = '<div class="empty">Sin biblioteca de charlas cargada.</div>';
+        return;
+    }
+    container.innerHTML = talks.slice(0, 9).map((talk, index) => `
+        <article class="library-card">
+            <strong>${esc(talk.topic || 'Charla preventiva')}</strong>
+            <span>${esc(talk.category || 'general')} - ${esc((talk.tags || []).join(', '))}</span>
+            <span>${esc(talk.notes || '')}</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="applyTalkTemplate(${index})">Usar charla</button>
+        </article>
+    `).join('');
+}
+
+function applyTalkTemplate(index) {
+    const talk = (SAFETY_DETAIL.dossier?.libraries?.talks || [])[Number(index)];
+    if (!talk) return;
+    setValue('talk-topic', talk.topic || '');
+    setValue('talk-notes', talk.notes || '');
+    setValue('talk-date', todayIso());
+    switchSafetyTab('section-talks', false);
 }
 
 function editTalk(id) {
@@ -1233,6 +1296,38 @@ function renderChecklists() {
             </td>
         </tr>
     `).join('');
+}
+
+function renderChecklistLibrary() {
+    const container = document.getElementById('checklist-library');
+    if (!container) return;
+    const checklists = SAFETY_DETAIL.dossier?.libraries?.checklists || [];
+    if (!checklists.length) {
+        container.innerHTML = '<div class="empty">Sin biblioteca de checklists cargada.</div>';
+        return;
+    }
+    container.innerHTML = checklists.map((item, index) => `
+        <article class="library-card">
+            <strong>${esc(item.name || 'Checklist')}</strong>
+            <span>${esc(item.type || '')} - ${esc((item.tags || []).join(', '))}</span>
+            <span>${esc((item.items || []).slice(0, 3).join(' / '))}</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="applyChecklistTemplate(${index})">Usar checklist</button>
+        </article>
+    `).join('');
+}
+
+function applyChecklistTemplate(index) {
+    const item = (SAFETY_DETAIL.dossier?.libraries?.checklists || [])[Number(index)];
+    if (!item) return;
+    setValue('checklist-name', item.name || '');
+    setValue('checklist-type', item.type || '');
+    setValue('checklist-date', todayIso());
+    setValue('checklist-result', 'pending');
+    setValue('checklist-items', (item.items || []).join('\n'));
+    setValue('checklist-findings', '');
+    const action = document.getElementById('checklist-requires-action');
+    if (action) action.checked = false;
+    switchSafetyTab('section-checklists', false);
 }
 
 function editChecklist(id) {

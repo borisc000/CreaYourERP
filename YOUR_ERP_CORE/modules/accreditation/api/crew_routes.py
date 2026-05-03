@@ -18,20 +18,45 @@ router = APIRouter(
 
 ROLE_LABELS = {
     "supervisor": "Supervisor",
+    "prevencionista": "Prevencionista",
+    "administrator": "Administrador",
+    "crew_lead": "Jefe de cuadrilla",
     "operator": "Operador",
     "helper": "Ayudante",
+    "worker": "Trabajador",
 }
 STATUS_LABELS = {
     "assigned": "Asignado",
     "active": "Activo",
     "removed": "Removido",
 }
+AUTHORIZATION_STATUS_LABELS = {
+    "pending": "Pendiente",
+    "authorized": "Autorizado",
+    "requires_revalidation": "Revalidacion requerida",
+    "rejected": "Rechazado",
+}
+AUTHORIZATION_MODE_LABELS = {
+    "ready": "Autorizado",
+    "warning": "Autorizado con observaciones",
+}
 ROLE_ALIASES = {
     "supervisor": "supervisor",
+    "prevencion": "prevencionista",
+    "prevencionista": "prevencionista",
+    "apr": "prevencionista",
+    "administrador": "administrator",
+    "administrator": "administrator",
+    "adm": "administrator",
+    "jefe_cuadrilla": "crew_lead",
+    "jefe de cuadrilla": "crew_lead",
+    "cuadrilla": "crew_lead",
     "operator": "operator",
     "operador": "operator",
     "helper": "helper",
     "ayudante": "helper",
+    "trabajador": "worker",
+    "worker": "worker",
 }
 
 
@@ -76,6 +101,14 @@ def _serialize(assignment: CrewAssignment) -> dict:
     data.update(_employee_payload(assignment.employee_id))
     data["role_label"] = ROLE_LABELS.get(data.get("role") or "", data.get("role") or "Sin rol")
     data["status_label"] = STATUS_LABELS.get(data.get("status") or "", data.get("status") or "Sin estado")
+    data["authorization_status_label"] = AUTHORIZATION_STATUS_LABELS.get(
+        data.get("authorization_status") or "",
+        data.get("authorization_status") or "Pendiente",
+    )
+    data["authorization_mode_label"] = AUTHORIZATION_MODE_LABELS.get(
+        data.get("authorization_mode") or "",
+        data.get("authorization_mode") or "",
+    )
     return data
 
 
@@ -84,6 +117,27 @@ def _get_order_or_404(service_order_id: int) -> ServiceOrder:
     if not order:
         raise HTTPException(status_code=404, detail="Service order not found")
     return order
+
+
+def _active_assignments(service_order_id: int) -> List[CrewAssignment]:
+    return CrewAssignment.search([
+        ("service_order_id", "=", service_order_id),
+        ("status", "!=", "removed"),
+    ])
+
+
+def _has_authorized_assignments(assignments: List[CrewAssignment]) -> bool:
+    return any((item.authorization_status or "") == "authorized" for item in assignments)
+
+
+def _mark_requires_revalidation(assignments: List[CrewAssignment], reason: str) -> None:
+    for assignment in assignments:
+        assignment.authorization_status = "requires_revalidation"
+        assignment.authorization_mode = None
+        assignment.authorized_at = None
+        assignment.authorized_by = None
+        assignment.revalidation_reason = reason
+        assignment.save()
 
 
 # ============================================================================
@@ -121,6 +175,8 @@ async def add_crew_members(service_order_id: int, crew_data: dict):
     if not employee_ids:
         raise HTTPException(status_code=400, detail="employee_ids is required")
 
+    active_before = _active_assignments(service_order_id)
+    had_authorized = _has_authorized_assignments(active_before)
     created = []
     for emp_id in employee_ids:
         # Check for existing non-removed assignment
@@ -139,6 +195,7 @@ async def add_crew_members(service_order_id: int, crew_data: dict):
                 "company_id": order.company_id,
                 "role": role,
                 "status": "assigned",
+                "authorization_status": "pending",
                 "assigned_at": utc_now().isoformat(),
             })
             created.append(assignment)
@@ -150,6 +207,12 @@ async def add_crew_members(service_order_id: int, crew_data: dict):
             })
         except (ValueError, Exception) as exc:
             raise HTTPException(status_code=400, detail=str(exc))
+
+    if had_authorized and created:
+        _mark_requires_revalidation(
+            _active_assignments(service_order_id),
+            "La cuadrilla fue modificada y requiere reconfirmacion.",
+        )
 
     return [_serialize(a) for a in created]
 
@@ -172,6 +235,7 @@ async def remove_crew_member(service_order_id: int, employee_id: int):
     if not assignments:
         raise HTTPException(status_code=404, detail="Crew assignment not found")
 
+    had_authorized = _has_authorized_assignments(_active_assignments(service_order_id))
     for assignment in assignments:
         assignment.status = "removed"
         assignment.save()
@@ -180,6 +244,12 @@ async def remove_crew_member(service_order_id: int, employee_id: int):
         "service_order_id": service_order_id,
         "employee_id": employee_id,
     })
+
+    if had_authorized:
+        _mark_requires_revalidation(
+            _active_assignments(service_order_id),
+            "La cuadrilla fue modificada y requiere reconfirmacion.",
+        )
 
     return {"success": True}
 
@@ -201,6 +271,8 @@ async def bulk_assign_crew(service_order_id: int, bulk_data: dict):
     if not items:
         raise HTTPException(status_code=400, detail="assignments list is required")
 
+    active_before = _active_assignments(service_order_id)
+    had_authorized = _has_authorized_assignments(active_before)
     created = []
     for item in items:
         emp_id = item.get("employee_id")
@@ -224,6 +296,7 @@ async def bulk_assign_crew(service_order_id: int, bulk_data: dict):
                 "company_id": order.company_id,
                 "role": role,
                 "status": "assigned",
+                "authorization_status": "pending",
                 "assigned_at": utc_now().isoformat(),
             })
             created.append(assignment)
@@ -236,4 +309,52 @@ async def bulk_assign_crew(service_order_id: int, bulk_data: dict):
         except (ValueError, Exception) as exc:
             raise HTTPException(status_code=400, detail=str(exc))
 
+    if had_authorized and created:
+        _mark_requires_revalidation(
+            _active_assignments(service_order_id),
+            "La cuadrilla fue modificada y requiere reconfirmacion.",
+        )
+
     return [_serialize(a) for a in created]
+
+
+# ============================================================================
+# AUTHORIZE CREW
+# ============================================================================
+
+@router.post("/authorize")
+async def authorize_crew(service_order_id: int, payload: dict | None = None):
+    """Persist deployment authorization for the active crew."""
+    _get_order_or_404(service_order_id)
+    active_assignments = _active_assignments(service_order_id)
+    if not active_assignments:
+        raise HTTPException(status_code=400, detail="There is no active crew to authorize")
+
+    data = payload or {}
+    mode = str(data.get("mode") or "ready").strip().lower()
+    if mode not in ("ready", "warning"):
+        raise HTTPException(status_code=400, detail="Invalid authorization mode")
+    authorized_by = data.get("authorized_by")
+    timestamp = utc_now().isoformat()
+
+    for assignment in active_assignments:
+        assignment.status = "active"
+        assignment.authorization_status = "authorized"
+        assignment.authorization_mode = mode
+        assignment.authorized_at = timestamp
+        assignment.authorized_by = int(authorized_by) if str(authorized_by or "").strip().isdigit() else None
+        assignment.revalidation_reason = ""
+        assignment.save()
+
+    EventBus.emit("crew.authorization_confirmed", {
+        "service_order_id": service_order_id,
+        "authorized_count": len(active_assignments),
+        "mode": mode,
+    })
+
+    return {
+        "success": True,
+        "authorized_count": len(active_assignments),
+        "mode": mode,
+        "crew": [_serialize(item) for item in active_assignments],
+    }

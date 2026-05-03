@@ -355,6 +355,7 @@ function filteredTaskActivities() {
             task.assigned_employee_name,
             task.assigned_employee_code,
             task.created_by_user_name,
+            ...(task.attachments || []).map((attachment) => attachment.file_name),
         ].some((value) => String(value || '').toLowerCase().includes(search));
         return matchesStatus && matchesWorker && matchesSearch;
     });
@@ -512,9 +513,22 @@ function buildTaskCardHTML(task, variant = 'list') {
 
             <div class="tasks-deliverable">${taskEscape(task.deliverable || 'Sin entregable definido')}</div>
 
+            <div class="tasks-attachment-summary">
+                <span>${Number(task.evidence_count || 0)} evidencia(s)</span>
+                <span>${Number(task.support_count || 0)} apoyo(s)</span>
+            </div>
+
             <div class="tasks-card-actions">
                 <button class="btn btn-ghost btn-sm" type="button" onclick="event.stopPropagation(); openTaskModal(${task.id})">Editar</button>
                 <button class="btn btn-ghost btn-sm" type="button" onclick="event.stopPropagation(); moveTaskToStatus(${task.id}, '${taskEscape(nextStatus)}')">${taskEscape(quickActionLabel)}</button>
+                <label class="btn btn-ghost btn-sm tasks-upload-btn" onclick="event.stopPropagation()">
+                    Evidencia
+                    <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onchange="uploadTaskAttachment(event, ${task.id}, 'evidence')">
+                </label>
+                <label class="btn btn-ghost btn-sm tasks-upload-btn" onclick="event.stopPropagation()">
+                    Apoyo
+                    <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onchange="uploadTaskAttachment(event, ${task.id}, 'support')">
+                </label>
             </div>
         </article>
     `;
@@ -587,6 +601,29 @@ function renderTaskDetail() {
 
             <div class="tasks-detail-rich"><strong>Entregable</strong>${taskEscape(task.deliverable || '-')}</div>
             <div class="tasks-detail-rich"><strong>Descripcion</strong>${taskEscape(task.description || 'Sin descripcion adicional')}</div>
+            <div class="tasks-documents-panel">
+                <div class="tasks-documents-head">
+                    <div>
+                        <strong>Documentos cargados</strong>
+                        <span>${Number(task.attachments_count || 0)} archivo(s) asociados a esta tarea</span>
+                    </div>
+                    <div class="tasks-documents-actions">
+                        <label class="btn btn-ghost btn-sm tasks-upload-btn">
+                            + Evidencia
+                            <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onchange="uploadTaskAttachment(event, ${task.id}, 'evidence')">
+                        </label>
+                        <label class="btn btn-ghost btn-sm tasks-upload-btn">
+                            + Apoyo
+                            <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onchange="uploadTaskAttachment(event, ${task.id}, 'support')">
+                        </label>
+                    </div>
+                </div>
+                <div class="tasks-attachment-summary">
+                    <span>${Number(task.evidence_count || 0)} evidencia(s)</span>
+                    <span>${Number(task.support_count || 0)} apoyo(s)</span>
+                </div>
+                ${renderTaskAttachmentsList(task)}
+            </div>
         `;
     }
 
@@ -605,6 +642,281 @@ function renderTaskDetail() {
     if (editBtn) editBtn.disabled = false;
     if (deleteBtn) deleteBtn.disabled = false;
     if (duplicateBtn) duplicateBtn.disabled = false;
+}
+
+function renderTaskAttachmentsListLegacy(task) {
+    const attachments = task?.attachments || [];
+    if (!attachments.length) {
+        return `
+            <div class="tasks-attachments-empty">
+                <div class="tasks-attachments-empty-icon">DOC</div>
+                <div>
+                    <strong>Sin documentos todavia</strong>
+                    <span>Sube una o varias evidencias, PDFs, Word, Excel u otros respaldos desde los botones superiores.</span>
+                </div>
+            </div>
+        `;
+    }
+
+    const typeOrder = { evidence: 0, support: 1 };
+    const sorted = [...attachments].sort((left, right) => {
+        const typeDelta = (typeOrder[left.attachment_type] ?? 9) - (typeOrder[right.attachment_type] ?? 9);
+        if (typeDelta !== 0) return typeDelta;
+        return String(right.created_at || '').localeCompare(String(left.created_at || ''));
+    });
+
+    return `
+        <div class="tasks-attachments-list">
+            ${sorted.map((attachment) => `
+                <div class="tasks-attachment-row">
+                    <div>
+                        <span class="tasks-attachment-type ${taskEscape(attachment.attachment_type || 'support')}">
+                            ${taskEscape(attachment.attachment_type_label || 'Adjunto')}
+                        </span>
+                        <button
+                            type="button"
+                            class="tasks-attachment-name"
+                            onclick="openTaskAttachment(${attachment.id})"
+                        >
+                            ${taskEscape(attachment.file_name || 'Archivo')}
+                        </button>
+                        <small>
+                            ${taskEscape(attachment.uploaded_by_user_name || 'Usuario')}
+                            · ${taskFormatDate(attachment.created_at, true)}
+                        </small>
+                    </div>
+                    <button
+                        type="button"
+                        class="tasks-attachment-delete"
+                        title="Eliminar adjunto"
+                        onclick="deleteTaskAttachment(${attachment.id})"
+                    >
+                        Eliminar
+                    </button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function readTaskFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('No se pudo leer el archivo'));
+        reader.readAsDataURL(file);
+    });
+}
+
+function taskAttachmentExtension(attachment) {
+    const fileName = String(attachment?.file_name || '');
+    const extension = fileName.includes('.') ? fileName.split('.').pop() : '';
+    return extension ? extension.toUpperCase() : 'ARCHIVO';
+}
+
+function taskAttachmentIcon(attachment) {
+    const mime = String(attachment?.mime_type || '').toLowerCase();
+    const extension = taskAttachmentExtension(attachment).toLowerCase();
+    if (mime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extension)) return 'IMG';
+    if (extension === 'pdf') return 'PDF';
+    if (['doc', 'docx'].includes(extension)) return 'DOC';
+    if (['xls', 'xlsx'].includes(extension)) return 'XLS';
+    if (['ppt', 'pptx'].includes(extension)) return 'PPT';
+    if (extension === 'txt') return 'TXT';
+    return 'FILE';
+}
+
+function taskAttachmentTone(attachment) {
+    const icon = taskAttachmentIcon(attachment).toLowerCase();
+    if (['img', 'pdf', 'doc', 'xls', 'ppt', 'txt'].includes(icon)) return icon;
+    return 'file';
+}
+
+function renderTaskAttachmentsList(task) {
+    const attachments = task?.attachments || [];
+    if (!attachments.length) {
+        return `
+            <div class="tasks-attachments-empty">
+                <div class="tasks-attachments-empty-icon">DOC</div>
+                <div>
+                    <strong>Sin documentos todavia</strong>
+                    <span>Sube una o varias evidencias, PDFs, Word, Excel u otros respaldos desde los botones superiores.</span>
+                </div>
+            </div>
+        `;
+    }
+
+    const typeOrder = { evidence: 0, support: 1 };
+    const sorted = [...attachments].sort((left, right) => {
+        const typeDelta = (typeOrder[left.attachment_type] ?? 9) - (typeOrder[right.attachment_type] ?? 9);
+        if (typeDelta !== 0) return typeDelta;
+        return String(right.created_at || '').localeCompare(String(left.created_at || ''));
+    });
+
+    return `
+        <div class="tasks-attachments-list">
+            ${sorted.map((attachment) => `
+                <div class="tasks-attachment-row">
+                    <div class="tasks-attachment-icon ${taskEscape(taskAttachmentTone(attachment))}">
+                        ${taskEscape(taskAttachmentIcon(attachment))}
+                    </div>
+                    <div class="tasks-attachment-main">
+                        <div class="tasks-attachment-meta">
+                            <span class="tasks-attachment-type ${taskEscape(attachment.attachment_type || 'support')}">
+                                ${taskEscape(attachment.attachment_type_label || 'Adjunto')}
+                            </span>
+                            <span>${taskEscape(taskAttachmentExtension(attachment))}</span>
+                        </div>
+                        <button type="button" class="tasks-attachment-name" onclick="openTaskAttachment(${attachment.id})">
+                            ${taskEscape(attachment.file_name || 'Archivo')}
+                        </button>
+                        <small>${taskEscape(attachment.uploaded_by_user_name || 'Usuario')} - ${taskFormatDate(attachment.created_at, true)}</small>
+                    </div>
+                    <div class="tasks-attachment-actions">
+                        <button type="button" class="tasks-attachment-open" onclick="openTaskAttachment(${attachment.id})">
+                            ${attachment.is_image ? 'Ver' : 'Descargar'}
+                        </button>
+                        <button type="button" class="tasks-attachment-delete" title="Eliminar adjunto" onclick="deleteTaskAttachment(${attachment.id})">
+                            Eliminar
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+async function uploadTaskAttachment(event, taskId, attachmentType) {
+    event.stopPropagation();
+    const input = event.target;
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!files.length) return;
+
+    const maxSize = 5 * 1024 * 1024;
+    const validFiles = files.filter((file) => file.size <= maxSize);
+    const rejectedFiles = files.length - validFiles.length;
+
+    if (!validFiles.length) {
+        showToast('Ningun archivo puede superar 5MB', 'error');
+        return;
+    }
+
+    let uploaded = 0;
+    let failed = 0;
+
+    try {
+        for (const file of validFiles) {
+            const fileData = await readTaskFileAsDataUrl(file);
+            const response = await API.post(`/tasks/activities/${taskId}/attachments`, {
+                attachment_type: attachmentType,
+                file_name: file.name,
+                mime_type: file.type || 'application/octet-stream',
+                file_data: fileData,
+            });
+
+            if (response?.success) {
+                uploaded += 1;
+            } else {
+                failed += 1;
+            }
+        }
+
+        tasksState.selectedId = taskId;
+        const label = attachmentType === 'evidence' ? 'evidencia' : 'documento de apoyo';
+        const details = [
+            uploaded ? `${uploaded} ${label}${uploaded === 1 ? '' : 's'} subido${uploaded === 1 ? '' : 's'}` : '',
+            rejectedFiles ? `${rejectedFiles} rechazado${rejectedFiles === 1 ? '' : 's'} por superar 5MB` : '',
+            failed ? `${failed} con error` : '',
+        ].filter(Boolean).join(', ');
+        showToast(details || 'No se subieron archivos', uploaded ? 'success' : 'error');
+        await loadTasksWorkspace();
+    } catch (error) {
+        showToast(error?.message || 'No se pudo leer uno de los archivos', 'error');
+        if (uploaded) await loadTasksWorkspace();
+    }
+}
+
+async function openTaskAttachment(attachmentId) {
+    const response = await API.get(`/tasks/attachments/${attachmentId}`);
+    if (!response?.success) {
+        showToast(response?.errors?.[0] || 'No se pudo abrir el archivo', 'error');
+        return;
+    }
+
+    const attachment = response.data || {};
+    const dataUrl = attachment.file_data || '';
+    if (!dataUrl) {
+        showToast('El archivo no tiene datos disponibles', 'error');
+        return;
+    }
+
+    if (attachment.is_image) {
+        showTaskAttachmentPreview(attachment);
+        return;
+    }
+
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = attachment.file_name || 'adjunto-tarea';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+
+function showTaskAttachmentPreview(attachment) {
+    let modal = document.getElementById('tasks-attachment-preview-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'tasks-attachment-preview-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal tasks-attachment-preview-modal" onclick="event.stopPropagation()">
+                <div class="tasks-modal-head">
+                    <div>
+                        <p class="tasks-section-label">Vista de evidencia</p>
+                        <h2 id="tasks-attachment-preview-title">Archivo</h2>
+                    </div>
+                    <button type="button" class="tasks-modal-close" onclick="closeTaskAttachmentPreview()">&#10005;</button>
+                </div>
+                <div id="tasks-attachment-preview-body"></div>
+                <div class="modal-actions">
+                    <a id="tasks-attachment-preview-download" class="btn btn-primary" download>Descargar</a>
+                    <button type="button" class="btn btn-ghost" onclick="closeTaskAttachmentPreview()">Cerrar</button>
+                </div>
+            </div>
+        `;
+        modal.addEventListener('click', closeTaskAttachmentPreview);
+        document.body.appendChild(modal);
+    }
+
+    document.getElementById('tasks-attachment-preview-title').textContent = attachment.file_name || 'Archivo';
+    document.getElementById('tasks-attachment-preview-body').innerHTML = `
+        <img class="tasks-attachment-preview-image" src="${attachment.file_data}" alt="${taskEscape(attachment.file_name || 'Evidencia')}">
+    `;
+    const download = document.getElementById('tasks-attachment-preview-download');
+    download.href = attachment.file_data;
+    download.download = attachment.file_name || 'adjunto-tarea';
+    modal.classList.add('open');
+}
+
+function closeTaskAttachmentPreview() {
+    document.getElementById('tasks-attachment-preview-modal')?.classList.remove('open');
+}
+
+async function deleteTaskAttachment(attachmentId) {
+    const task = currentTaskActivity();
+    if (!confirm('Eliminar este archivo adjunto?')) return;
+
+    const response = await API.del(`/tasks/attachments/${attachmentId}`);
+    if (!response?.success) {
+        showToast(response?.errors?.[0] || 'No se pudo eliminar el archivo', 'error');
+        return;
+    }
+
+    showToast('Archivo eliminado');
+    if (task) tasksState.selectedId = task.id;
+    await loadTasksWorkspace();
 }
 
 function setTasksView(viewMode) {

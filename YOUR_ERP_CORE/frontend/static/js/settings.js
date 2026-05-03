@@ -62,6 +62,7 @@ async function loadSettings() {
     document.getElementById('s-account-type').value   = c.account_type   || '';
     document.getElementById('s-account-number').value = c.account_number || '';
     document.getElementById('s-default-terms').value  = c.default_terms  || '';
+    document.getElementById('s-default-tax-rate').value = c.default_tax_rate ?? 19;
     updateTermsPreview();
 
     if (c.logo_url) {
@@ -102,6 +103,7 @@ async function saveSettings(e) {
         account_type:  document.getElementById('s-account-type').value,
         account_number: document.getElementById('s-account-number').value,
         default_terms: document.getElementById('s-default-terms').value,
+        default_tax_rate: document.getElementById('s-default-tax-rate').value,
     };
 
     const res = await API.put('/company/settings', payload);

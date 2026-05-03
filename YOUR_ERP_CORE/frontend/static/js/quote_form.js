@@ -54,10 +54,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Pre-llenar notas con términos por defecto de la empresa
         const compRes = await API.get('/company/settings');
-        if (compRes?.success && compRes.data?.default_terms) {
+        if (compRes?.success) {
             const notesEl = document.getElementById('quote-notes');
-            if (notesEl && !notesEl.value) {
+            if (notesEl && !notesEl.value && compRes.data?.default_terms) {
                 notesEl.value = compRes.data.default_terms;
+            }
+            const taxEl = document.getElementById('pct-tax');
+            if (taxEl && (taxEl.value === '' || Number(taxEl.value) === 19)) {
+                taxEl.value = Number(compRes.data?.default_tax_rate ?? 19);
             }
         }
 
@@ -139,6 +143,7 @@ async function loadExistingQuote(quoteId) {
     console.log('[QF] loadExistingQuote() STARTED → quoteId:', quoteId);
 
     const res = await API.get('/quotes/' + quoteId);
+    const companySettings = await API.get('/company/settings');
     console.log('[QF] API response received → success:', res?.success, 'data keys:', Object.keys(res?.data || res || {}));
 
     if (!res || res.success === false) {
@@ -199,7 +204,7 @@ async function loadExistingQuote(quoteId) {
     }
 
     if (taxEl) {
-        taxEl.value = q.tax_pct ?? 19;
+        taxEl.value = q.tax_pct ?? Number(companySettings?.data?.default_tax_rate ?? 19);
         console.log('[QF] pct-tax set to:', taxEl.value);
     } else {
         console.warn('[QF] WARNING: pct-tax element NOT found');
@@ -308,7 +313,7 @@ function syncAcceptButtonState() {
     if (status === 'sent') {
         btnAccept.style.display = '';
         btnAccept.disabled = false;
-        btnAccept.textContent = 'Aceptar y crear arriendo';
+        btnAccept.textContent = 'Aceptar cotizacion';
         return;
     }
     if (status === 'accepted') {
@@ -595,7 +600,7 @@ async function acceptQuote() {
         showToast('Guarda la cotizacion antes de aceptarla.', 'error');
         return;
     }
-    if (!window.confirm('Aceptar esta cotizacion y crear el expediente en Arriendos?')) {
+    if (!window.confirm('Aceptar esta cotizacion y adjudicar el servicio?')) {
         return;
     }
     const btnAccept = document.getElementById('btn-accept-quote');
@@ -607,13 +612,23 @@ async function acceptQuote() {
     if (res && res.success !== false) {
         QF.quote = res.data || res;
         syncAcceptButtonState();
-        showToast('Cotizacion aceptada. Expediente de arriendo creado.', 'success');
-        setTimeout(() => { window.location.href = '/app/rentals'; }, 700);
+        const accepted = res.data || res;
+        if (accepted.rental_contract) {
+            showToast('Cotizacion aceptada. Se creo el expediente de arriendo asociado.', 'success');
+            setTimeout(() => {
+                window.location.href = '/app/rentals?lead_id=' + encodeURIComponent(QF.quote.lead_id || '');
+            }, 700);
+            return;
+        }
+        showToast('Cotizacion aceptada. El servicio quedo listo para continuar en Servicios.', 'success');
+        setTimeout(() => {
+            window.location.href = '/app/crm/leads/' + encodeURIComponent(QF.quote.lead_id || '');
+        }, 700);
         return;
     }
     if (btnAccept) {
         btnAccept.disabled = false;
-        btnAccept.textContent = 'Aceptar y crear arriendo';
+        btnAccept.textContent = 'Aceptar cotizacion';
     }
     showToast((res?.errors || ['No se pudo aceptar la cotizacion']).join(', '), 'error');
 }

@@ -13,6 +13,8 @@ def crm_lead_detail_page(lead_id: str):
         <span id="breadcrumb-title" style="color:#94a3b8;">Cargando&hellip;</span>
     </div>
     <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="openLeadPreventionFolder()">&#128737; Prevenci&oacute;n</button>
+        <button class="btn btn-ghost btn-sm" onclick="openServiceMirror()">Vista espejo</button>
         <button class="btn btn-ghost btn-sm" onclick="openEditLeadModal()">&#9998; Editar</button>
         <button class="btn btn-danger btn-sm" onclick="deleteThisLead()">&#128465; Eliminar</button>
     </div>
@@ -30,6 +32,8 @@ def crm_lead_detail_page(lead_id: str):
     </div>
     <h1 id="detail-title" style="margin:0 0 0.25rem;font-size:1.4rem;color:#f1f5f9;line-height:1.3;">—</h1>
     <div id="detail-service-type" style="font-size:0.82rem;color:#64748b;"></div>
+    <div id="detail-service-id" style="margin-top:0.35rem;font-size:0.78rem;color:#94a3b8;"></div>
+    <div id="detail-service-status-strip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.65rem;margin-top:0.95rem;"></div>
 </div>
 
 <!-- ═══ STAGE PIPELINE BAR ════════════════════════════════════ -->
@@ -365,6 +369,40 @@ def crm_lead_detail_page(lead_id: str):
 
                         <div class="step-content" id="step-1-content">
 
+                            <div class="section-block mb-4">
+                                <div class="section-label">
+                                    <i class="fas fa-shield-alt"></i> PREVENCI&Oacute;N DEL SERVICIO
+                                    <span id="prevention-summary-badge" class="ms-2"></span>
+                                </div>
+                                <div style="margin-top:0.85rem;display:grid;gap:0.85rem;">
+                                    <div id="prevention-summary-copy" class="text-sm text-muted">
+                                        Revisando carpeta preventiva de la oportunidad...
+                                    </div>
+                                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;">
+                                        <div class="ld360-info-box">
+                                            <span class="ld360-info-label">Readiness preventiva</span>
+                                            <span id="prevention-readiness" class="ld360-info-value mono">0%</span>
+                                        </div>
+                                        <div class="ld360-info-box">
+                                            <span class="ld360-info-label">Sem&aacute;foro</span>
+                                            <span id="prevention-traffic" class="ld360-info-value">Sin carpeta</span>
+                                        </div>
+                                        <div class="ld360-info-box">
+                                            <span class="ld360-info-label">Base operativa</span>
+                                            <span id="prevention-profile" class="ld360-info-value">Sin perfil asignado</span>
+                                        </div>
+                                    </div>
+                                    <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+                                        <button type="button" class="btn btn-secondary btn-sm" id="btn-open-prevention-folder" onclick="openLeadPreventionFolder()">
+                                            Abrir carpeta preventiva
+                                        </button>
+                                        <a class="btn btn-ghost btn-sm" href="/app/safety">
+                                            Abrir m&oacute;dulo Prevenci&oacute;n
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- SECCIÓN 1: ASIGNACIÓN DE TRABAJADORES -->
                             <div class="section-block mb-4">
                                 <div class="section-label">
@@ -459,11 +497,14 @@ def crm_lead_detail_page(lead_id: str):
                                     <div id="worker-selector-list" class="worker-selector-grid" style="max-height:420px;overflow-y:auto;">
                                         <div class="empty">Cargando trabajadores activos...</div>
                                     </div>
+                                    <div id="worker-selected-preview" class="worker-selected-preview" style="margin-top:0.85rem;">
+                                        <span class="worker-selected-empty">Selecciona trabajadores para verlos aqu&iacute;.</span>
+                                    </div>
                                     <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;margin-top:1rem;padding-top:1rem;border-top:1px solid #334155;">
                                         <span id="selected-count-badge" class="text-muted text-sm">0 seleccionados</span>
                                         <div style="display:flex;gap:.7rem;flex-wrap:wrap;">
                                             <button type="button" class="btn btn-ghost" onclick="closeWorkerSelectorModal()">Cancelar</button>
-                                            <button type="button" class="btn btn-primary" onclick="addSelectedWorkers(window._LEAD_ID)">
+                                            <button type="button" class="btn btn-primary" id="worker-add-btn" onclick="addSelectedWorkers(window._LEAD_ID)" disabled>
                                                 Agregar a cuadrilla
                                             </button>
                                         </div>
@@ -1702,7 +1743,7 @@ def crm_lead_detail_page(lead_id: str):
 .preop-day-axis,
 .preop-gantt-row {{
     display: grid;
-    grid-template-columns: minmax(190px, 0.95fr) minmax(0, 2fr);
+    grid-template-columns: minmax(320px, 1.15fr) minmax(0, 2fr);
 }}
 .preop-axis-left,
 .preop-row-label {{
@@ -1740,20 +1781,41 @@ def crm_lead_detail_page(lead_id: str):
     color: #f8fafc;
     font-size: 0.82rem;
     margin-bottom: 0.22rem;
+    white-space: normal;
+    line-height: 1.35;
 }}
 .preop-row-label small {{
     display: block;
     color: #64748b;
     font-size: 0.7rem;
+    line-height: 1.45;
+}}
+.preop-row-dates {{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+    margin-top: 0.55rem;
+}}
+.preop-row-dates span {{
+    display: block;
+    padding: 0.32rem 0.45rem;
+    border-radius: 8px;
+    border: 1px solid rgba(37,99,235,0.22);
+    background: rgba(37,99,235,0.08);
+    color: #c7d2fe;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.15;
+    white-space: nowrap;
 }}
 .preop-row-bars {{
     position: relative;
-    min-height: 58px;
+    min-height: 76px;
     background-image: linear-gradient(to right, rgba(148,163,184,0.08) 1px, transparent 1px);
 }}
 .preop-bar {{
     position: absolute;
-    top: 12px;
+    top: 21px;
     height: 34px;
     min-width: 18px;
     display: flex;
@@ -1914,7 +1976,10 @@ def crm_lead_detail_page(lead_id: str):
     }}
     .preop-day-axis,
     .preop-gantt-row {{
-        grid-template-columns: minmax(160px, 0.9fr) minmax(0, 1.6fr);
+        grid-template-columns: minmax(280px, 1fr) minmax(0, 1.45fr);
+    }}
+    .preop-row-dates {{
+        grid-template-columns: 1fr;
     }}
 }}
 

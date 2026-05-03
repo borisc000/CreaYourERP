@@ -110,6 +110,18 @@ def settings_page():
                     </div>
                 </div>
 
+                <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #334155;">
+                    <h4 style="margin-bottom: 0.25rem; font-size: 1rem; font-weight: 600;">&#128178; ConfiguraciÃ³n Tributaria Base</h4>
+                    <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;">
+                        Este IVA por defecto se usarÃ¡ como base en nuevas cotizaciones y en el registro de gastos del servicio.
+                    </p>
+                    <div class="form-group">
+                        <label>IVA por defecto (%)</label>
+                        <input type="number" id="s-default-tax-rate" min="0" max="100" step="0.01" placeholder="19">
+                        <small class="field-hint">AdminÃ­stralo desde aquÃ­ para evitar diferencias entre cotizaciones, gastos y control financiero.</small>
+                    </div>
+                </div>
+
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" id="save-btn">Guardar Cambios</button>
                     <span id="save-status" style="font-size:0.8rem;color:#22c55e;display:none">&#10003; Guardado</span>

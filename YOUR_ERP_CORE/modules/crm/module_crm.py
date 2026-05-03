@@ -15,6 +15,7 @@ Depende de:
 """
 
 from datetime import datetime
+import secrets
 from typing import Dict, Any, List, Optional
 
 from core.YOUR_ERP_core_framework import BaseModule, Request, Response, ValidationError
@@ -42,6 +43,31 @@ DEFAULT_STAGES = [
 
 LEAD_PRIORITIES  = ('low', 'medium', 'high')
 LEAD_STATUSES    = ('open', 'won', 'lost')
+SERVICE_COMMERCIAL_STATUSES = ('intake', 'estimating', 'quoted', 'won')
+SERVICE_OPERATIONAL_STATUSES = ('not_started', 'pending_preop', 'preparing', 'ready', 'in_execution', 'reported')
+SERVICE_FINANCIAL_STATUSES = ('pre_sale', 'pending_billing', 'hes_requested', 'invoiced', 'paid')
+SERVICE_PUBLIC_DOCUMENT_TYPES = (
+    'po_oc',
+    'contrato',
+    'factura',
+    'respaldo',
+    'operativo',
+    'preventivo',
+    'reporte_firmado',
+)
+SERVICE_ACTIONS = (
+    'service.view_internal',
+    'service.edit_context',
+    'service.edit_operational_control',
+    'service.close_operational_step',
+    'service.manage_documents',
+    'service.version_documents',
+    'service.request_report_signature',
+    'service.view_mirror_internal',
+    'service.publish_mirror',
+    'service.view_financial',
+    'service.edit_financial',
+)
 
 
 def _crm_safe_int(value: Any) -> Optional[int]:
@@ -66,6 +92,110 @@ def _crm_safe_bool(value: Any) -> bool:
     if value in (None, '', 0, '0'):
         return False
     return str(value).strip().lower() in ('1', 'true', 'yes', 'si', 'sí', 'on')
+
+
+# ============================================================================
+# HELPERS DE SERVICIO CANONICO
+# ============================================================================
+
+def _default_service_operational_control() -> Dict[str, Any]:
+    return {
+        'fecha_envio_manual': '',
+        'fecha_orden': '',
+        'fecha_inicio': '',
+        'fecha_termino': '',
+        'fecha_operativa': '',
+        'lugar_trabajo': '',
+        'procedimiento': '',
+        'pop': '',
+        'estado_report': '',
+        'rep_online_url': '',
+        'enlace_doc_manual': '',
+        'respaldos_manual': '',
+        'fecha_hes': '',
+        'fecha_envio_factura': '',
+        'fecha_pago': '',
+        'monto_pagado_manual': 0.0,
+    }
+
+
+def _normalize_service_operational_control(payload: Any) -> Dict[str, Any]:
+    base = _default_service_operational_control()
+    if not isinstance(payload, dict):
+        return base
+
+    for key in (
+        'fecha_envio_manual',
+        'fecha_orden',
+        'fecha_inicio',
+        'fecha_termino',
+        'fecha_operativa',
+        'fecha_hes',
+        'fecha_envio_factura',
+        'fecha_pago',
+    ):
+        base[key] = _crm_safe_str(payload.get(key)) or ''
+    for key in (
+        'lugar_trabajo',
+        'procedimiento',
+        'pop',
+        'estado_report',
+        'rep_online_url',
+        'enlace_doc_manual',
+        'respaldos_manual',
+    ):
+        base[key] = _crm_safe_str(payload.get(key)) or ''
+    try:
+        base['monto_pagado_manual'] = max(float(payload.get('monto_pagado_manual') or 0.0), 0.0)
+    except (TypeError, ValueError):
+        base['monto_pagado_manual'] = 0.0
+    return base
+
+
+def _user_allowed_modules(user: Any) -> set:
+    raw = getattr(user, 'allowed_modules', None)
+    if not raw:
+        raw = getattr(user, 'modules', None)
+    return {str(item).strip() for item in (raw or []) if str(item).strip()}
+
+
+def service_action_allowed(user: Any, action: str) -> bool:
+    if action not in SERVICE_ACTIONS:
+        return False
+    if not user:
+        return False
+    if getattr(user, 'role', None) in ('superadmin', 'company_admin'):
+        return True
+    if getattr(user, 'role', None) != 'employee':
+        return False
+
+    allowed_modules = _user_allowed_modules(user)
+    module_map = {
+        'service.view_internal': {'crm', 'reports', 'finance', 'expenses', 'safety', 'accreditation', 'document_center'},
+        'service.edit_context': {'crm'},
+        'service.edit_operational_control': {'crm', 'reports', 'safety'},
+        'service.close_operational_step': {'reports', 'safety'},
+        'service.manage_documents': {'crm', 'document_center'},
+        'service.version_documents': {'crm', 'document_center'},
+        'service.request_report_signature': {'reports', 'signature'},
+        'service.view_mirror_internal': {'crm', 'reports'},
+        'service.publish_mirror': {'crm'},
+        'service.view_financial': {'finance', 'expenses'},
+        'service.edit_financial': {'finance', 'expenses'},
+    }
+    return bool(allowed_modules.intersection(module_map.get(action, set())))
+
+
+def _document_is_publicly_visible(document: Any) -> bool:
+    metadata = getattr(document, 'metadata_json', None) or {}
+    if not bool(getattr(document, 'is_current', True)):
+        return False
+    if metadata.get('publish_to_mirror') is False:
+        return False
+    if metadata.get('publish_to_mirror') is True:
+        return True
+    document_type = _crm_safe_str(getattr(document, 'document_type', None) or getattr(document, 'category', None) or 'general') or 'general'
+    return document_type in SERVICE_PUBLIC_DOCUMENT_TYPES
 
 
 # ============================================================================
@@ -146,6 +276,14 @@ class Document(BaseModel, AuditMixin):
     company_id  = Column(ColumnType.INTEGER, required=True, label="Company ID")
     uploaded_by = Column(ColumnType.INTEGER, required=True, label="User ID")
     category    = Column(ColumnType.STRING,  label="Upload Category Stage")
+    service_id  = Column(ColumnType.INTEGER, label="Canonical Service")
+    document_type = Column(ColumnType.STRING, label="Document Type")
+    version = Column(ColumnType.INTEGER, default=1, label="Version")
+    is_current = Column(ColumnType.BOOLEAN, default=True, label="Current Version")
+    parent_document_id = Column(ColumnType.INTEGER, label="Previous Version")
+    metadata_json = Column(ColumnType.JSON, default={}, label="Document Metadata")
+    signature_request_id = Column(ColumnType.INTEGER, label="Signature Request")
+    signed_at = Column(ColumnType.DATETIME, label="Signed At")
 
     def validate(self):
         super().validate()
@@ -314,6 +452,206 @@ class Lead(BaseModel, AuditMixin):
         return data
 
 
+class Service(BaseModel, AuditMixin):
+    """Servicio canónico post-adjudicación, con compatibilidad hacia Lead."""
+
+    __tablename__ = 'crm_services'
+    __displayname__ = 'service_code'
+
+    lead_id = Column(ColumnType.INTEGER, required=True, label="Lead")
+    company_id = Column(ColumnType.INTEGER, required=True, label="Company")
+    customer_id = Column(ColumnType.INTEGER, label="Customer")
+    mandante_id = Column(ColumnType.INTEGER, label="Mandante")
+    service_type_id = Column(ColumnType.INTEGER, label="Service Type")
+    accepted_quote_id = Column(ColumnType.INTEGER, label="Accepted Quote")
+    service_code = Column(ColumnType.STRING, required=True, label="Service Code")
+    title = Column(ColumnType.STRING, required=True, label="Title")
+    description = Column(ColumnType.TEXT, label="Description")
+    service_name = Column(ColumnType.STRING, label="Operational Service Name")
+    empresa_faena = Column(ColumnType.STRING, label="Empresa / Faena")
+    apr_name = Column(ColumnType.STRING, label="APR")
+    supervisor_name = Column(ColumnType.STRING, label="Supervisor")
+    contract_admin_name = Column(ColumnType.STRING, label="Contract Admin")
+    commercial_status = Column(ColumnType.STRING, default='intake', label="Commercial Status")
+    operational_status = Column(ColumnType.STRING, default='not_started', label="Operational Status")
+    financial_status = Column(ColumnType.STRING, default='pre_sale', label="Financial Status")
+    status_snapshot = Column(ColumnType.JSON, default={}, label="Status Snapshot")
+    context_snapshot = Column(ColumnType.JSON, default={}, label="Context Snapshot")
+    operational_control = Column(ColumnType.JSON, default={}, label="Operational Control")
+    mirror_token = Column(ColumnType.STRING, label="Mirror Token")
+    mirror_enabled = Column(ColumnType.BOOLEAN, default=True, label="Mirror Enabled")
+    active = Column(ColumnType.BOOLEAN, default=True, label="Active")
+
+    def validate(self):
+        super().validate()
+        if not self.service_code or not str(self.service_code).strip():
+            raise ValidationError("Service code is required")
+        if not self.title or not str(self.title).strip():
+            raise ValidationError("Service title is required")
+        if self.commercial_status and self.commercial_status not in SERVICE_COMMERCIAL_STATUSES:
+            raise ValidationError(f"Invalid commercial_status: {self.commercial_status}")
+        if self.operational_status and self.operational_status not in SERVICE_OPERATIONAL_STATUSES:
+            raise ValidationError(f"Invalid operational_status: {self.operational_status}")
+        if self.financial_status and self.financial_status not in SERVICE_FINANCIAL_STATUSES:
+            raise ValidationError(f"Invalid financial_status: {self.financial_status}")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'lead_id': self.lead_id,
+            'company_id': self.company_id,
+            'customer_id': self.customer_id,
+            'mandante_id': self.mandante_id,
+            'service_type_id': self.service_type_id,
+            'accepted_quote_id': self.accepted_quote_id,
+            'service_code': self.service_code or '',
+            'title': self.title or '',
+            'description': self.description or '',
+            'service_name': self.service_name or '',
+            'empresa_faena': self.empresa_faena or '',
+            'apr_name': self.apr_name or '',
+            'supervisor_name': self.supervisor_name or '',
+            'contract_admin_name': self.contract_admin_name or '',
+            'commercial_status': self.commercial_status or 'intake',
+            'operational_status': self.operational_status or 'not_started',
+            'financial_status': self.financial_status or 'pre_sale',
+            'status_snapshot': self.status_snapshot or {},
+            'context_snapshot': self.context_snapshot or {},
+            'operational_control': _normalize_service_operational_control(self._data.get('operational_control') or self.operational_control or {}),
+            'mirror_token': self.mirror_token or '',
+            'mirror_url': f"/app/services/verify/{self.mirror_token}" if self.mirror_token else '',
+            'public_api_url': f"/crm/services/public/{self.mirror_token}" if self.mirror_token else '',
+            'active': bool(self.active),
+            'created_at': Lead._fmt_dt(self._data.get('created_at')),
+            'updated_at': Lead._fmt_dt(self._data.get('updated_at')),
+        }
+
+
+def _generate_service_token() -> str:
+    return secrets.token_urlsafe(18).replace('-', '').replace('_', '')
+
+
+def _service_code_from_lead(lead: Lead) -> str:
+    existing = _crm_safe_str(getattr(lead, 'project_code', None))
+    if existing:
+        return existing
+    try:
+        return f"SRV-{int(lead.id or 0):05d}"
+    except Exception:
+        return f"SRV-{lead.id}"
+
+
+def find_service_for_lead(lead_id: Optional[int], company_id: Optional[int] = None) -> Optional[Service]:
+    if not lead_id:
+        return None
+    domain = [('lead_id', '=', int(lead_id))]
+    if company_id is not None:
+        domain.append(('company_id', '=', int(company_id)))
+    services = Service.search(domain)
+    services.sort(key=lambda item: item.id or 0, reverse=True)
+    return services[0] if services else None
+
+
+def ensure_service_for_lead(
+    lead: Optional[Lead],
+    accepted_quote: Any = None,
+    service_statuses: Optional[Dict[str, Any]] = None,
+    create_projection: bool = True,
+) -> Optional[Service]:
+    """Crear o sincronizar el servicio canónico a partir del Lead."""
+    if not lead or not getattr(lead, 'id', None):
+        return None
+
+    service = find_service_for_lead(lead.id, getattr(lead, 'company_id', None))
+    commercial_code = _crm_safe_str((service_statuses or {}).get('commercial', {}).get('code')) or (
+        'won' if getattr(lead, 'status', '') == 'won' or accepted_quote else 'intake'
+    )
+    operational_code = _crm_safe_str((service_statuses or {}).get('operational', {}).get('code')) or 'not_started'
+    financial_code = _crm_safe_str((service_statuses or {}).get('financial', {}).get('code')) or 'pre_sale'
+
+    payload = {
+        'lead_id': lead.id,
+        'company_id': lead.company_id,
+        'customer_id': getattr(lead, 'customer_id', None),
+        'mandante_id': getattr(lead, 'mandante_id', None),
+        'service_type_id': getattr(lead, 'service_type_id', None),
+        'accepted_quote_id': getattr(accepted_quote, 'id', None) or (getattr(service, 'accepted_quote_id', None) if service else None),
+        'service_code': getattr(service, 'service_code', None) or _service_code_from_lead(lead),
+        'title': _crm_safe_str(getattr(lead, 'title', None)) or _crm_safe_str(getattr(lead, 'service_name', None)) or f"Servicio {lead.id}",
+        'description': getattr(lead, 'description', None),
+        'service_name': getattr(lead, 'service_name', None) or getattr(lead, 'title', None),
+        'empresa_faena': getattr(lead, 'empresa_faena', None),
+        'apr_name': getattr(lead, 'apr_name', None),
+        'supervisor_name': getattr(lead, 'supervisor_name', None),
+        'contract_admin_name': getattr(lead, 'contract_admin_name', None),
+        'commercial_status': commercial_code if commercial_code in SERVICE_COMMERCIAL_STATUSES else 'intake',
+        'operational_status': operational_code if operational_code in SERVICE_OPERATIONAL_STATUSES else 'not_started',
+        'financial_status': financial_code if financial_code in SERVICE_FINANCIAL_STATUSES else 'pre_sale',
+        'status_snapshot': service_statuses or (getattr(service, 'status_snapshot', None) or {}),
+        'context_snapshot': {
+            'project_code': getattr(lead, 'project_code', None) or '',
+            'service_name': getattr(lead, 'service_name', None) or '',
+            'empresa_faena': getattr(lead, 'empresa_faena', None) or '',
+            'apr_name': getattr(lead, 'apr_name', None) or '',
+            'supervisor_name': getattr(lead, 'supervisor_name', None) or '',
+            'contract_admin_name': getattr(lead, 'contract_admin_name', None) or '',
+            'expected_revenue': float(getattr(lead, 'expected_revenue', 0) or 0),
+        },
+        'operational_control': _normalize_service_operational_control(getattr(service, 'operational_control', None) or {}),
+        'mirror_enabled': True,
+        'active': True,
+    }
+
+    if not service:
+        payload['mirror_token'] = _generate_service_token()
+        service = Service.create(payload)
+    else:
+        for key, value in payload.items():
+            setattr(service, key, value)
+        if not getattr(service, 'mirror_token', None):
+            service.mirror_token = _generate_service_token()
+        service.save()
+
+    if not getattr(lead, 'project_code', None):
+        try:
+            lead.project_code = service.service_code
+            lead.save()
+        except Exception:
+            pass
+
+    if create_projection:
+        try:
+            from modules.accreditation.models import ServiceOrder
+
+            orders = ServiceOrder.search([
+                ('lead_id', '=', lead.id),
+                ('company_id', '=', lead.company_id),
+            ])
+            orders.sort(key=lambda item: item.id or 0, reverse=True)
+            order = orders[0] if orders else None
+            order_payload = {
+                'service_id': service.id,
+                'lead_id': lead.id,
+                'customer_id': getattr(lead, 'customer_id', None),
+                'company_id': lead.company_id,
+                'title': getattr(lead, 'service_name', None) or getattr(lead, 'title', None) or f"Orden {service.service_code}",
+                'description': getattr(lead, 'description', None),
+                'status': 'active' if getattr(lead, 'status', 'open') != 'lost' else 'cancelled',
+                'start_date': getattr(accepted_quote, 'quote_date', None) if accepted_quote else getattr(order, 'start_date', None) if order else None,
+                'location': getattr(lead, 'empresa_faena', None),
+            }
+            if order:
+                for key, value in order_payload.items():
+                    setattr(order, key, value)
+                order.save()
+            else:
+                ServiceOrder.create(order_payload)
+        except Exception:
+            pass
+
+    return service
+
+
 class LeadNote(BaseModel, AuditMixin):
     """Nota o actividad registrada manualmente sobre un Lead."""
 
@@ -428,6 +766,7 @@ class CRMModule(BaseModule):
         self.register_model('crm.lead_note',    LeadNote)
         self.register_model('crm.activity_log', ActivityLog)
         self.register_model('crm.document',     Document)
+        self.register_model('crm.service',      Service)
         self.register_model('crm.service_type', ServiceType)
 
         # ── Catalogos ───────────────────────────────────────
@@ -471,6 +810,10 @@ class CRMModule(BaseModule):
         # ── Dossier (Expediente Completo) ─────────────────────
         # IMPORTANTE: registrar ANTES de /crm/leads/{id} para evitar conflicto de rutas
         self.register_route('/crm/leads/{id}/dossier', self.lead_dossier, methods=['GET'], auth_required=True)
+        self.register_route('/crm/services/{id}', self.get_service, methods=['GET'], auth_required=True)
+        self.register_route('/crm/services/by-lead/{lead_id}', self.get_service_by_lead, methods=['GET'], auth_required=True)
+        self.register_route('/crm/services/{id}/mirror', self.get_service_mirror_link, methods=['GET'], auth_required=True)
+        self.register_route('/crm/services/public/{token}', self.get_public_service_mirror, methods=['GET'], auth_required=False)
 
         # ── Stats ─────────────────────────────────────────────
         self.register_route('/crm/stats', self.get_stats, methods=['GET'], auth_required=True)
@@ -504,6 +847,18 @@ class CRMModule(BaseModule):
         if user and user.role == 'superadmin':
             return []
         return [('company_id', '=', self._company_id())]
+
+    def _require_service_action(self, action: str, *, service: Optional[Service] = None, lead: Optional[Lead] = None) -> Optional[Response]:
+        user = self.env.user
+        if not user:
+            return Response.unauthorized("Authentication required")
+        if service and service.company_id != self._company_id() and user.role != 'superadmin':
+            return Response.forbidden("No tienes acceso a este servicio")
+        if lead and lead.company_id != self._company_id() and user.role != 'superadmin':
+            return Response.forbidden("No tienes acceso a esta oportunidad")
+        if not service_action_allowed(user, action):
+            return Response.forbidden(f"No tienes permiso para {action}")
+        return None
 
     # ========================================================================
     # STAGES
@@ -1461,12 +1816,71 @@ class CRMModule(BaseModule):
         except ImportError:
             pass
 
+        prevention_folder = None
+        prevention_summary = {
+            'exists': False,
+            'status': 'missing',
+            'status_label': 'Sin carpeta preventiva',
+            'readiness_pct': 0.0,
+            'traffic_light': 'red',
+            'procedure_count': 0,
+            'job_profile_count': 0,
+            'assigned_employee_count': 0,
+        }
+        try:
+            from modules.safety.module_safety import SafetyFolder
+
+            _folders = SafetyFolder.search([
+                ('lead_id', '=', lead_id),
+                ('company_id', '=', lead.company_id),
+            ])
+            _folders.sort(key=lambda item: item.id or 0, reverse=True)
+            if _folders:
+                prevention_folder = _folders[0].to_dict()
+                prevention_summary = {
+                    'exists': True,
+                    'status': prevention_folder.get('status') or 'draft',
+                    'status_label': (prevention_folder.get('status') or 'draft').replace('_', ' ').title(),
+                    'readiness_pct': round(float(prevention_folder.get('readiness_pct') or 0.0), 1),
+                    'traffic_light': prevention_folder.get('traffic_light') or 'red',
+                    'procedure_count': len(prevention_folder.get('procedure_ids') or []),
+                    'job_profile_count': len(prevention_folder.get('job_profile_ids') or []),
+                    'assigned_employee_count': len(prevention_folder.get('assigned_employee_ids') or []),
+                }
+        except Exception as exc:
+            self.logger.warning("Lead dossier prevention loading failed for %s: %s", lead_id, exc)
+
+        service_record = None
+        try:
+            accepted_quote_record = None
+            try:
+                from modules.quotes.module_quotes import Quote
+                accepted_quotes = Quote.search([
+                    ('lead_id', '=', lead_id),
+                    ('company_id', '=', lead.company_id),
+                    ('status', '=', 'accepted'),
+                ])
+                accepted_quotes.sort(key=lambda item: item.id or 0, reverse=True)
+                accepted_quote_record = accepted_quotes[0] if accepted_quotes else None
+            except Exception:
+                accepted_quote_record = None
+
+            if lead.status == 'won' or accepted_quote_record or reports_data or prevention_summary.get('exists'):
+                service_record = ensure_service_for_lead(
+                    lead,
+                    accepted_quote=accepted_quote_record,
+                    create_projection=True,
+                )
+        except Exception as exc:
+            self.logger.warning("Lead dossier service sync failed for %s: %s", lead_id, exc)
+
         # ── Documents ────────────────────────────────────────────
         _docs_A = Document.search([('model_name', '=', 'Lead'), ('record_id', '=', lead_id)])
         _docs_B = Document.search([('model_name', '=', 'lead'), ('record_id', '=', lead_id)])
+        _docs_service = Document.search([('service_id', '=', service_record.id), ('company_id', '=', lead.company_id)]) if service_record else []
         _seen   = set()
         docs_data = []
-        for d in _docs_A + _docs_B:
+        for d in _docs_A + _docs_B + _docs_service:
             if d.id in _seen: continue
             _seen.add(d.id)
             docs_data.append({
@@ -1474,9 +1888,20 @@ class CRMModule(BaseModule):
                 'filename':   d.filename   or '',
                 'mime_type':  d.mime_type  or '',
                 'category':   d.category  or '',
+                'document_type': getattr(d, 'document_type', None) or d.category or 'general',
+                'version':    int(getattr(d, 'version', 1) or 1),
+                'is_current': bool(getattr(d, 'is_current', True)),
+                'service_id': getattr(d, 'service_id', None),
+                'download_url': f"/crm/documents/download/{d.id}",
                 'created_at': _fmt(d._data.get('created_at')),
             })
-        docs_data.sort(key=lambda x: x['created_at'] or '', reverse=True)
+        docs_data.sort(
+            key=lambda x: (
+                x.get('document_type') or '',
+                -(x.get('version') or 1),
+                x['created_at'] or '',
+            )
+        )
 
         # ── Expenses folder for this opportunity ─────────────────
         expenses_data = []
@@ -1644,6 +2069,83 @@ class CRMModule(BaseModule):
         summary['expense_margin_vs_expected'] = expenses_summary['margin_vs_expected']
         summary['expense_margin_vs_accepted_quote'] = expenses_summary['margin_vs_accepted_quote']
 
+        def _commercial_status_payload() -> Dict[str, Any]:
+            if lead.status == 'won' or accepted_q:
+                return {'code': 'won', 'label': 'Adjudicado', 'tone': 'success'}
+            if sent_q:
+                return {'code': 'quoted', 'label': 'Cotizacion enviada', 'tone': 'info'}
+            if quotes_data:
+                return {'code': 'estimating', 'label': 'En costeo / cotizacion', 'tone': 'warning'}
+            if stage_data and (stage_data.get('order') or 0) <= 2:
+                return {'code': 'intake', 'label': 'Prospeccion / antecedentes', 'tone': 'secondary'}
+            return {
+                'code': stage_data.get('name', 'open').lower().replace(' ', '_') if stage_data else 'open',
+                'label': stage_data.get('name') if stage_data else 'Abierto',
+                'tone': 'secondary',
+            }
+
+        def _operational_status_payload() -> Dict[str, Any]:
+            if reports_data and any((item.get('estado') or '').upper() == 'ABIERTO' for item in reports_data):
+                return {'code': 'in_execution', 'label': 'En ejecucion', 'tone': 'info'}
+            if reports_data:
+                return {'code': 'reported', 'label': 'Con reportes emitidos', 'tone': 'success'}
+            if prevention_summary['exists'] and prevention_summary['readiness_pct'] >= 85:
+                tone = 'success' if prevention_summary['traffic_light'] == 'green' else 'warning'
+                return {'code': 'ready', 'label': 'Listo para despliegue', 'tone': tone}
+            if prevention_summary['exists']:
+                tone = 'warning' if prevention_summary['readiness_pct'] > 0 else 'danger'
+                return {'code': 'preparing', 'label': 'Preparacion operativa', 'tone': tone}
+            if accepted_q:
+                return {'code': 'pending_preop', 'label': 'Pendiente de habilitacion', 'tone': 'warning'}
+            return {'code': 'not_started', 'label': 'Sin operacion activa', 'tone': 'secondary'}
+
+        def _financial_status_payload() -> Dict[str, Any]:
+            if bool(lead.is_paid):
+                return {'code': 'paid', 'label': 'Pagado', 'tone': 'success'}
+            if getattr(lead, 'invoice_number', None):
+                return {'code': 'invoiced', 'label': 'Facturado', 'tone': 'info'}
+            if getattr(lead, 'hes_number', None):
+                return {'code': 'hes_requested', 'label': 'HES solicitada', 'tone': 'warning'}
+            if accepted_q:
+                return {'code': 'pending_billing', 'label': 'Pendiente de cobro', 'tone': 'secondary'}
+            return {'code': 'pre_sale', 'label': 'Sin control financiero', 'tone': 'secondary'}
+
+        service_statuses = {
+            'commercial': _commercial_status_payload(),
+            'operational': _operational_status_payload(),
+            'financial': _financial_status_payload(),
+        }
+        try:
+            if service_record:
+                service_record = ensure_service_for_lead(
+                    lead,
+                    accepted_quote=accepted_quote_record if 'accepted_quote_record' in locals() else None,
+                    service_statuses=service_statuses,
+                    create_projection=True,
+                )
+        except Exception as exc:
+            self.logger.warning("Lead dossier service status sync failed for %s: %s", lead_id, exc)
+        service_context = {
+            'service_db_id': service_record.id if service_record else None,
+            'service_id': service_record.service_code if service_record else lead.project_code or f"SRV-{lead.id}",
+            'lead_id': lead.id,
+            'opportunity_id': lead.id,
+            'company_id': lead.company_id,
+            'title': lead.title or '',
+            'project_code': lead.project_code or '',
+            'service_type_id': stype_data['id'] if stype_data else None,
+            'service_type_name': stype_data['name'] if stype_data else '',
+            'customer_id': customer_data['id'] if customer_data else None,
+            'customer_name': customer_data['name'] if customer_data else '',
+            'mandante_id': mandante_data['id'] if mandante_data else None,
+            'mandante_name': mandante_data['name'] if mandante_data else '',
+            'commercial_status': service_statuses['commercial'],
+            'operational_status': service_statuses['operational'],
+            'financial_status': service_statuses['financial'],
+            'mirror_url': f"/app/services/verify/{service_record.mirror_token}" if service_record and service_record.mirror_token else '',
+            'public_api_url': f"/crm/services/public/{service_record.mirror_token}" if service_record and service_record.mirror_token else '',
+        }
+
         return Response.ok({
             'lead':         lead_data,
             'customer':     customer_data,
@@ -1656,9 +2158,198 @@ class CRMModule(BaseModule):
             'expenses_summary': expenses_summary,
             'rentals':      rentals_data,
             'rentals_summary': rentals_summary,
+            'prevention_folder': prevention_folder,
+            'prevention_summary': prevention_summary,
             'documents':    docs_data,
             'activity':     activity_data,
             'summary':      summary,
+            'service_statuses': service_statuses,
+            'service_context': service_context,
+            'service':      service_record.to_dict() if service_record else None,
+        })
+
+    async def get_service(self, request: Request) -> Response:
+        """GET /crm/services/{id}"""
+        if not self.env.user:
+            return Response.unauthorized("Authentication required")
+
+        service_id = _crm_safe_int(request.params.get('id'))
+        if not service_id:
+            return Response.bad_request("Invalid service id")
+
+        service = Service.find_by_id(service_id)
+        if not service:
+            return Response.not_found("Service not found")
+        err = self._require_service_action('service.view_internal', service=service)
+        if err:
+            return err
+
+        return Response.ok(service.to_dict())
+
+    async def get_service_by_lead(self, request: Request) -> Response:
+        """GET /crm/services/by-lead/{lead_id}"""
+        if not self.env.user:
+            return Response.unauthorized("Authentication required")
+
+        lead_id = _crm_safe_int(request.params.get('lead_id'))
+        if not lead_id:
+            return Response.bad_request("Invalid lead id")
+
+        lead = Lead.find_by_id(lead_id)
+        if not lead:
+            return Response.not_found("Lead not found")
+        err = self._require_service_action('service.view_internal', lead=lead)
+        if err:
+            return err
+
+        service = ensure_service_for_lead(lead, create_projection=True)
+        if not service:
+            return Response.not_found("Service not available")
+        return Response.ok(service.to_dict())
+
+    async def get_service_mirror_link(self, request: Request) -> Response:
+        """GET /crm/services/{id}/mirror"""
+        if not self.env.user:
+            return Response.unauthorized("Authentication required")
+
+        service_id = _crm_safe_int(request.params.get('id'))
+        if not service_id:
+            return Response.bad_request("Invalid service id")
+
+        service = Service.find_by_id(service_id)
+        if not service:
+            return Response.not_found("Service not found")
+        err = self._require_service_action('service.publish_mirror', service=service)
+        if err:
+            return err
+
+        if not getattr(service, 'mirror_token', None):
+            service.mirror_token = _generate_service_token()
+            service.save()
+
+        return Response.ok({
+            'service_id': service.id,
+            'service_code': service.service_code or '',
+            'mirror_url': f"/app/services/verify/{service.mirror_token}",
+            'public_api_url': f"/crm/services/public/{service.mirror_token}",
+            'mirror_enabled': bool(service.mirror_enabled),
+        })
+
+    async def get_public_service_mirror(self, request: Request) -> Response:
+        """GET /crm/services/public/{token}"""
+        token = str(request.params.get('token') or '').strip()
+        if not token:
+            return Response.bad_request("Token de servicio inválido")
+
+        matches = Service.search([('mirror_token', '=', token)])
+        service = matches[0] if matches else None
+        if not service or not bool(getattr(service, 'mirror_enabled', True)):
+            return Response.not_found("Servicio no encontrado")
+
+        lead = Lead.find_by_id(service.lead_id) if service.lead_id else None
+        if not lead:
+            return Response.not_found("Oportunidad asociada no encontrada")
+
+        from modules.base.module_base import Company, User
+        from modules.reports.module_reports import Report, ReportCheckpoint
+
+        company = Company.find_by_id(service.company_id) if service.company_id else None
+        customer = Customer.find_by_id(service.customer_id) if service.customer_id else None
+        mandante = Mandante.find_by_id(service.mandante_id) if service.mandante_id else None
+        service_type = ServiceType.find_by_id(service.service_type_id) if service.service_type_id else None
+
+        def _user_name(user_id: Optional[int]) -> str:
+            if not user_id:
+                return 'Sistema'
+            user = User.find_by_id(user_id)
+            return user.name if user and getattr(user, 'name', None) else f"Usuario #{user_id}"
+
+        documents = []
+        seen_docs = set()
+        legacy_docs = Document.search([('record_id', '=', lead.id), ('company_id', '=', service.company_id)])
+        service_docs = Document.search([('service_id', '=', service.id), ('company_id', '=', service.company_id)])
+        for doc in legacy_docs + service_docs:
+            if doc.id in seen_docs:
+                continue
+            if str(getattr(doc, 'model_name', '') or '').lower() not in ('lead', 'service'):
+                continue
+            if not _document_is_publicly_visible(doc):
+                continue
+            seen_docs.add(doc.id)
+            documents.append({
+                'id': doc.id,
+                'filename': doc.filename or '',
+                'mime_type': doc.mime_type or '',
+                'category': doc.category or '',
+                'document_type': getattr(doc, 'document_type', None) or doc.category or 'general',
+                'version': int(getattr(doc, 'version', 1) or 1),
+                'is_current': bool(getattr(doc, 'is_current', True)),
+                'created_at': Lead._fmt_dt(doc._data.get('created_at')),
+                'download_url': f"/crm/documents/download/{doc.id}",
+            })
+        documents.sort(key=lambda item: (item.get('document_type') or '', -(item.get('version') or 1)))
+
+        activity_logs = ActivityLog.search([('lead_id', '=', lead.id)])
+        activity_logs.sort(key=lambda item: item.id or 0, reverse=True)
+        activity = [{
+            'id': item.id,
+            'action': item.action or '',
+            'details': item.details or '',
+            'user_name': _user_name(item.user_id),
+            'created_at': Lead._fmt_dt(item._data.get('created_at')),
+        } for item in activity_logs[:100]]
+
+        reports = Report.search([('lead_id', '=', lead.id)])
+        reports.sort(key=lambda item: item.id or 0, reverse=True)
+        reports_data = []
+        for report in reports:
+            payload = report.to_dict()
+            if getattr(report, 'signature_request_id', None):
+                try:
+                    from modules.signature.module_signature import SignatureRequest
+
+                    sig_req = SignatureRequest.find_by_id(report.signature_request_id)
+                    if sig_req:
+                        payload['signature_status'] = sig_req.status
+                        payload['signature'] = {
+                            'id': sig_req.id,
+                            'status': sig_req.status,
+                            'public_url': f"/app/sign/{sig_req.signer_public_token()}",
+                            'signed_at': sig_req.signed_at.isoformat() if getattr(sig_req, 'signed_at', None) else None,
+                        }
+                except Exception:
+                    pass
+            checkpoints = ReportCheckpoint.search([('report_id', '=', report.id)])
+            checkpoints.sort(key=lambda item: item.id or 0)
+            payload['checkpoints_count'] = len(checkpoints)
+            payload['last_checkpoint_tipo'] = checkpoints[-1].tipo if checkpoints else None
+            reports_data.append(payload)
+
+        return Response.ok({
+            'read_only': True,
+            'service': service.to_dict(),
+            'company': {
+                'id': getattr(company, 'id', None),
+                'name': getattr(company, 'name', '') or '',
+                'legal_name': getattr(company, 'legal_name', '') or '',
+                'tax_id': getattr(company, 'tax_id', '') or '',
+                'email': getattr(company, 'email', '') or '',
+                'phone': getattr(company, 'phone', '') or '',
+                'address': getattr(company, 'address', '') or '',
+                'logo_url': getattr(company, 'logo_url', '') or '',
+            },
+            'lead': lead.to_dict(include_relations=True),
+            'customer': {'id': getattr(customer, 'id', None), 'name': getattr(customer, 'name', '') or ''},
+            'mandante': {'id': getattr(mandante, 'id', None), 'name': getattr(mandante, 'name', '') or ''},
+            'service_type': {'id': getattr(service_type, 'id', None), 'name': getattr(service_type, 'name', '') or ''},
+            'documents': documents,
+            'reports': reports_data,
+            'activity': activity,
+            'summary': {
+                'documents_count': len(documents),
+                'reports_count': len(reports_data),
+                'activity_count': len(activity),
+            },
         })
 
     # ========================================================================
@@ -1959,12 +2650,34 @@ class CRMModule(BaseModule):
 
         model_name = request.get_data('model_name')
         record_id_str = request.get_data('record_id')
+        document_type = _crm_safe_str(request.get_data('document_type')) or _crm_safe_str(request.get_data('category')) or 'general'
+        replace_document_id = _crm_safe_int(request.get_data('replace_document_id'))
+        service_id = _crm_safe_int(request.get_data('service_id'))
+        publish_to_mirror = _crm_safe_bool(request.get_data('publish_to_mirror'))
 
         if not model_name or not record_id_str:
             return Response.bad_request("model_name and record_id are required")
 
         try: record_id = int(record_id_str)
         except ValueError: return Response.bad_request("invalid record_id")
+
+        if str(model_name).strip().lower() == 'lead':
+            lead = Lead.find_by_id(record_id)
+            if lead and lead.company_id == self._company_id():
+                err = self._require_service_action('service.manage_documents', lead=lead)
+                if err:
+                    return err
+                service = ensure_service_for_lead(lead, create_projection=True)
+                service_id = service.id if service else service_id
+        elif str(model_name).strip().lower() == 'service' and not service_id:
+            service_id = record_id
+        if str(model_name).strip().lower() == 'service':
+            service = Service.find_by_id(service_id or record_id)
+            if not service:
+                return Response.not_found("Servicio no encontrado")
+            err = self._require_service_action('service.manage_documents', service=service)
+            if err:
+                return err
 
         upload_dir = os.path.join(os.getcwd(), 'uploads', model_name, str(record_id))
         os.makedirs(upload_dir, exist_ok=True)
@@ -1976,6 +2689,28 @@ class CRMModule(BaseModule):
             shutil.copyfileobj(file_obj.file, buffer)
 
         try:
+            parent_document = Document.find_by_id(replace_document_id) if replace_document_id else None
+            existing_versions = []
+            if service_id:
+                existing_versions.extend(Document.search([
+                    ('service_id', '=', service_id),
+                    ('company_id', '=', self._company_id()),
+                ]))
+            existing_versions.extend(Document.search([
+                ('model_name', '=', model_name),
+                ('record_id', '=', record_id),
+                ('company_id', '=', self._company_id()),
+            ]))
+            relevant_versions = [
+                item for item in existing_versions
+                if (getattr(item, 'document_type', None) or item.category or 'general') == document_type
+            ]
+            current_version = max([int(getattr(item, 'version', 1) or 1) for item in relevant_versions], default=0)
+            for item in relevant_versions:
+                if bool(getattr(item, 'is_current', True)):
+                    item.is_current = False
+                    item.save()
+
             doc = Document.create({
                 'filename': filename,
                 'file_path': file_path,
@@ -1984,7 +2719,19 @@ class CRMModule(BaseModule):
                 'record_id': record_id,
                 'company_id': self._company_id(),
                 'uploaded_by': self.env.user.id,
-                'category': request.get_data('category')
+                'category': request.get_data('category'),
+                'service_id': service_id,
+                'document_type': document_type,
+                'version': current_version + 1,
+                'is_current': True,
+                'parent_document_id': parent_document.id if parent_document else (relevant_versions[0].id if relevant_versions else None),
+                'metadata_json': {
+                    'original_filename': filename,
+                    'size_bytes': int(cl or 0) if cl else None,
+                    'publish_to_mirror': publish_to_mirror,
+                    'replaced_signed_document': bool(parent_document and getattr(parent_document, 'signed_at', None)),
+                },
+                'signature_request_id': getattr(parent_document, 'signature_request_id', None) if parent_document and getattr(parent_document, 'signed_at', None) else None,
             })
             
             if model_name.lower() == 'lead':
@@ -1994,6 +2741,9 @@ class CRMModule(BaseModule):
             return Response.created({
                 'id': doc.id,
                 'filename': doc.filename,
+                'document_type': doc.document_type or doc.category or 'general',
+                'version': doc.version or 1,
+                'service_id': doc.service_id,
                 'created_at': Lead._fmt_dt(doc._data.get('created_at'))
             })
         except Exception as e:
@@ -2012,14 +2762,34 @@ class CRMModule(BaseModule):
         try: record_id = int(path_segments[-1])
         except ValueError: return Response.bad_request("Invalid record_id")
 
+        if str(model_name).strip().lower() == 'service':
+            service = Service.find_by_id(record_id)
+            if not service:
+                return Response.not_found("Servicio no encontrado")
+            err = self._require_service_action('service.view_internal', service=service)
+            if err:
+                return err
+        elif str(model_name).strip().lower() == 'lead':
+            lead = Lead.find_by_id(record_id)
+            if lead:
+                err = self._require_service_action('service.view_internal', lead=lead)
+                if err:
+                    return err
+
         docs = Document.search([
             ('model_name', '=', model_name),
             ('record_id', '=', record_id),
             ('company_id', '=', self._company_id())
         ])
-        
+        if str(model_name).strip().lower() == 'service':
+            extra_docs = Document.search([
+                ('service_id', '=', record_id),
+                ('company_id', '=', self._company_id())
+            ])
+            docs = list({item.id: item for item in docs + extra_docs}.values())
+
         # Sort newest first
-        docs.sort(key=lambda d: str(d._data.get('created_at') or ''), reverse=True)
+        docs.sort(key=lambda d: (str(getattr(d, 'document_type', '') or ''), -(int(getattr(d, 'version', 1) or 1)), str(d._data.get('created_at') or '')))
 
         return Response.ok({
             'count': len(docs),
@@ -2027,7 +2797,16 @@ class CRMModule(BaseModule):
                 'id': d.id,
                 'filename': d.filename,
                 'mime_type': d.mime_type,
+                'category': d.category,
+                'document_type': getattr(d, 'document_type', None) or d.category or 'general',
+                'version': int(getattr(d, 'version', 1) or 1),
+                'is_current': bool(getattr(d, 'is_current', True)),
+                'service_id': getattr(d, 'service_id', None),
+                'signature_request_id': getattr(d, 'signature_request_id', None),
+                'signed_at': Lead._fmt_dt(getattr(d, 'signed_at', None)),
+                'metadata': getattr(d, 'metadata_json', None) or {},
                 'uploaded_by': d.uploaded_by,
+                'download_url': f"/crm/documents/download/{d.id}",
                 'created_at': Lead._fmt_dt(d._data.get('created_at'))
             } for d in docs]
         })

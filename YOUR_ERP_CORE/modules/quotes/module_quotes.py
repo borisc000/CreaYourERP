@@ -187,6 +187,28 @@ def _quote_normalize_control_meta(payload: Any) -> Dict[str, Any]:
     return base
 
 
+def _quote_service_record(quote: Any, lead: Any = None):
+    try:
+        from modules.crm.module_crm import find_service_for_lead
+    except Exception:
+        return None
+    lead_id = _quote_safe_int(getattr(quote, 'lead_id', None) or getattr(lead, 'id', None))
+    company_id = _quote_safe_int(getattr(quote, 'company_id', None) or getattr(lead, 'company_id', None))
+    if not lead_id:
+        return None
+    return find_service_for_lead(lead_id, company_id)
+
+
+def _quote_control_source_payload(quote: Any, lead: Any = None) -> Tuple[Dict[str, Any], Any, bool]:
+    service = _quote_service_record(quote, lead)
+    accepted = str(getattr(quote, 'status', '') or '').strip().lower() == 'accepted'
+    if accepted and service:
+        payload = getattr(service, 'operational_control', None) or getattr(quote, 'control_snapshot', None) or getattr(quote, 'control_meta', None) or {}
+        return _quote_normalize_control_meta(payload), service, True
+    payload = getattr(quote, 'control_meta', None) or getattr(quote, 'control_snapshot', None) or {}
+    return _quote_normalize_control_meta(payload), service, False
+
+
 def _quote_resolve_service_type_name(service_type_id: Optional[int]) -> str:
     if not service_type_id:
         return ''
@@ -301,6 +323,7 @@ class Quote(BaseModel, AuditMixin):
 
     notes = Column(ColumnType.TEXT, label="Notas / Condiciones")
     control_meta = Column(ColumnType.JSON, default={}, label="Control Operativo")
+    control_snapshot = Column(ColumnType.JSON, default={}, label="Control Snapshot")
 
     # Fecha editable de la cotizacion (default = fecha de creacion)
     quote_date = Column(ColumnType.DATETIME, label="Fecha de Cotizacion")
@@ -335,6 +358,7 @@ class Quote(BaseModel, AuditMixin):
             'gross_total':       self.gross_total or 0,
             'notes':             self.notes or '',
             'control_meta':      _quote_normalize_control_meta(self._data.get('control_meta') or self.control_meta or {}),
+            'control_snapshot':  _quote_normalize_control_meta(self._data.get('control_snapshot') or self.control_snapshot or {}),
             'quote_date':        self._fmt_dt(self._data.get('quote_date') or self._data.get('created_at')),
             'created_at':        self._fmt_dt(self._data.get('created_at')),
             'updated_at':        self._fmt_dt(self._data.get('updated_at')),
@@ -596,6 +620,27 @@ class QuotesModule(BaseModule):
             self.logger.warning(f"Rental event creation from quote acceptance failed: {exc}")
         return contract.to_dict(include_relations=True)
 
+    def _quote_requires_rental(self, quote: Quote, lead: Any) -> bool:
+        """Detect if an accepted quote should bridge into the Rentals flow."""
+        keywords = ("arriendo", "rental", "alquiler", "lease")
+        service_type_name = ""
+        try:
+            from modules.crm.module_crm import ServiceType
+
+            service_type_id = getattr(lead, "service_type_id", None) if lead else None
+            service_type = ServiceType.find_by_id(service_type_id) if service_type_id else None
+            service_type_name = (service_type.name or "") if service_type else ""
+        except Exception:
+            service_type_name = ""
+
+        candidates = [
+            service_type_name,
+            getattr(lead, "service_name", "") if lead else "",
+            getattr(lead, "title", "") if lead else "",
+        ]
+        haystack = " ".join(str(item or "").strip().lower() for item in candidates if item)
+        return any(keyword in haystack for keyword in keywords)
+
     def _quote_or_404(self, quote_id: Any) -> Tuple[Optional[Quote], Optional[Response]]:
         numeric_id = _quote_safe_int(quote_id)
         if not numeric_id:
@@ -837,7 +882,7 @@ class QuotesModule(BaseModule):
         sent_log = context.get('sent_log_map', {}).get(quote.id)
 
         base_payload = quote.to_dict()
-        control_meta = _quote_normalize_control_meta(base_payload.get('control_meta'))
+        control_meta, service_record, control_owned_by_service = _quote_control_source_payload(quote, lead)
         quote_date = _quote_parse_dt(base_payload.get('quote_date') or base_payload.get('created_at'))
         year = quote_date.year if quote_date else None
         month_number = quote_date.month if quote_date else None
@@ -948,6 +993,12 @@ class QuotesModule(BaseModule):
             'report_id': report_payload.get('id'),
             'gantt_plan_id': gantt_payload.get('id'),
             'control_meta': control_meta,
+            'control_snapshot': _quote_normalize_control_meta(base_payload.get('control_snapshot')),
+            'service_id': getattr(service_record, 'id', None),
+            'service_code': getattr(service_record, 'service_code', None) or _quote_clean_str(getattr(lead, 'project_code', None)),
+            'control_source': 'service' if control_owned_by_service else 'quote',
+            'control_editable': not control_owned_by_service,
+            'control_redirect_url': f"/app/crm/leads/{lead_id}" if control_owned_by_service and lead_id else '',
         }
         return row
 
@@ -956,6 +1007,11 @@ class QuotesModule(BaseModule):
         return {
             'quote': row,
             'control_meta': row.get('control_meta') or _quote_default_control_meta(),
+            'control_snapshot': row.get('control_snapshot') or _quote_default_control_meta(),
+            'control_source': row.get('control_source') or 'quote',
+            'control_editable': bool(row.get('control_editable', True)),
+            'control_redirect_url': row.get('control_redirect_url') or '',
+            'service_id': row.get('service_id'),
         }
 
     # ========================================================================
@@ -1520,6 +1576,14 @@ class QuotesModule(BaseModule):
         quote, error = self._quote_or_404(request.params.get('id'))
         if error:
             return error
+        _, service_record, control_owned_by_service = _quote_control_source_payload(quote)
+        if control_owned_by_service:
+            try:
+                from modules.crm.module_crm import service_action_allowed
+                if not service_action_allowed(self.env.user, 'service.view_internal'):
+                    return Response.forbidden("No tienes permiso para ver el control operativo del servicio")
+            except Exception:
+                pass
 
         return Response.ok(self._build_quote_control_payload(quote))
 
@@ -1537,13 +1601,24 @@ class QuotesModule(BaseModule):
         if control_meta is None:
             control_meta = incoming
 
-        existing = _quote_normalize_control_meta(getattr(quote, 'control_meta', {}) or {})
-        merged = _quote_normalize_control_meta({
-            **existing,
-            **(control_meta or {}),
-        })
+        existing, service_record, control_owned_by_service = _quote_control_source_payload(quote)
+        if control_owned_by_service:
+            try:
+                from modules.crm.module_crm import service_action_allowed
+                if not service_action_allowed(self.env.user, 'service.edit_operational_control'):
+                    return Response.forbidden("No tienes permiso para editar el control operativo del servicio")
+            except Exception:
+                pass
+        merged = _quote_normalize_control_meta({**existing, **(control_meta or {})})
 
-        quote.control_meta = merged
+        if control_owned_by_service and service_record:
+            service_record.operational_control = merged
+            if not service_record.save():
+                return Response.error("No fue posible guardar el control operativo del servicio")
+            quote.control_snapshot = merged
+        else:
+            quote.control_meta = merged
+            quote.control_snapshot = merged
         if not quote.save():
             return Response.error("No fue posible guardar el control operativo")
 
@@ -1565,7 +1640,7 @@ class QuotesModule(BaseModule):
         quote.status = 'sent'
         quote.save()
 
-        from modules.crm.module_crm import Lead, Stage
+        from modules.crm.module_crm import Lead, Stage, ensure_service_for_lead
         lead = Lead.find_by_id(quote.lead_id) if quote.lead_id else None
         if lead:
             self._log_on_lead(lead, 'Quote Sent', f'Cotizacion {quote.quote_number} enviada')
@@ -1584,7 +1659,7 @@ class QuotesModule(BaseModule):
         return Response.ok({**quote.to_dict()})
 
     async def accept_quote(self, request: Request) -> Response:
-        """POST /quotes/{id}/accept - mark as accepted and create linked rental dossier."""
+        """POST /quotes/{id}/accept - mark as accepted and conditionally bridge into Rentals."""
         if not self.env.user:
             return Response.unauthorized("Authentication required")
 
@@ -1601,10 +1676,11 @@ class QuotesModule(BaseModule):
             quote.status = 'accepted'
             quote.save()
 
-        from modules.crm.module_crm import Lead, Stage
+        from modules.crm.module_crm import Lead, Stage, ensure_service_for_lead
 
         lead = Lead.find_by_id(quote.lead_id) if quote.lead_id else None
-        contract_data = self._ensure_rental_contract_from_quote(quote, lead)
+        requires_rental = self._quote_requires_rental(quote, lead)
+        contract_data = self._ensure_rental_contract_from_quote(quote, lead) if requires_rental else None
 
         if lead and not was_already_accepted:
             lead.status = 'won'
@@ -1627,13 +1703,36 @@ class QuotesModule(BaseModule):
             self._log_on_lead(
                 lead,
                 'Quote Accepted',
-                f'Cotizacion {quote.quote_number} aceptada y expediente de arriendo creado para asignacion operativa.',
+                (
+                    f'Cotizacion {quote.quote_number} aceptada y expediente de arriendo creado para asignacion operativa.'
+                    if contract_data
+                    else f'Cotizacion {quote.quote_number} aceptada y lista para iniciar ejecucion operativa.'
+                ),
             )
+
+        service_payload = None
+        if lead:
+            try:
+                service = ensure_service_for_lead(lead, accepted_quote=quote, create_projection=True)
+                migrated_control = _quote_normalize_control_meta(
+                    getattr(quote, 'control_snapshot', {}) or getattr(quote, 'control_meta', {}) or {}
+                )
+                if service and not was_already_accepted:
+                    service.operational_control = migrated_control
+                    service.save()
+                if not was_already_accepted:
+                    quote.control_snapshot = migrated_control
+                    quote.save()
+                service_payload = service.to_dict() if service else None
+            except Exception as exc:
+                self.logger.warning(f"Service sync on quote accept failed: {exc}")
 
         return Response.ok({
             **quote.to_dict(),
             'rental_contract': contract_data,
+            'requires_rental': requires_rental,
             'was_already_accepted': was_already_accepted,
+            'service': service_payload,
         })
 
     # ========================================================================

@@ -112,6 +112,22 @@ function expenseCanAdmin() {
     return !!user && user.role !== 'employee';
 }
 
+function getDefaultExpenseTaxRate() {
+    return Number(expensesState.refs?.default_tax_rate ?? 19);
+}
+
+function updateExpenseTaxMeta() {
+    const taxLabel = document.getElementById('expenses-record-tax-label');
+    const taxHint = document.getElementById('expenses-record-tax-hint');
+    const rate = getDefaultExpenseTaxRate();
+    if (taxLabel) {
+        taxLabel.textContent = `(base ${expNumber(rate)}%)`;
+    }
+    if (taxHint) {
+        taxHint.textContent = `Se completa automaticamente desde la configuracion tributaria (${expNumber(rate)}%) cuando no ingresas un valor manual.`;
+    }
+}
+
 async function loadExpensesWorkspace() {
     const [dashboardRes, recordsRes, backupsRes, refsRes] = await Promise.all([
         API.get('/expenses/dashboard'),
@@ -144,6 +160,7 @@ async function loadExpensesWorkspace() {
     renderExpenseFocus();
     renderExpenseBridge();
     renderExpenseBackups();
+    updateExpenseTaxMeta();
 
     const context = expensesState.routeContext || {};
     if (context.openNew && !context.modalOpened) {
@@ -624,9 +641,14 @@ function applyExpenseScopeRules() {
 
 function syncExpenseAmountPreview() {
     const netValue = Number(document.getElementById('expenses-record-net')?.value || 0);
-    const taxValue = Number(document.getElementById('expenses-record-tax')?.value || 0);
+    const taxInput = document.getElementById('expenses-record-tax');
+    let taxValue = Number(taxInput?.value || 0);
     const totalInput = document.getElementById('expenses-record-total');
     if (!totalInput) return;
+    if (taxInput && String(taxInput.value || '').trim() === '' && netValue > 0) {
+        taxValue = Math.round(netValue * (getDefaultExpenseTaxRate() / 100));
+        taxInput.value = taxValue;
+    }
     if (netValue > 0 || taxValue > 0) {
         totalInput.value = Math.round(netValue + taxValue);
     }
@@ -692,6 +714,14 @@ function openExpenseRecordModal(recordId = null, forcedScope = null, forcedLeadI
         || expensesState.routeContext?.supplierName
         || expensesState.routeContext?.supplierCode
         || '';
+    const defaultTaxRate = getDefaultExpenseTaxRate();
+    const defaultNet = row?.net_amount || '';
+    const defaultTaxAmount = row
+        ? (row.tax_amount || '')
+        : (defaultNet ? Math.round(Number(defaultNet || 0) * (defaultTaxRate / 100)) : '');
+    const defaultTotalAmount = row
+        ? (row.total_amount || '')
+        : (defaultNet ? Math.round(Number(defaultNet || 0) + Number(defaultTaxAmount || 0)) : '');
 
     document.getElementById('expenses-record-modal-title').textContent = isEdit ? 'Editar gasto' : 'Nuevo gasto';
     document.getElementById('expenses-record-id').value = row?.id || '';
@@ -705,9 +735,9 @@ function openExpenseRecordModal(recordId = null, forcedScope = null, forcedLeadI
     document.getElementById('expenses-record-spender').value = row?.spender_name || API.getUser()?.name || '';
     document.getElementById('expenses-record-document-type').value = row?.document_type || 'Boleta / factura';
     document.getElementById('expenses-record-document-number').value = row?.document_number || '';
-    document.getElementById('expenses-record-net').value = row?.net_amount || '';
-    document.getElementById('expenses-record-tax').value = row?.tax_amount || '';
-    document.getElementById('expenses-record-total').value = row?.total_amount || '';
+    document.getElementById('expenses-record-net').value = defaultNet;
+    document.getElementById('expenses-record-tax').value = defaultTaxAmount;
+    document.getElementById('expenses-record-total').value = defaultTotalAmount;
     document.getElementById('expenses-record-description').value = row?.description || '';
     document.getElementById('expenses-record-notes').value = row?.notes || '';
 
@@ -726,6 +756,7 @@ function openExpenseRecordModal(recordId = null, forcedScope = null, forcedLeadI
     }
 
     applyExpenseScopeRules();
+    updateExpenseTaxMeta();
     document.getElementById('expenses-record-modal').classList.add('open');
 }
 

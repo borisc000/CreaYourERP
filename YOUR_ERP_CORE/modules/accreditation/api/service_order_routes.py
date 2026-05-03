@@ -24,12 +24,42 @@ def _serialize(order: ServiceOrder) -> dict:
     for field_name, field_def in ServiceOrder._fields.items():
         if field_name not in data:
             data[field_name] = getattr(order, field_name, field_def.column.default)
+    if getattr(order, "service_id", None):
+        try:
+            from modules.crm.module_crm import Service
+
+            service = Service.find_by_id(order.service_id)
+            data["service"] = service.to_dict() if service else None
+        except Exception:
+            data["service"] = None
+    else:
+        data["service"] = None
     return data
 
 
 def _resolve_lead(lead_id: Optional[int]):
     if not lead_id:
         return None
+
+
+def _requirement_payload(requirement, level: str) -> dict:
+    data = requirement.to_dict() if hasattr(requirement, "to_dict") else {}
+    data["level"] = level
+    data["signature_policy"] = "with_signature" if data.get("requires_signature") else "without_signature"
+    mode = data.get("fulfillment_mode") or "upload_only"
+    if mode == "upload_only":
+        data["document_flow"] = "upload_only"
+    elif data.get("requires_signature"):
+        data["document_flow"] = "generated_with_signature"
+    else:
+        data["document_flow"] = "generated_without_signature"
+    data["expiry_control"] = {
+        "tracks_expiration": bool(data.get("tracks_expiration")),
+        "expiration_required": bool(data.get("expiration_required")),
+        "default_validity_days": data.get("default_validity_days") or 0,
+        "warning_days": data.get("warning_days") or 30,
+    }
+    return data
     try:
         from modules.crm.module_crm import Lead
 
@@ -44,7 +74,7 @@ def _resolve_lead(lead_id: Optional[int]):
 
 @router.get("")
 async def list_service_orders(
-    company_id: Optional[int] = Query(None, description="Company ID"),
+    company_id: int = Query(..., description="Company ID"),
     customer_id: Optional[int] = Query(None),
     lead_id: Optional[int] = Query(None),
     status: Optional[str] = Query(None),
@@ -52,12 +82,6 @@ async def list_service_orders(
     """List service orders filtered by company, optionally by customer, lead and status."""
     lead = _resolve_lead(lead_id)
     effective_company_id = company_id or getattr(lead, "company_id", None)
-
-    if effective_company_id is None and customer_id is None and lead_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="company_id, customer_id or lead_id is required",
-        )
 
     domain = []
     if effective_company_id is not None:
@@ -91,6 +115,15 @@ async def create_service_order(order_data: dict):
         payload["customer_id"] = getattr(lead, "customer_id", None)
     if not payload.get("title") and lead:
         payload["title"] = getattr(lead, "title", None) or f"Orden de Servicio - Lead {lead.id}"
+    if not payload.get("service_id") and lead:
+        try:
+            from modules.crm.module_crm import ensure_service_for_lead
+
+            service = ensure_service_for_lead(lead, create_projection=False)
+            if service:
+                payload["service_id"] = service.id
+        except Exception:
+            pass
 
     try:
         order = ServiceOrder.create(payload)
@@ -153,6 +186,17 @@ async def update_service_order(service_order_id: int, update_data: dict):
     try:
         order.validate()
         order.save()
+        if getattr(order, "lead_id", None):
+            try:
+                from modules.crm.module_crm import Lead, ensure_service_for_lead
+
+                lead = Lead.find_by_id(order.lead_id)
+                service = ensure_service_for_lead(lead, create_projection=False) if lead else None
+                if service and order.service_id != service.id:
+                    order.service_id = service.id
+                    order.save()
+            except Exception:
+                pass
     except (ValueError, Exception) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -186,10 +230,38 @@ async def get_requirements(service_order_id: int):
     if not order:
         raise HTTPException(status_code=404, detail="Service order not found")
 
-    # Level A = general company requirements (from company config / base module)
-    # Level B = order-specific requirements
-    # TODO: Integrate with base module Requirement/Course models when available
-    level_a: list = []  # placeholder - general requirements
+    try:
+        from modules.hr.module_hr import AccreditationRequirement
+    except Exception:
+        AccreditationRequirement = None
+
+    level_a: list = []
+    level_b: list = []
+    if AccreditationRequirement:
+        general = AccreditationRequirement.search([
+            ("company_id", "=", order.company_id),
+            ("customer_id", "=", None),
+        ])
+        general = [req for req in general if getattr(req, "is_mandatory", True)]
+        general.sort(key=lambda req: (getattr(req, "display_order", 0) or 0, getattr(req, "name", "") or ""))
+        level_a = [_requirement_payload(req, "A") for req in general]
+
+        specific = []
+        if order.customer_id:
+            specific = AccreditationRequirement.search([
+                ("company_id", "=", order.company_id),
+                ("customer_id", "=", order.customer_id),
+            ])
+        explicit_ids = order.required_requirement_ids or []
+        seen_ids = {getattr(req, "id", None) for req in specific}
+        for req_id in explicit_ids:
+            req = AccreditationRequirement.find_by_id(req_id)
+            if req and req.company_id == order.company_id and req.id not in seen_ids:
+                specific.append(req)
+                seen_ids.add(req.id)
+        specific.sort(key=lambda req: (getattr(req, "display_order", 0) or 0, getattr(req, "name", "") or ""))
+        level_b = [_requirement_payload(req, "B") for req in specific]
+
     level_b_req_ids = order.required_requirement_ids or []
     level_b_course_ids = order.required_course_ids or []
 
@@ -198,6 +270,15 @@ async def get_requirements(service_order_id: int):
         "level_b": {
             "required_requirement_ids": level_b_req_ids,
             "required_course_ids": level_b_course_ids,
+            "requirements": level_b,
+        },
+        "summary": {
+            "general_documents": len(level_a),
+            "specific_documents": len(level_b),
+            "with_signature": len([item for item in level_a + level_b if item.get("requires_signature")]),
+            "upload_only": len([item for item in level_a + level_b if item.get("document_flow") == "upload_only"]),
+            "generated": len([item for item in level_a + level_b if item.get("document_flow") != "upload_only"]),
+            "tracks_expiration": len([item for item in level_a + level_b if item.get("tracks_expiration")]),
         },
     }
 

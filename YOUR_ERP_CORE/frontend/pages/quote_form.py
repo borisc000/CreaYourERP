@@ -246,7 +246,7 @@ def quote_form_page(quote_id=None):
         <button class="btn btn-ghost" onclick="window.location.href='/app/quotes'">Cancelar</button>
         <button class="btn btn-secondary" id="btn-save-draft" onclick="saveQuote('draft')">Guardar Borrador</button>
         <button class="btn btn-primary" id="btn-save-send" onclick="saveQuote('send')">Guardar y Enviar</button>
-        <button class="btn btn-primary" id="btn-accept-quote" onclick="acceptQuote()" style="display:none;">Aceptar y crear arriendo</button>
+        <button class="btn btn-primary" id="btn-accept-quote" onclick="acceptQuote()" style="display:none;">Aceptar cotizaci&oacute;n</button>
     </div>
 
 </div>

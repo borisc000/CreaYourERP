@@ -124,6 +124,7 @@ function renderInfoCard(report) {
             ${infoCell('Área', report.area)}
             ${infoCell('Sector', report.sector)}
         </div>
+        ${renderSignaturePanel(report)}
     `;
 }
 
@@ -140,6 +141,49 @@ function infoCell(label, value) {
         <div class="rw-info-cell">
             <span>${escHtml(label)}</span>
             <strong>${escHtml(value || '—')}</strong>
+        </div>`;
+}
+
+function renderSignaturePanel(report) {
+    const signature = report.signature || null;
+    const target = report.signature_target || {};
+    const status = signature?.status || report.signature_status || 'not_requested';
+    const isClosed = report.estado === 'CERRADO';
+    const publicUrl = signature?.public_url || '';
+    const statusLabel = {
+        not_requested: 'Pendiente de solicitar',
+        draft: 'Preparada',
+        sent: 'Enviada',
+        viewed: 'Vista por mandante',
+        signed: 'Firmada',
+        declined: 'Rechazada',
+        expired: 'Vencida',
+    }[status] || status;
+    const signedHash = signature?.integrity_payload?.signature_hash || '';
+    const targetText = target.email
+        ? `${target.name || 'Mandante'} - ${target.email}`
+        : 'Registra email de mandante o cliente en CRM para enviar firma.';
+    const actionButton = isClosed && status !== 'signed'
+        ? `<button class="rw-btn" onclick="requestReportSignature()">Preparar firma mandante</button>`
+        : '';
+    const openButton = publicUrl
+        ? `<a class="rw-btn-secondary" href="${escAttr(publicUrl)}" target="_blank" rel="noopener">Abrir firma in-app</a>`
+        : '';
+
+    return `
+        <div class="rw-hero-card" style="margin-top:1rem;background:rgba(15,23,42,0.78);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+                <div>
+                    <div class="rw-kicker">Acta final / firma digital</div>
+                    <h3 style="margin:0.25rem 0;color:#f8fafc;font-size:1.02rem;">${escHtml(statusLabel)}</h3>
+                    <div class="rw-muted">${escHtml(targetText)}</div>
+                    ${signedHash ? `<div class="rw-muted" style="margin-top:0.35rem;">Huella firma: ${escHtml(signedHash)}</div>` : ''}
+                </div>
+                <div style="display:flex;gap:0.65rem;flex-wrap:wrap;justify-content:flex-end;">
+                    ${openButton}
+                    ${actionButton}
+                </div>
+            </div>
         </div>`;
 }
 
@@ -399,6 +443,35 @@ async function cerrarReporte() {
     } catch (error) {
         console.error('[REPORT] cerrarReporte error', error);
         showToast('Error de conexión al cerrar el reporte.', 'error');
+    }
+}
+
+async function requestReportSignature() {
+    const target = reportSnapshot?.signature_target || {};
+    const message = target.email
+        ? `Preparar firma digital para ${target.name || 'mandante'} (${target.email})?`
+        : 'No hay email de mandante/cliente en el reporte. Revisa CRM antes de preparar la firma.';
+    if (!target.email) {
+        showToast(message, 'error');
+        return;
+    }
+    if (!confirm(message)) {
+        return;
+    }
+
+    try {
+        const res = await API.post(`/reports/${REPORT_ID}/signature-request`, {
+            auto_send: false,
+        });
+        if (!res || !res.success) {
+            showToast((res?.errors && res.errors[0]) || 'No se pudo preparar la firma digital.', 'error');
+            return;
+        }
+        showToast(res.data?.already_exists ? 'La firma ya estaba preparada.' : 'Firma digital preparada correctamente.');
+        await loadReportData();
+    } catch (error) {
+        console.error('[REPORT] requestReportSignature error', error);
+        showToast('Error de conexiÃ³n al preparar la firma.', 'error');
     }
 }
 

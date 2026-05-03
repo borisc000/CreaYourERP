@@ -156,6 +156,17 @@ def _resolve_user_name(user_id: Optional[int]) -> Optional[str]:
         return None
 
 
+def _resolve_company_default_tax_rate(company_id: Optional[int], fallback: float = 19.0) -> float:
+    try:
+        from modules.base.module_base import Company
+
+        company = Company.find_by_id(int(company_id)) if company_id else None
+        rate = float(company.default_tax_rate if company and company.default_tax_rate is not None else fallback)
+        return max(rate, 0.0)
+    except Exception:
+        return float(fallback)
+
+
 def _resolve_lead_context(lead_id: Optional[int]) -> Dict[str, Any]:
     if not lead_id:
         return {
@@ -569,6 +580,9 @@ class ExpensesModule(BaseModule):
         if evidence_data is None and existing:
             evidence_data = existing.support_data
 
+        company_id = existing.company_id if existing else self._company_id()
+        default_tax_rate = _resolve_company_default_tax_rate(company_id)
+
         status = _clean_str(
             data.get("status"),
             existing.status if existing else "supported" if _clean_str(evidence_data) else "pending_support",
@@ -580,7 +594,7 @@ class ExpensesModule(BaseModule):
             "expense_number": data.get("expense_number") or (
                 existing.expense_number if existing else self._next_expense_number()
             ),
-            "company_id": existing.company_id if existing else self._company_id(),
+            "company_id": company_id,
             "scope": data.get("scope") if "scope" in data else (
                 existing.scope if existing else DEFAULT_SCOPE
             ),
@@ -652,6 +666,20 @@ class ExpensesModule(BaseModule):
             "reviewed_by_user_id": existing.reviewed_by_user_id if existing else None,
             "reviewed_at": existing.reviewed_at if existing else None,
         }
+
+        tax_was_provided = "tax_amount" in data and str(data.get("tax_amount") or "").strip() != ""
+        total_was_provided = "total_amount" in data and str(data.get("total_amount") or "").strip() != ""
+        net_amount = _safe_float(payload["net_amount"])
+        tax_amount = _safe_float(payload["tax_amount"])
+        total_amount = _safe_float(payload["total_amount"])
+
+        if net_amount > 0 and not tax_was_provided:
+            tax_amount = _round_money(net_amount * (default_tax_rate / 100))
+            payload["tax_amount"] = tax_amount
+
+        if net_amount > 0 and not total_was_provided:
+            total_amount = _round_money(net_amount + tax_amount)
+            payload["total_amount"] = total_amount
 
         if payload["scope"] == "project" and not _safe_int(payload["lead_id"]) and existing and _safe_int(existing.lead_id):
             payload["lead_id"] = existing.lead_id
@@ -967,6 +995,7 @@ class ExpensesModule(BaseModule):
                     for code, label in EXPENSE_STATUSES.items()
                 ],
                 "payment_methods": PAYMENT_METHODS,
+                "default_tax_rate": _resolve_company_default_tax_rate(self._company_id()),
             }
         )
 

@@ -515,6 +515,102 @@ DEFAULT_PROCEDURE_TEMPLATES = [
             },
         ],
     }
+    ,
+    {
+        "procedure": {
+            "procedure_code": "PT-GEN-VEH-01",
+            "name": "PTS Verificacion y Conduccion Segura de Vehiculos",
+            "version": "V1",
+            "status": "active",
+            "objective": "Estandarizar la inspeccion, conduccion y cierre seguro de vehiculos livianos y de apoyo.",
+            "scope": "Aplica a traslados internos, ingreso a faena, retiro de materiales y apoyo logistico operativo.",
+            "responsibilities": (
+                "Administrador: asegurar vehiculos documentados y recursos.\n"
+                "Supervisor: validar ruta, condiciones del area y autorizacion de conductor.\n"
+                "Conductor: ejecutar checklist, respetar transito interno y reportar desviaciones.\n"
+                "Prevencionista: verificar controles criticos y difusion cuando aplique."
+            ),
+            "required_ppe": ["Casco", "Chaleco reflectante", "Calzado de seguridad", "Lentes de seguridad"],
+            "tools_and_equipment": ["Vehiculo autorizado", "Checklist preuso", "Extintor", "Conos o elementos de segregacion"],
+            "workforce_roles": ["Conductor autorizado", "Supervisor de terreno", "Prevencionista"],
+            "activity_description": "Revision documental, inspeccion visual, conduccion defensiva, estacionamiento seguro y cierre de novedades.",
+            "methodology": "Aplicar checklist antes del uso, controlar fatiga, velocidad, rutas peatonales y zonas de carga o descarga.",
+            "recommendations": "Detener el uso ante falla critica, condiciones climaticas adversas o interferencia con peatones/equipos.",
+            "prohibitions": ["Conducir sin licencia o autorizacion.", "Usar celular durante la conduccion.", "Transportar personal no autorizado."],
+            "records": ["Checklist de vehiculo", "Registro de novedades", "Charla de conduccion defensiva"],
+            "change_control": "Version V1: base operativa para vehiculos livianos y apoyo logistico.",
+        },
+        "steps": [
+            {
+                "activity_block_code": "ACT-GEN-CONDUCCION",
+                "phase_name": "setup",
+                "step_title": "Revision documental y autorizacion del conductor",
+                "step_description": "Confirmar licencia, autorizacion, documentacion del vehiculo y condiciones de ruta.",
+                "display_order": 10,
+            },
+            {
+                "activity_block_code": "ACT-GEN-CONDUCCION",
+                "phase_name": "inspection",
+                "step_title": "Checklist preuso del vehiculo",
+                "step_description": "Revisar luces, frenos, neumaticos, niveles, extintor, kit y estado general.",
+                "display_order": 20,
+            },
+            {
+                "activity_block_code": "ACT-GEN-TRANSITO-PEATONAL",
+                "phase_name": "execution",
+                "step_title": "Conduccion defensiva e ingreso a area operativa",
+                "step_description": "Controlar velocidad, rutas peatonales, puntos ciegos, estacionamiento y segregacion.",
+                "display_order": 30,
+            },
+        ],
+    },
+    {
+        "procedure": {
+            "procedure_code": "PT-GEN-HERR-01",
+            "name": "PTS Uso y Control de Herramientas",
+            "version": "V1",
+            "status": "active",
+            "objective": "Controlar seleccion, inspeccion, uso, traslado y retiro de herramientas manuales y electricas.",
+            "scope": "Aplica a tareas operativas con herramientas propias, arrendadas o provistas por el mandante.",
+            "responsibilities": (
+                "Supervisor: asignar herramientas aptas y controlar el inventario operativo.\n"
+                "Trabajador: inspeccionar antes de usar y reportar fallas.\n"
+                "Prevencionista: verificar controles de energia, EPP y condiciones del entorno."
+            ),
+            "required_ppe": ["Casco", "Lentes de seguridad", "Guantes segun tarea", "Calzado de seguridad", "Proteccion auditiva si aplica"],
+            "tools_and_equipment": ["Herramientas certificadas", "Extensiones y enchufes en buen estado", "Registro de inspeccion", "Elementos de amarre en altura"],
+            "workforce_roles": ["Supervisor", "Trabajador autorizado", "Prevencionista"],
+            "activity_description": "Seleccion, chequeo, uso seguro, control de energia, limpieza y devolucion de herramientas.",
+            "methodology": "Inspeccionar estado, protecciones, cables, discos o accesorios; aislar herramientas defectuosas y registrar hallazgos.",
+            "recommendations": "Usar la herramienta correcta para la tarea y mantener orden del frente de trabajo.",
+            "prohibitions": ["Usar herramientas intervenidas.", "Retirar protecciones.", "Usar herramientas electricas con cables danados."],
+            "records": ["Checklist de herramientas", "Registro de retiro por falla", "Charla de herramientas"],
+            "change_control": "Version V1: base operativa para control de herramientas.",
+        },
+        "steps": [
+            {
+                "activity_block_code": "ACT-GEN-HERRAMIENTAS",
+                "phase_name": "inspection",
+                "step_title": "Inspeccion inicial de herramientas",
+                "step_description": "Revisar estado fisico, protecciones, energia, cables y accesorios antes de usar.",
+                "display_order": 10,
+            },
+            {
+                "activity_block_code": "ACT-GEN-HERRAMIENTAS",
+                "phase_name": "execution",
+                "step_title": "Uso seguro y control durante la tarea",
+                "step_description": "Aplicar EPP, postura, control de energia y segregacion del area de trabajo.",
+                "display_order": 20,
+            },
+            {
+                "activity_block_code": "ACT-GEN-MMC",
+                "phase_name": "closing",
+                "step_title": "Retiro, limpieza y almacenamiento",
+                "step_description": "Ordenar, limpiar, almacenar y dejar registradas herramientas con falla o faltantes.",
+                "display_order": 30,
+            },
+        ],
+    },
 ]
 
 
