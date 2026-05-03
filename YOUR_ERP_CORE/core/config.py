@@ -98,6 +98,12 @@ class Settings:
     
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24
+    enable_demo_seed: bool = os.getenv("ENABLE_DEMO_SEED", "True" if debug else "False").lower() == "true"
+    enable_demo_login: bool = os.getenv("ENABLE_DEMO_LOGIN", "True" if debug else "False").lower() == "true"
+    enable_debug_endpoints: bool = os.getenv("ENABLE_DEBUG_ENDPOINTS", "True" if debug else "False").lower() == "true"
+    expose_dev_password_reset_tokens: bool = (
+        os.getenv("EXPOSE_DEV_PASSWORD_RESET_TOKENS", "True" if debug else "False").lower() == "true"
+    )
     
     # CORS
     allowed_origins: List[str] = [
@@ -145,6 +151,7 @@ class Settings:
     # ARCHIVOS
     max_upload_size: int = 100 * 1024 * 1024  # 100 MB
     upload_dir: str = os.path.join(BASE_DIR, "uploads")
+    document_converter_path: str = os.getenv("DOCUMENT_CONVERTER_PATH", "")
     
     # SENTRY (Error tracking)
     sentry_dsn: Optional[str] = os.getenv("SENTRY_DSN")
@@ -231,6 +238,18 @@ def validate_config():
     # Validar secret key en producción
     if settings.is_production and settings.secret_key == "dev-secret-key-change-in-production":
         errors.append("❌ SECRET_KEY debe ser cambiado en producción")
+
+    weak_secret_markers = ("dev", "change", "placeholder", "production")
+    if settings.is_production:
+        lowered_secret = (settings.secret_key or "").lower()
+        if len(settings.secret_key or "") < 32 or any(marker in lowered_secret for marker in weak_secret_markers):
+            errors.append("❌ SECRET_KEY de producción debe ser fuerte, única y tener al menos 32 caracteres")
+
+        if not settings.allowed_origins or not [origin for origin in settings.allowed_origins if origin.strip()]:
+            errors.append("❌ ALLOWED_ORIGINS debe estar definido en producción")
+
+        if settings.enable_demo_seed or settings.enable_demo_login or settings.enable_debug_endpoints:
+            errors.append("❌ Demo seed, demo login y debug endpoints deben estar desactivados en producción")
     
     # Validar base de datos
     if settings.database_type == DatabaseType.POSTGRESQL:

@@ -13,9 +13,10 @@ Este archivo muestra:
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Dict, Any, List, Tuple
 from fastapi import FastAPI, Request as FastAPIRequest, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response as StarletteResponse
 
@@ -58,6 +59,7 @@ from core.mvp import (
     filter_mvp_modules,
     get_mvp_disabled_api_module,
 )
+from core.version import APP_VERSION
 from core.YOUR_ERP_orm import BaseModel
 from config.database import init_db, SessionLocal
 from core.time_utils import utc_now, utc_strftime
@@ -78,6 +80,7 @@ from modules.accreditation.api.check_routes import router as check_router
 from modules.signature import listeners  # This imports and registers all listeners
 from modules.notifications.listeners import setup_notification_listeners
 from modules.accreditation.listeners import setup_accreditation_listeners
+from modules.reports.listeners import setup_reports_listeners
 
 
 # ============================================================================
@@ -299,6 +302,10 @@ def init_framework() -> CoreFramework:
 
 async def startup_seed():
     """Seed demo data on startup if database is empty"""
+    if not settings.enable_demo_seed:
+        logger.info("Demo seed disabled for this environment")
+        return
+
     try:
         from modules.base.module_base import User, Company
         from modules.crm.module_crm import Customer
@@ -359,14 +366,29 @@ async def startup_seed():
         print(f"  [!] Seed error: {str(e)[:100]}")
 
 
+def assert_no_demo_admin_in_production() -> None:
+    """Fail fast if a production database contains the built-in demo admin."""
+    if not settings.is_production:
+        return
+
+    from modules.base.module_base import User
+
+    demo_users = User.search([('email', '=', 'demo@pedroconstruction.cl')])
+    for demo_user in demo_users:
+        if demo_user.is_active and (demo_user.is_admin or demo_user.role in ('company_admin', 'superadmin')):
+            raise RuntimeError("Production startup blocked: built-in demo admin user is active")
+
+
 @asynccontextmanager
 async def app_lifespan(_: FastAPI):
     """Lifespan hook used instead of deprecated startup events."""
     BaseModel.initialize_persistence()
+    assert_no_demo_admin_in_production()
     await startup_seed()
     init_db()
     setup_notification_listeners()
     setup_accreditation_listeners()
+    setup_reports_listeners()
     yield
 
 
@@ -377,15 +399,17 @@ erp_framework = init_framework()
 app = FastAPI(
     title="YOUR ERP",
     description="Open source ERP platform",
-    version="1.0.0",
+    version=APP_VERSION,
     lifespan=app_lifespan,
 )
 
 # Middleware CORS
 _cors_allowed_origins = [origin for origin in settings.allowed_origins if origin]
+if settings.is_production and not _cors_allowed_origins:
+    raise RuntimeError("ALLOWED_ORIGINS must be configured in production")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_allowed_origins or ["*"],
+    allow_origins=_cors_allowed_origins if _cors_allowed_origins else ["*"],
     allow_credentials=bool(_cors_allowed_origins) and "*" not in _cors_allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -436,16 +460,20 @@ app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 # Servir archivos subidos (fotos de reportes, etc.) como estáticos
 _uploads_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "uploads")
 _os.makedirs(_uploads_dir, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
 
 
 # ============================================================================
 # DEBUG ENDPOINT - MANUAL SEED (development only)
 # ============================================================================
 
+def _require_dev_endpoint_enabled() -> None:
+    if not settings.enable_debug_endpoints:
+        raise HTTPException(status_code=404, detail="Not found")
+
 @app.post("/debug/seed")
 async def debug_seed():
     """Manual seeding endpoint for development"""
+    _require_dev_endpoint_enabled()
     try:
         from seed_demo_data import seed_if_empty
         from modules.base.module_base import User
@@ -471,6 +499,7 @@ async def debug_seed():
 @app.get("/debug/users")
 async def debug_users():
     """Debug endpoint to check all users in database"""
+    _require_dev_endpoint_enabled()
     from modules.base.module_base import User
 
     users_list = []
@@ -537,6 +566,54 @@ async def convert_fastapi_request(fastapi_request: FastAPIRequest) -> Request:
         request.company_id = user.company_id
 
     return request
+
+
+@app.get("/uploads/{file_path:path}")
+async def protected_upload(file_path: str, fastapi_request: FastAPIRequest):
+    """Serve uploaded operational files only after tenant-aware authorization."""
+    user = _resolve_fastapi_user(fastapi_request)
+    if not user:
+        return JSONResponse(status_code=401, content={"success": False, "errors": ["Authentication required"]})
+
+    normalized_path = str(file_path or "").replace("\\", "/").strip().lstrip("/")
+    if not normalized_path or ".." in normalized_path.split("/"):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    uploads_root = Path(_uploads_dir).resolve()
+    target_path = (uploads_root / normalized_path).resolve()
+    try:
+        target_path.relative_to(uploads_root)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    if not target_path.exists() or not target_path.is_file():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    try:
+        from modules.reports.module_reports import ReportPhoto
+
+        candidates = ReportPhoto.search([('file_path', '=', normalized_path)])
+        if not candidates:
+            candidates = ReportPhoto.search([('file_path', '=', f"uploads/{normalized_path}")])
+        authorized_photo = next(
+            (
+                photo for photo in candidates
+                if getattr(user, "role", "") == "superadmin" or photo.company_id == user.company_id
+            ),
+            None,
+        )
+        if not authorized_photo:
+            raise HTTPException(status_code=404, detail="Not found")
+        return FileResponse(
+            path=str(target_path),
+            media_type=authorized_photo.mime_type or "application/octet-stream",
+            filename=authorized_photo.filename or target_path.name,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Protected upload authorization failed: %s", exc)
+        raise HTTPException(status_code=404, detail="Not found")
 
 
 # ============================================================================
@@ -972,6 +1049,16 @@ async def catch_all(fastapi_request: FastAPIRequest, path: str):
         # Convertir response a JSON de FastAPI
         if isinstance(response, StarletteResponse):
             return response
+        if getattr(response, "is_file", False):
+            file_path = getattr(response, "file_path", "")
+            if not file_path or not _os.path.exists(file_path):
+                return JSONResponse(
+                    status_code=404,
+                    content={"status": 404, "errors": ["File not found"], "success": False},
+                )
+            headers = dict(response.headers or {})
+            media_type = headers.pop("Content-Type", None)
+            return FileResponse(path=file_path, media_type=media_type, headers=headers)
         return JSONResponse(
             status_code=response.status,
             content=response.to_dict(),

@@ -19,6 +19,7 @@ from typing import Dict, Any, List, Optional
 from core.YOUR_ERP_core_framework import (
     BaseModule, Request, Response, ValidationError
 )
+from core.config import settings
 from core.YOUR_ERP_orm import BaseModel, Column, ColumnType, EmailValidator, LengthValidator, AuditMixin
 from core.time_utils import ensure_utc_datetime, utc_now
 
@@ -93,6 +94,12 @@ class Company(BaseModel, AuditMixin):
         label="Términos y Condiciones por Defecto"
     )
 
+    default_tax_rate = Column(
+        ColumnType.FLOAT,
+        default=19.0,
+        label="Default Tax Rate"
+    )
+
     is_active = Column(
         ColumnType.BOOLEAN,
         default=True,
@@ -115,6 +122,13 @@ class Company(BaseModel, AuditMixin):
         is_valid, error = validator.validate(self.email)
         if not is_valid:
             raise ValidationError(f"Email: {error}")
+
+        try:
+            self.default_tax_rate = float(self.default_tax_rate if self.default_tax_rate is not None else 19.0)
+        except (TypeError, ValueError):
+            raise ValidationError("Default tax rate must be numeric")
+        if self.default_tax_rate < 0 or self.default_tax_rate > 100:
+            raise ValidationError("Default tax rate must be between 0 and 100")
 
 
 class Group(BaseModel, AuditMixin):
@@ -351,7 +365,8 @@ class BaseModule(BaseModule):
         
         # Registrar rutas
         self.register_route('/auth/login', self.login, methods=['POST'], auth_required=False)
-        self.register_route('/auth/demologin', self.demo_login, methods=['GET'], auth_required=False)
+        if settings.enable_demo_login:
+            self.register_route('/auth/demologin', self.demo_login, methods=['GET'], auth_required=False)
         self.register_route('/auth/logout', self.logout, methods=['POST'], auth_required=True)
         self.register_route('/auth/register', self.register, methods=['POST'], auth_required=False)
         self.register_route('/auth/forgot-password', self.forgot_password, methods=['POST'], auth_required=False)
@@ -446,6 +461,9 @@ class BaseModule(BaseModule):
 
         GET /auth/demo-login
         """
+        if not settings.enable_demo_login:
+            return Response.not_found("Route not found")
+
         # Buscar usuario demo
         demo_users = User.search([('email', '=', 'demo@pedroconstruction.cl')])
 
@@ -839,6 +857,7 @@ class BaseModule(BaseModule):
             "account_type": company.account_type or '',
             "account_number": company.account_number or '',
             "default_terms": company.default_terms or '',
+            "default_tax_rate": float(company.default_tax_rate if company.default_tax_rate is not None else 19.0),
         })
 
     async def update_company_settings(self, request: Request) -> Response:
@@ -857,7 +876,7 @@ class BaseModule(BaseModule):
         if not company:
             return Response.not_found("Company not found")
 
-        updatable = ['name', 'legal_name', 'phone', 'address', 'tax_id', 'logo_url', 'bank_name', 'account_type', 'account_number', 'default_terms']
+        updatable = ['name', 'legal_name', 'phone', 'address', 'tax_id', 'logo_url', 'bank_name', 'account_type', 'account_number', 'default_terms', 'default_tax_rate']
         data = request.data or {}
         for field in updatable:
             if field in data:
@@ -880,6 +899,7 @@ class BaseModule(BaseModule):
                     "account_type": company.account_type or '',
                     "account_number": company.account_number or '',
                     "default_terms": company.default_terms or '',
+                    "default_tax_rate": float(company.default_tax_rate if company.default_tax_rate is not None else 19.0),
                 }
             })
         except ValidationError as e:
@@ -994,11 +1014,14 @@ class BaseModule(BaseModule):
         self.logger.info(f"  Expires: {expires.strftime('%Y-%m-%d %H:%M UTC')}")
         self.logger.info("=" * 60)
 
-        return Response.ok({
+        payload = {
             "message": "If that email exists, a reset link was sent",
-            "_dev_token": token,
-            "_dev_link":  reset_url,
-        })
+        }
+        if settings.expose_dev_password_reset_tokens:
+            payload["_dev_token"] = token
+            payload["_dev_link"] = reset_url
+
+        return Response.ok(payload)
 
     async def reset_password(self, request: Request) -> Response:
         """
