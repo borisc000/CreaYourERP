@@ -20,6 +20,7 @@ import logging
 from enum import Enum
 
 from core.time_utils import utc_now
+from core.version import APP_VERSION
 
 # ============================================================================
 # 1. REQUEST & RESPONSE - Abstracción universal de HTTP
@@ -231,7 +232,7 @@ class BaseModule(ABC):
     
     # Metadata del módulo (reemplaza __manifest__)
     name: str = "Base Module"
-    version: str = "1.0.0"
+    version: str = APP_VERSION
     author: str = "Anonymous"
     description: str = ""
     depends: List[str] = []

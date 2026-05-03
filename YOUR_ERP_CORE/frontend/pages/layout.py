@@ -1,10 +1,11 @@
 import json
-import time
+import os
 
 from core.mvp import MVP_DISABLED_MODULES
+from core.version import APP_VERSION, RELEASE_LABEL
 
 
-ASSET_VERSION = str(int(time.time()))
+ASSET_VERSION = os.getenv("ASSET_VERSION", APP_VERSION)
 
 
 def base_layout(title, page_id, content, scripts=None, no_sidebar=False):
@@ -20,7 +21,7 @@ def base_layout(title, page_id, content, scripts=None, no_sidebar=False):
         <aside class="sidebar">
             <div class="sidebar-logo">
                 <h2><span>YOUR</span> ERP</h2>
-                <div class="ver">v1.0.0 - Local Dev</div>
+                <div class="ver">v{APP_VERSION} - {RELEASE_LABEL}</div>
             </div>
             <nav>
                 <a href="/app/dashboard" data-roles="superadmin,company_admin,employee">
