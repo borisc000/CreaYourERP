@@ -201,6 +201,59 @@ def test_bulk_assign_crew():
     assert roles[21] == "helper"
 
 
+def test_authorize_crew_persists_authorization_state():
+    order = _create_order()
+    oid = order["id"]
+
+    client.post(
+        f"/api/accreditation/service-orders/{oid}/crew",
+        json={"employee_ids": [30, 31], "role": "operator"},
+    )
+
+    resp = client.post(
+        f"/api/accreditation/service-orders/{oid}/crew/authorize",
+        json={"mode": "warning", "authorized_by": 99},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["authorized_count"] == 2
+    assert data["mode"] == "warning"
+    assert all(item["authorization_status"] == "authorized" for item in data["crew"])
+    assert all(item["authorization_mode"] == "warning" for item in data["crew"])
+    assert all(item["authorized_by"] == 99 for item in data["crew"])
+    assert all(item["status"] == "active" for item in data["crew"])
+
+
+def test_crew_change_requires_revalidation_after_authorization():
+    order = _create_order()
+    oid = order["id"]
+
+    client.post(
+        f"/api/accreditation/service-orders/{oid}/crew",
+        json={"employee_ids": [40], "role": "operator"},
+    )
+    authorize_resp = client.post(
+        f"/api/accreditation/service-orders/{oid}/crew/authorize",
+        json={"mode": "ready", "authorized_by": 7},
+    )
+    assert authorize_resp.status_code == 200
+
+    add_resp = client.post(
+        f"/api/accreditation/service-orders/{oid}/crew",
+        json={"employee_ids": [41], "role": "helper"},
+    )
+    assert add_resp.status_code == 200
+
+    crew_resp = client.get(f"/api/accreditation/service-orders/{oid}/crew")
+    assert crew_resp.status_code == 200
+    crew = crew_resp.json()
+    assert len(crew) == 2
+    assert all(item["authorization_status"] == "requires_revalidation" for item in crew)
+    assert all(item["authorization_mode"] in (None, "") for item in crew)
+    assert all("reconfirmacion" in (item["revalidation_reason"] or "").lower() for item in crew)
+
+
 # ============================================================================
 # Accreditation Checks
 # ============================================================================

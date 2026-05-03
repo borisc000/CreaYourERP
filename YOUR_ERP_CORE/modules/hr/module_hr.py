@@ -445,8 +445,6 @@ class Department(BaseModel, AuditMixin):
 
     def validate(self):
         super().validate()
-        self.fulfillment_mode = self.fulfillment_mode or "upload_only"
-        self.accepted_file_types = self.accepted_file_types or ["pdf", "jpg", "jpeg", "png"]
         if not (self.name or "").strip():
             raise ValidationError("Department name is required")
         if not (self.code or "").strip():

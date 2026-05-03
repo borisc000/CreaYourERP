@@ -75,9 +75,19 @@ def _on_correspondence_approved(data: Dict):
         print(f"   [WARNING] Correspondencia no encontrada: {correspondence_id}")
 
 
+def setup_hiring_listeners() -> None:
+    """Register hiring workflow listeners after test/runtime bus resets."""
+    contract_subscribers = EventBus._subscribers.get('contract.approved', [])
+    if _on_contract_approved not in contract_subscribers:
+        EventBus.subscribe('contract.approved', _on_contract_approved)
+
+    correspondence_subscribers = EventBus._subscribers.get('correspondence.approved', [])
+    if _on_correspondence_approved not in correspondence_subscribers:
+        EventBus.subscribe('correspondence.approved', _on_correspondence_approved)
+
+
 # Suscribirse a eventos
-EventBus.subscribe('contract.approved', _on_contract_approved)
-EventBus.subscribe('correspondence.approved', _on_correspondence_approved)
+setup_hiring_listeners()
 
 print("[+] hiring_routes: Event listeners registrados")
 

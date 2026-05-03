@@ -38,6 +38,10 @@ class Contract(BaseModel):
             kwargs['personalization_data'] = {}
         super().__init__(**kwargs)
 
+    @staticmethod
+    def _fmt_datetime(value):
+        return value.isoformat() if hasattr(value, 'isoformat') else value
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -50,7 +54,7 @@ class Contract(BaseModel):
             'end_date': self.end_date,
             'personalization_data': self.personalization_data,
             'signature_request_id': self.signature_request_id,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': self._fmt_datetime(self.created_at) if self.created_at else None
         }
 
     def transition_to(self, new_state: str):

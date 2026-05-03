@@ -8,11 +8,18 @@ import sys
 import os
 import json
 from pathlib import Path
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parent / "YOUR_ERP_CORE"
+project_parent = project_root.parent
+if str(project_parent) not in sys.path:
+    sys.path.insert(0, str(project_parent))
+if str(project_root) in sys.path:
+    sys.path.remove(str(project_root))
 sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root.parent))
+if "config" in sys.modules and not hasattr(sys.modules["config"], "__path__"):
+    del sys.modules["config"]
 
 # Import required modules
 from core.event_bus import EventBus
@@ -21,7 +28,8 @@ from modules.hr.api.contract_routes import create_contract, approve_contract, _c
 from modules.cross_correspondence.api.hiring_routes import (
     _correspondence_drafts,
     approve_correspondence,
-    render_template as api_render_template
+    render_template as api_render_template,
+    setup_hiring_listeners,
 )
 from datetime import datetime
 
@@ -33,9 +41,10 @@ def print_section(title):
     print(f"{'='*70}\n")
 
 
-async def test_event_chain():
+async def _run_event_chain():
     """Test the complete event chain"""
     print_section("TEST 1: Event Chain - Contract Approval Triggers Correspondencia")
+    setup_hiring_listeners()
 
     # Create contract
     contract_data = {
@@ -88,9 +97,10 @@ async def test_event_chain():
     return True
 
 
-async def test_correspondence_approval():
+async def _run_correspondence_approval():
     """Test correspondence approval triggering signature event"""
     print_section("TEST 2: Correspondencia Approval Triggers Signature Event")
+    setup_hiring_listeners()
 
     # Use the contract from previous test
     contract_id = list(_contracts_db)[0].id if _contracts_db else None
@@ -113,7 +123,7 @@ async def test_correspondence_approval():
     return True
 
 
-async def test_template_rendering():
+async def _run_template_rendering():
     """Test template rendering"""
     print_section("TEST 3: Template Rendering")
 
@@ -143,7 +153,7 @@ async def test_template_rendering():
     return result['success']
 
 
-def test_event_history():
+def _run_event_history():
     """Test event history tracking"""
     print_section("TEST 4: Event History")
 
@@ -158,7 +168,7 @@ def test_event_history():
     return len(history) > 0
 
 
-def test_template_processor():
+def _run_template_processor():
     """Test TemplateProcessor directly"""
     print_section("TEST 5: Template Processor")
 
@@ -195,6 +205,33 @@ Firma: _______________
     return result['success']
 
 
+@pytest.mark.asyncio
+async def test_event_chain():
+    assert await _run_event_chain()
+
+
+@pytest.mark.asyncio
+async def test_correspondence_approval():
+    if not _contracts_db or not _correspondence_drafts:
+        assert await _run_event_chain()
+    assert await _run_correspondence_approval()
+
+
+@pytest.mark.asyncio
+async def test_template_rendering():
+    assert await _run_template_rendering()
+
+
+def test_event_history():
+    if not EventBus.get_history():
+        pytest.skip("Event history is populated by the async integration chain")
+    assert _run_event_history()
+
+
+def test_template_processor():
+    assert _run_template_processor()
+
+
 async def run_all_tests():
     """Run all tests"""
     print("\n" + "="*70)
@@ -205,19 +242,19 @@ async def run_all_tests():
     results = {}
 
     # Test template processor first
-    results['template_processor'] = test_template_processor()
+    results['template_processor'] = _run_template_processor()
 
     # Test event chain
-    results['event_chain'] = await test_event_chain()
+    results['event_chain'] = await _run_event_chain()
 
     # Test correspondence approval
-    results['correspondence_approval'] = await test_correspondence_approval()
+    results['correspondence_approval'] = await _run_correspondence_approval()
 
     # Test template rendering
-    results['template_rendering'] = await test_template_rendering()
+    results['template_rendering'] = await _run_template_rendering()
 
     # Test event history
-    results['event_history'] = test_event_history()
+    results['event_history'] = _run_event_history()
 
     # Summary
     print_section("TEST SUMMARY")

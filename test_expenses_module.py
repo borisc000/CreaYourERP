@@ -229,6 +229,50 @@ class ExpensesModuleTest(unittest.IsolatedAsyncioTestCase):
         granted_res = await self.dispatch("/expenses/records", user=employee)
         self.assertEqual(granted_res.status, 200)
 
+    async def test_expense_defaults_use_company_tax_rate(self):
+        register_res = await self.dispatch(
+            "/auth/register",
+            method="POST",
+            data={
+                "email": f"tax.expenses.{self.suffix}@example.com",
+                "name": "Tax Admin",
+                "password": "securepass123",
+                "company_name": f"Tax Expenses Spa {self.suffix}",
+            },
+        )
+        self.assertEqual(register_res.status, 201)
+        admin = User.search([("email", "=", f"tax.expenses.{self.suffix}@example.com")])[0]
+
+        settings_res = await self.dispatch(
+            "/company/settings",
+            method="PUT",
+            user=admin,
+            data={"default_tax_rate": 17},
+        )
+        self.assertEqual(settings_res.status, 200)
+        self.assertEqual(settings_res.data["company"]["default_tax_rate"], 17.0)
+
+        refs_res = await self.dispatch("/expenses/reference-data", user=admin)
+        self.assertEqual(refs_res.status, 200)
+        self.assertEqual(refs_res.data["default_tax_rate"], 17.0)
+
+        expense_res = await self.dispatch(
+            "/expenses/records",
+            method="POST",
+            user=admin,
+            data={
+                "scope": "general",
+                "category": "Administracion",
+                "expense_date": "2026-04-04",
+                "vendor_name": "Proveedor Fiscal",
+                "description": "Servicio administrativo mensual",
+                "net_amount": 100000,
+            },
+        )
+        self.assertEqual(expense_res.status, 201)
+        self.assertEqual(expense_res.data["tax_amount"], 17000.0)
+        self.assertEqual(expense_res.data["total_amount"], 117000.0)
+
 
 if __name__ == "__main__":
     unittest.main()

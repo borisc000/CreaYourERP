@@ -8,7 +8,7 @@ from core.YOUR_ERP_core_framework import CoreFramework, Request
 from core.YOUR_ERP_orm import BaseModel
 from modules.base.module_base import BaseModule as ERPBaseModule
 from modules.base.module_base import User
-from modules.crm.module_crm import ActivityLog, CRMModule
+from modules.crm.module_crm import ActivityLog, CRMModule, Service
 from modules.quotes.module_quotes import Quote, QuotesModule
 from modules.rentals.module_rentals import RentalContract, RentalsModule
 
@@ -215,6 +215,91 @@ class QuoteAcceptanceRentalsBridgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(accept_again_res.status, 200)
         self.assertTrue(accept_again_res.data["was_already_accepted"])
         self.assertEqual(accept_again_res.data["rental_contract"]["id"], contract.id)
+
+    async def test_accept_quote_without_rental_flow_keeps_service_in_crm(self):
+        register_res = await self.dispatch(
+            "/auth/register",
+            method="POST",
+            data={
+                "email": f"service.admin.{self.suffix}@example.com",
+                "name": "Service Admin",
+                "password": "securepass123",
+                "company_name": f"Service Demo SPA {self.suffix}",
+            },
+        )
+        self.assertEqual(register_res.status, 201)
+        admin = User.search([("email", "=", f"service.admin.{self.suffix}@example.com")])[0]
+
+        customer_res = await self.dispatch(
+            "/crm/customers",
+            method="POST",
+            user=admin,
+            data={"name": "Minera del Norte"},
+        )
+        self.assertEqual(customer_res.status, 201)
+        customer_id = customer_res.data["id"]
+
+        lead_res = await self.dispatch(
+            "/crm/leads",
+            method="POST",
+            user=admin,
+            data={
+                "title": "Servicio de mantenimiento predictivo",
+                "customer_id": customer_id,
+                "priority": "high",
+                "status": "open",
+                "expected_revenue": 1250000,
+            },
+        )
+        self.assertEqual(lead_res.status, 201)
+        lead_id = lead_res.data["id"]
+
+        quote_res = await self.dispatch(
+            "/quotes",
+            method="POST",
+            user=admin,
+            data={
+                "lead_id": lead_id,
+                "customer_id": customer_id,
+                "adm_margin_pct": 5,
+                "profit_margin_pct": 12,
+                "tax_pct": 19,
+                "notes": "Servicio operativo sin flujo de arriendo asociado.",
+                "lines": [
+                    {
+                        "section_type": "SERVICIOS",
+                        "description": "Mantenimiento predictivo de equipos criticos",
+                        "quantity": 1,
+                        "unit_price": 1250000,
+                    }
+                ],
+            },
+        )
+        self.assertEqual(quote_res.status, 201)
+        quote_id = quote_res.data["id"]
+
+        send_res = await self.dispatch(f"/quotes/{quote_id}/send", method="POST", user=admin)
+        self.assertEqual(send_res.status, 200)
+        self.assertEqual(send_res.data["status"], "sent")
+
+        accept_res = await self.dispatch(f"/quotes/{quote_id}/accept", method="POST", user=admin)
+        self.assertEqual(accept_res.status, 200)
+        self.assertEqual(accept_res.data["status"], "accepted")
+        self.assertFalse(accept_res.data["was_already_accepted"])
+        self.assertFalse(accept_res.data["requires_rental"])
+        self.assertIsNone(accept_res.data["rental_contract"])
+        self.assertIsNotNone(accept_res.data["service"])
+
+        rentals = RentalContract.search([("lead_id", "=", lead_id)])
+        self.assertEqual(rentals, [])
+        services = Service.search([("lead_id", "=", lead_id)])
+        self.assertEqual(len(services), 1)
+        self.assertEqual(services[0].accepted_quote_id, quote_id)
+        self.assertEqual(services[0].commercial_status, "won")
+
+        lead_logs = ActivityLog.search([("lead_id", "=", lead_id)])
+        self.assertTrue(any(log.action == "Quote Accepted" for log in lead_logs))
+        self.assertFalse(any((log.action or "").startswith("Rental - ") for log in lead_logs))
 
 
 if __name__ == "__main__":

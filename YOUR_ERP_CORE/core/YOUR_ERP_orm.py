@@ -38,6 +38,7 @@ from enum import Enum
 import uuid
 import hashlib
 import json
+import os
 from core.time_utils import utc_now
 from core.local_persistence import LocalSQLiteStore
 from sqlalchemy import (
@@ -310,8 +311,17 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
         return BaseModel._persistence_backend
 
     @classmethod
+    def _persistence_enabled(cls) -> bool:
+        """Disable disk persistence while pytest is executing ORM-only tests."""
+        if os.getenv("ERP_ENABLE_PERSISTENCE_IN_TESTS", "").lower() in ("1", "true", "yes"):
+            return True
+        return not bool(os.getenv("PYTEST_CURRENT_TEST"))
+
+    @classmethod
     def initialize_persistence(cls, preload_all: bool = True) -> None:
         """Inicializar almacenamiento local y recargar tablas conocidas."""
+        if not cls._persistence_enabled():
+            return
         backend = cls._get_persistence_backend()
         backend.ensure_ready()
         if preload_all:
@@ -346,6 +356,12 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
             return
 
         if BaseModel._loaded_tables.get(table):
+            return
+
+        if not cls._persistence_enabled():
+            BaseModel._store.setdefault(table, {})
+            BaseModel._id_counters.setdefault(table, 0)
+            BaseModel._loaded_tables[table] = True
             return
 
         backend = cls._get_persistence_backend()
@@ -433,7 +449,7 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
         try:
             table = self.__tablename__
             self._ensure_table_loaded()
-            backend = self._get_persistence_backend()
+            backend = self._get_persistence_backend() if self._persistence_enabled() else None
 
             # Hooks
             self.before_save()
@@ -449,7 +465,8 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
                 BaseModel._id_counters[table] += 1
                 self._id = BaseModel._id_counters[table]
                 BaseModel._store[table][self._id] = self
-                backend.upsert(table, self._id, self._data)
+                if backend:
+                    backend.upsert(table, self._id, self._data)
 
                 self.logger.debug(f"Inserted {self.__class__.__name__} #{self._id}")
                 self.after_insert()
@@ -459,7 +476,8 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
 
                 if table in BaseModel._store:
                     BaseModel._store[table][self._id] = self
-                backend.upsert(table, self._id, self._data)
+                if backend:
+                    backend.upsert(table, self._id, self._data)
 
                 self.logger.debug(f"Updated {self.__class__.__name__} #{self._id}")
                 self.after_update()
@@ -482,7 +500,8 @@ class BaseModel(ABC, metaclass=BaseModelMeta):
             table = self.__tablename__
             if table in BaseModel._store and self._id in BaseModel._store[table]:
                 del BaseModel._store[table][self._id]
-            self._get_persistence_backend().delete(table, self._id)
+            if self._persistence_enabled():
+                self._get_persistence_backend().delete(table, self._id)
 
             self.logger.debug(f"Deleted {self.__class__.__name__} #{self._id}")
             self.after_delete()

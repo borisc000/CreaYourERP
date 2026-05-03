@@ -487,39 +487,3 @@ function statusChip(status) {
     const tone = current === 'ready' ? 'green' : (current === 'in_progress' ? 'yellow' : 'red');
     return `<span class="safety-chip ${tone}">${esc(current)}</span>`;
 }
-
-function renderFolderTable() {
-    const tbody = document.getElementById('safety-folders-tbody');
-    if (!tbody) return;
-    if (!SAFETY_STATE.filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty">No hay carpetas para mostrar.</td></tr>';
-        return;
-    }
-    tbody.innerHTML = SAFETY_STATE.filtered.map((folder) => {
-        const summary = folder.summary || {};
-        return `
-            <tr>
-                <td>
-                    <div style="font-weight:700;color:#f8fafc;">${esc(folder.project_code || 'SIN-CODIGO')}</div>
-                    <div style="color:#94a3b8;font-size:0.82rem;">${esc(folder.lead_title || 'Sin oportunidad')}</div>
-                </td>
-                <td>${esc(folder.customer_name || '-')}</td>
-                <td>${esc(folder.service_profile_name || 'Automatico')}</td>
-                <td>
-                    <div style="font-weight:700;color:#f8fafc;">${esc(folder.procedure_code || 'Auto')}</div>
-                    <div style="color:#94a3b8;font-size:0.78rem;">${esc(folder.procedure_name || 'Segun perfil')}</div>
-                </td>
-                <td>${trafficChip(folder.traffic_light)}</td>
-                <td>
-                    <div class="readiness-wrap">
-                        <div class="readiness-bar"><span style="width:${Math.max(0, Math.min(100, Number(folder.readiness_pct || 0)))}%;"></span></div>
-                        <div class="readiness-label">${Number(folder.readiness_pct || 0).toFixed(1)}% - ${summary.critical_blockers?.length || 0} bloqueos</div>
-                    </div>
-                </td>
-                <td>${esc(folder.planned_start_date || '-')}</td>
-                <td>${statusChip(folder.status || 'draft')}</td>
-                <td><a class="btn btn-ghost btn-sm safety-open-btn" href="/app/safety/folders/${folder.id}">Abrir</a></td>
-            </tr>
-        `;
-    }).join('');
-}

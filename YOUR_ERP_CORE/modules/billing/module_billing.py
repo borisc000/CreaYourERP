@@ -662,7 +662,7 @@ class BillingModule(BaseModule):
                 payment_status = "partial"
 
             due = _parse_date(document.due_date)
-            if due and due < date.today() and balance_due > 0:
+            if due and due < date.today() and balance_due > 0 and paid_amount <= 0:
                 payment_status = "overdue"
 
             if _round_money(document.paid_amount) != paid_amount:
