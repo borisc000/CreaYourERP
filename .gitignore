@@ -8,16 +8,21 @@ pytest-cache-files-*/
 *.pid
 *.tmp
 *.bak
+tmp_*.py
 
 .env
 .env.*
 !.env.example
+!.env.production.example
+!YOUR_ERP_CORE/.env.example
+!YOUR_ERP_CORE/.env.production.example
 
 *.db
 *.db-shm
 *.db-wal
 
 YOUR_ERP_CORE/uploads/
+YOUR_ERP_CORE/generated_docs/
 YOUR_ERP_CORE/server*.log
 YOUR_ERP_CORE/server*.out.log
 YOUR_ERP_CORE/server*.err.log

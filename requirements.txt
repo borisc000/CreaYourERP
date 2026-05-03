@@ -16,6 +16,7 @@ pymysql
 # Validación & Serialización
 pydantic
 pydantic-core
+pydantic-settings
 
 # Autenticación & Seguridad
 python-jose[cryptography]
@@ -31,9 +32,11 @@ aiofiles
 requests
 
 # Procesamiento de archivos
+python-docx
 python-pptx
 openpyxl
 reportlab
+pypdf
 pillow
 
 # Email
