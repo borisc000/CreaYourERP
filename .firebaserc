@@ -1,0 +1,9 @@
+{
+  "projects": {
+    "default": "your-erp-dev",
+    "staging": "your-erp-staging",
+    "prod": "your-erp-prod"
+  },
+  "targets": {},
+  "etags": {}
+}

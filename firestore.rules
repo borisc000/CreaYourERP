@@ -1,0 +1,186 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // FUNCIONES AUXILIARES
+    // ==========================================
+
+    // Verifica que el usuario esté autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Obtiene el companyId del token JWT (custom claim)
+    function getCompanyId() {
+      return request.auth.token.companyId;
+    }
+
+    // Obtiene el rol del usuario
+    function getRole() {
+      return request.auth.token.role;
+    }
+
+    // Verifica si el usuario pertenece a la empresa del documento
+    function belongsToCompany(companyId) {
+      return isAuthenticated() && getCompanyId() == companyId;
+    }
+
+    // Verifica si es admin de la empresa
+    function isCompanyAdmin(companyId) {
+      return belongsToCompany(companyId) && getRole() == 'admin';
+    }
+
+    // ==========================================
+    // COLECCIONES GLOBALES
+    // ==========================================
+
+    // companies: cualquiera puede leer su propia empresa, solo admins pueden modificar
+    match /companies/{companyId} {
+      allow read: if belongsToCompany(companyId);
+      allow create: if isAuthenticated(); // Solo en onboarding inicial
+      allow update: if isCompanyAdmin(companyId);
+      allow delete: if false; // Nunca borrar empresas
+    }
+
+    // ==========================================
+    // SUB-COLECCIONES POR EMPRESA
+    // ==========================================
+
+    // Usuarios de la empresa
+    match /companies/{companyId}/users/{userId} {
+      allow read: if belongsToCompany(companyId);
+      allow create: if isCompanyAdmin(companyId);
+      allow update: if belongsToCompany(companyId) && request.auth.uid == userId;
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Cotizaciones
+    match /companies/{companyId}/quotes/{quoteId} {
+      allow read: if belongsToCompany(companyId);
+      allow create: if belongsToCompany(companyId);
+      allow update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Clientes / CRM
+    match /companies/{companyId}/customers/{customerId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/leads/{leadId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/mandantes/{mandanteId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Empleados / RRHH
+    match /companies/{companyId}/employees/{employeeId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/departments/{deptId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/contracts/{contractId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Acreditaciones
+    match /companies/{companyId}/serviceOrders/{orderId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/crewAssignments/{assignmentId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/accreditationChecks/{checkId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Seguridad
+    match /companies/{companyId}/safetyDocuments/{docId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyChecks/{checkId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Firmas
+    match /companies/{companyId}/signatureRequests/{requestId} {
+      allow read: if belongsToCompany(companyId);
+      allow create: if belongsToCompany(companyId);
+      allow update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Inventario / Activos
+    match /companies/{companyId}/inventoryItems/{itemId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/suppliers/{supplierId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Gastos
+    match /companies/{companyId}/expenses/{expenseId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    // Configuración de la empresa
+    match /companies/{companyId}/settings/{docId} {
+      allow read: if belongsToCompany(companyId);
+      allow write: if isCompanyAdmin(companyId);
+    }
+
+    // ==========================================
+    // COLECCIONES GLOBALES DE PLATAFORMA
+    // ==========================================
+
+    // Catálogos globales (servicios estándar, cursos, etc.)
+    // Estos son compartidos entre todas las empresas (solo lectura)
+    match /catalogs/{catalogId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Solo admin de plataforma via console
+    }
+
+    // Subscriptions (Stripe) - solo el usuario puede ver su propia sub
+    match /subscriptions/{subId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow write: if false; // Solo Cloud Functions/webhooks de Stripe
+    }
+
+    // ==========================================
+    // BLOQUEO POR DEFECTO
+    // ==========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

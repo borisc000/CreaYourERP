@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getCompanyId() {
+      return request.auth.token.companyId;
+    }
+
+    function belongsToCompany(companyId) {
+      return isAuthenticated() && getCompanyId() == companyId;
+    }
+
+    // Documentos por empresa: /companies/{companyId}/documents/...
+    match /companies/{companyId}/{allPaths=**} {
+      allow read: if belongsToCompany(companyId);
+      allow write: if belongsToCompany(companyId);
+    }
+
+    // Bloquear todo lo demás
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
