@@ -359,6 +359,25 @@ export interface CrewAssignment {
   notes?: string;
 }
 
+export interface AccreditationRequirement {
+  id: string;
+  companyId: string;
+  name: string;
+  code: string;
+  category: "identity" | "contractual" | "health" | "safety" | "training" | "client_specific" | "other";
+  customerId?: string; // null = global (Level A)
+  isGlobal: boolean;
+  isMandatory: boolean;
+  fulfillmentMode: "upload_only" | "template_generated" | "hybrid";
+  acceptedFileTypes: string[];
+  requiresSignature: boolean;
+  tracksExpiration: boolean;
+  expirationRequired: boolean;
+  defaultValidityDays: number;
+  warningDays: number;
+  displayOrder: number;
+}
+
 export interface AccreditationCheck {
   id: string;
   companyId: string;

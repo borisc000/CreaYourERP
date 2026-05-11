@@ -16,6 +16,8 @@ import { LeadList } from "./modules/crm/LeadList";
 import { LeadForm } from "./modules/crm/LeadForm";
 import { LeadDetail } from "./modules/crm/LeadDetail";
 import { ServiceOrderList } from "./modules/accreditation/ServiceOrderList";
+import { ServiceOrderForm } from "./modules/accreditation/ServiceOrderForm";
+import { ServiceOrderDetail } from "./modules/accreditation/ServiceOrderDetail";
 import { EmployeeList } from "./modules/hr/EmployeeList";
 import { EmployeeForm } from "./modules/hr/EmployeeForm";
 import { EmployeeDetail } from "./modules/hr/EmployeeDetail";
@@ -54,6 +56,9 @@ function App() {
                 <Route path="/crm/leads/:id/edit" element={<LeadForm />} />
 
                 <Route path="/accreditation" element={<ServiceOrderList />} />
+                <Route path="/accreditation/new" element={<ServiceOrderForm />} />
+                <Route path="/accreditation/:id" element={<ServiceOrderDetail />} />
+                <Route path="/accreditation/:id/edit" element={<ServiceOrderForm />} />
                 <Route path="/hr" element={<EmployeeList />} />
                 <Route path="/hr/employees/new" element={<EmployeeForm />} />
                 <Route path="/hr/employees/:id" element={<EmployeeDetail />} />

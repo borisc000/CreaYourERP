@@ -10,7 +10,7 @@
 | **CRM** | ✅ Completo | Customers, Leads, Contacts (Mandantes) | `onLeadCreated`, `onLeadUpdated`, `onLeadWon` | ✅ |
 | **Quotes** | ✅ Completo | List, Form (3 secciones), Detail | `calculateQuoteTotal`, `onQuoteUpdated`, `onQuoteAccepted` | ✅ |
 | **HR** | ✅ Completo | EmployeeList, EmployeeForm, EmployeeDetail, DepartmentList, JobProfileList | `onEmployeeHired` (scaffold) | ✅ |
-| **Accreditation** | 🔄 Pendiente | ServiceOrderList placeholder | `checkCrewCompliance` (scaffold) | ❌ |
+| **Accreditation** | ✅ Completo | ServiceOrderList, ServiceOrderForm, ServiceOrderDetail (crew + matrix) | `checkCrewCompliance`, `onCrewAssigned` | ✅ |
 | **Signature** | 🔄 Pendiente | SignatureCenter placeholder | — | ❌ |
 | **Safety** | 🔄 Pendiente | — | — | ❌ |
 | **Billing** | 🔄 Pendiente | — | — | ❌ |

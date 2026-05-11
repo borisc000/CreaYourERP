@@ -289,6 +289,65 @@ async function seed() {
   }
   console.log("✅ 3 contratos demo creados");
 
+  // 6e. Requisitos de acreditación por defecto (Level A - Global)
+  const levelARequirements = [
+    { name: "Cédula de Identidad", code: "DOC_ID", category: "identity", isGlobal: true, isMandatory: true, fulfillmentMode: "upload_only", acceptedFileTypes: ["pdf", "jpg", "png"], requiresSignature: false, tracksExpiration: false, displayOrder: 1 },
+    { name: "Contrato Firmado", code: "CONTRATO_FIRMADO", category: "contractual", isGlobal: true, isMandatory: true, fulfillmentMode: "upload_only", acceptedFileTypes: ["pdf"], requiresSignature: true, tracksExpiration: false, displayOrder: 2 },
+    { name: "Exámen Preocupacional", code: "EXAMEN_PREOCUPACIONAL", category: "health", isGlobal: true, isMandatory: true, fulfillmentMode: "upload_only", acceptedFileTypes: ["pdf"], requiresSignature: false, tracksExpiration: true, defaultValidityDays: 365, displayOrder: 3 },
+    { name: "Inducción de Seguridad", code: "INDUCCION_SEGURIDAD", category: "safety", isGlobal: true, isMandatory: true, fulfillmentMode: "template_generated", acceptedFileTypes: ["pdf"], requiresSignature: true, tracksExpiration: true, defaultValidityDays: 730, displayOrder: 4 },
+    { name: "Anexo de Funciones", code: "ANEXO_FUNCIONES", category: "contractual", isGlobal: true, isMandatory: true, fulfillmentMode: "template_generated", acceptedFileTypes: ["pdf"], requiresSignature: true, tracksExpiration: false, displayOrder: 5 },
+  ];
+
+  const requirementIds = [];
+  for (const r of levelARequirements) {
+    const docRef = await addDoc(collection(db, "companies", user.uid, "accreditationRequirements"), {
+      companyId: user.uid,
+      ...r,
+    });
+    requirementIds.push(docRef.id);
+  }
+  console.log("✅ 5 requisitos de acreditación Level A creados");
+
+  // 6f. Requisitos Level B (cliente específico)
+  const levelBRequirements = [
+    { name: "Inducción Cliente Minera", code: "INDUCCION_CLIENTE", category: "client_specific", customerId: customerIds[1], isGlobal: false, isMandatory: true, fulfillmentMode: "upload_only", acceptedFileTypes: ["pdf"], requiresSignature: false, tracksExpiration: true, defaultValidityDays: 365, displayOrder: 10 },
+    { name: "Autorización de Ingreso", code: "AUT_INGRESO_CLIENTE", category: "client_specific", customerId: customerIds[1], isGlobal: false, isMandatory: true, fulfillmentMode: "template_generated", acceptedFileTypes: ["pdf"], requiresSignature: true, tracksExpiration: true, defaultValidityDays: 180, displayOrder: 11 },
+  ];
+
+  const levelBIds = [];
+  for (const r of levelBRequirements) {
+    const docRef = await addDoc(collection(db, "companies", user.uid, "accreditationRequirements"), {
+      companyId: user.uid,
+      ...r,
+    });
+    levelBIds.push(docRef.id);
+  }
+  console.log("✅ 2 requisitos de acreditación Level B creados");
+
+  // 6g. EmployeeAccreditations (documentos validados)
+  const empAccreditations = [
+    { employeeId: employeeIds[0], type: "requirement", referenceId: requirementIds[0], status: "valid", validFrom: "2023-03-15", validUntil: "2028-03-15" },
+    { employeeId: employeeIds[0], type: "requirement", referenceId: requirementIds[1], status: "valid", validFrom: "2023-03-15" },
+    { employeeId: employeeIds[0], type: "requirement", referenceId: requirementIds[2], status: "valid", validFrom: "2023-03-15", validUntil: "2025-03-15" },
+    { employeeId: employeeIds[0], type: "requirement", referenceId: requirementIds[3], status: "valid", validFrom: "2023-03-15", validUntil: "2025-03-15" },
+    { employeeId: employeeIds[1], type: "requirement", referenceId: requirementIds[0], status: "valid", validFrom: "2022-08-01", validUntil: "2027-08-01" },
+    { employeeId: employeeIds[1], type: "requirement", referenceId: requirementIds[1], status: "valid", validFrom: "2022-08-01" },
+    { employeeId: employeeIds[1], type: "requirement", referenceId: requirementIds[2], status: "valid", validFrom: "2024-01-01", validUntil: "2025-01-01" },
+    { employeeId: employeeIds[1], type: "requirement", referenceId: requirementIds[3], status: "valid", validFrom: "2024-01-01", validUntil: "2026-01-01" },
+    // Carlos (onboarding) - le faltan algunos documentos
+    { employeeId: employeeIds[2], type: "requirement", referenceId: requirementIds[0], status: "valid", validFrom: "2024-01-10", validUntil: "2029-01-10" },
+    { employeeId: employeeIds[2], type: "requirement", referenceId: requirementIds[1], status: "pending", validFrom: "2024-01-10" },
+  ];
+
+  for (const a of empAccreditations) {
+    await addDoc(collection(db, "companies", user.uid, "employeeAccreditations"), {
+      companyId: user.uid,
+      ...a,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  console.log("✅ 10 acreditaciones de empleados creadas");
+
   // 7. Cotización demo (con leadId y nuevos nombres de campos)
   await addDoc(collection(db, "companies", user.uid, "quotes"), {
     companyId: user.uid,
@@ -321,14 +380,16 @@ async function seed() {
   });
   console.log("✅ Cotización demo creada");
 
-  // 8. Orden de servicio demo
-  await addDoc(collection(db, "companies", user.uid, "serviceOrders"), {
+  // 8. Orden de servicio demo (con leadId)
+  const serviceOrderRef = await addDoc(collection(db, "companies", user.uid, "serviceOrders"), {
     companyId: user.uid,
+    leadId: leadIds[0],
+    customerId: customerIds[1],
     title: "OS-001: Faena Minera del Sur",
     description: "Supervisión y prevención en faena minera",
     status: "active",
-    requiredRequirementIds: ["req-001", "req-002"],
-    requiredCourseIds: ["course-001"],
+    requiredRequirementIds: [...requirementIds.slice(0, 3), ...levelBIds],
+    requiredCourseIds: [],
     startDate: "2024-06-01",
     endDate: "2024-08-31",
     location: "Ruta 5 Sur Km 200",
@@ -337,6 +398,36 @@ async function seed() {
   });
   console.log("✅ Orden de servicio demo creada");
 
+  // 8b. Crew assignments demo
+  const crewAssignments = [
+    { serviceOrderId: serviceOrderRef.id, employeeId: employeeIds[0], role: "supervisor", status: "active", authorizationStatus: "authorized", authorizationMode: "ready", assignedAt: new Date().toISOString(), authorizedAt: new Date().toISOString() },
+    { serviceOrderId: serviceOrderRef.id, employeeId: employeeIds[1], role: "prevencionista", status: "active", authorizationStatus: "authorized", authorizationMode: "ready", assignedAt: new Date().toISOString(), authorizedAt: new Date().toISOString() },
+    { serviceOrderId: serviceOrderRef.id, employeeId: employeeIds[2], role: "operator", status: "assigned", authorizationStatus: "pending", assignedAt: new Date().toISOString() },
+  ];
+
+  for (const c of crewAssignments) {
+    await addDoc(collection(db, "companies", user.uid, "crewAssignments"), {
+      companyId: user.uid,
+      ...c,
+    });
+  }
+  console.log("✅ 3 asignaciones de cuadrilla creadas");
+
+  // 8c. Accreditation checks demo
+  const checksData = [
+    { serviceOrderId: serviceOrderRef.id, employeeId: employeeIds[0], levelAStatus: "compliant", levelATotal: 5, levelAValid: 5, levelAMissingIds: [], levelBStatus: "compliant", levelBTotal: 2, levelBValid: 2, levelBMissingIds: [], overallStatus: "compliant", lastCheckedAt: new Date().toISOString() },
+    { serviceOrderId: serviceOrderRef.id, employeeId: employeeIds[1], levelAStatus: "compliant", levelATotal: 5, levelAValid: 5, levelAMissingIds: [], levelBStatus: "compliant", levelBTotal: 2, levelBValid: 2, levelBMissingIds: [], overallStatus: "compliant", lastCheckedAt: new Date().toISOString() },
+    { serviceOrderId: serviceOrderRef.id, employeeId: employeeIds[2], levelAStatus: "non_compliant", levelATotal: 5, levelAValid: 3, levelAMissingIds: [requirementIds[3], requirementIds[4]], levelBStatus: "non_compliant", levelBTotal: 2, levelBValid: 0, levelBMissingIds: levelBIds, overallStatus: "non_compliant", lastCheckedAt: new Date().toISOString() },
+  ];
+
+  for (const chk of checksData) {
+    await addDoc(collection(db, "companies", user.uid, "accreditationChecks"), {
+      companyId: user.uid,
+      ...chk,
+    });
+  }
+  console.log("✅ 3 checks de acreditación creados");
+
   console.log("\n🎉 Seed completo! Puedes iniciar sesión con:");
   console.log("   Email: demo@pedroconstruction.cl");
   console.log("   Password: demo123");
@@ -344,8 +435,12 @@ async function seed() {
   console.log("   - 1 empresa (Pedro Construction)");
   console.log("   - 3 clientes con contactos");
   console.log("   - 3 oportunidades (1 ganada)");
-  console.log("   - 3 empleados");
+  console.log("   - 3 empleados con contratos");
+  console.log("   - 3 departamentos + 3 perfiles de cargo");
+  console.log("   - 5 requisitos Level A + 2 requisitos Level B");
+  console.log("   - 10 acreditaciones de empleados");
   console.log("   - 1 cotización + 1 orden de servicio");
+  console.log("   - 3 asignaciones de cuadrilla + 3 checks de acreditación");
 }
 
 seed().catch(console.error);
