@@ -43,17 +43,26 @@ export const onQuoteUpdated = onDocumentUpdated(
 
     const needsRecalculation =
       JSON.stringify(before.lines) !== JSON.stringify(after.lines) ||
-      before.taxRate !== after.taxRate ||
-      before.marginPercent !== after.marginPercent;
+      before.taxPct !== after.taxPct ||
+      before.admMarginPct !== after.admMarginPct ||
+      before.profitMarginPct !== after.profitMarginPct;
 
     if (!needsRecalculation) return;
 
     try {
-      const updated = await calculateQuoteTotal(after.lines, after.marginPercent, after.taxRate);
+      const updated = await calculateQuoteTotal({
+        lines: after.lines,
+        taxPct: after.taxPct,
+        admMarginPct: after.admMarginPct,
+        profitMarginPct: after.profitMarginPct,
+      });
       await db.collection("companies").doc(companyId).collection("quotes").doc(quoteId).update({
-        totalNet: updated.totalNet,
-        totalTax: updated.totalTax,
-        totalGross: updated.totalGross,
+        subtotalItems: updated.subtotalItems,
+        admExpenseAmount: updated.admExpenseAmount,
+        profitAmount: updated.profitAmount,
+        netTotal: updated.netTotal,
+        taxAmount: updated.taxAmount,
+        grossTotal: updated.grossTotal,
         recalculatedAt: new Date().toISOString(),
       });
     } catch (error) {

@@ -215,34 +215,43 @@ export interface CRMDocument {
 export interface QuoteLine {
   id: string;
   sectionType: "SERVICIOS" | "PERSONAL" | "INSUMOS";
+  catalogItemId?: string;
   description: string;
   quantity: number;
   unitPrice: number;
   discountPercent?: number;
-  totalLine: number;
+  subtotalLine: number;
 }
 
 export interface Quote {
   id: string;
   companyId: string;
-  leadId?: string;
+  quoteNumber?: string; // COT-XXXX-NN auto-generado
+  leadId: string;
   customerId?: string;
   title: string;
   description?: string;
   status: "draft" | "sent" | "accepted" | "rejected" | "cancelled";
   lines: QuoteLine[];
-  taxRate: number;
-  marginPercent: number;
-  subtotal: number;
-  totalNet: number;
-  totalTax: number;
-  totalGross: number;
+  taxPct: number; // IVA (default 19.0)
+  admMarginPct: number; // % Gastos Administrativos (default 5.0)
+  profitMarginPct: number; // % Utilidad (default 10.0)
+  subtotalItems: number; // Σ(qty * unit_price)
+  admExpenseAmount: number; // round(subtotal * adm_pct / 100)
+  profitAmount: number; // round(subtotal * profit_pct / 100)
+  netTotal: number; // subtotal + adm + profit
+  taxAmount: number; // round(net * tax_pct / 100)
+  grossTotal: number; // net + tax
+  notes?: string; // Términos y condiciones
+  quoteDate?: string; // Fecha editable en PDF
   validUntil?: string;
   sentAt?: string;
   acceptedAt?: string;
+  controlMeta?: Record<string, unknown>;
+  controlSnapshot?: Record<string, unknown>;
   createdBy: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 // ==========================================

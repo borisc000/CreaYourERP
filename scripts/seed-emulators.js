@@ -188,13 +188,15 @@ async function seed() {
     },
   ];
 
+  const leadIds = [];
   for (const l of leadsData) {
-    await addDoc(collection(db, "companies", user.uid, "leads"), {
+    const docRef = await addDoc(collection(db, "companies", user.uid, "leads"), {
       companyId: user.uid,
       ...l,
       isPaid: l.isPaid || false,
       createdAt: new Date().toISOString(),
     });
+    leadIds.push(docRef.id);
   }
   console.log("✅ 3 oportunidades demo creadas");
 
@@ -215,22 +217,33 @@ async function seed() {
   }
   console.log("✅ 3 empleados demo creados");
 
-  // 7. Cotización demo
+  // 7. Cotización demo (con leadId y nuevos nombres de campos)
   await addDoc(collection(db, "companies", user.uid, "quotes"), {
     companyId: user.uid,
+    quoteNumber: "COT-5001-01",
+    leadId: leadIds[0],
+    customerId: customerIds[1],
     title: "Cotización Faena Minera del Sur",
-    status: "draft",
+    description: "Cotización para supervisión y prevención en faena minera.",
+    status: "sent",
     lines: [
-      { sectionType: "SERVICIOS", description: "Supervisión de obra", quantity: 1, unitPrice: 5000000 },
-      { sectionType: "PERSONAL", description: "Prevencionista 40hrs/semana", quantity: 4, unitPrice: 2500000 },
-      { sectionType: "INSUMOS", description: "EPC básico", quantity: 10, unitPrice: 50000 },
+      { sectionType: "SERVICIOS", description: "Supervisión de obra", quantity: 1, unitPrice: 5000000, subtotalLine: 5000000 },
+      { sectionType: "PERSONAL", description: "Prevencionista 40hrs/semana", quantity: 4, unitPrice: 2500000, subtotalLine: 10000000 },
+      { sectionType: "INSUMOS", description: "EPC básico", quantity: 10, unitPrice: 50000, subtotalLine: 500000 },
     ],
-    taxRate: 19,
-    marginPercent: 15,
-    subtotal: 17550000,
-    totalNet: 20182500,
-    totalTax: 3834675,
-    totalGross: 24017175,
+    taxPct: 19,
+    admMarginPct: 5,
+    profitMarginPct: 10,
+    subtotalItems: 15500000,
+    admExpenseAmount: 775000,
+    profitAmount: 1550000,
+    netTotal: 17825000,
+    taxAmount: 3386750,
+    grossTotal: 21211750,
+    notes: "Condiciones de pago: 50% anticipo, 50% contra entrega. Validez: 30 días.",
+    quoteDate: "2024-05-15",
+    validUntil: "2024-06-15",
+    sentAt: new Date().toISOString(),
     createdBy: user.uid,
     createdAt: new Date().toISOString(),
   });

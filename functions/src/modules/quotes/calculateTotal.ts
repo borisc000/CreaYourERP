@@ -1,6 +1,14 @@
 /**
  * Recalcula los totales de una cotización desde sus líneas.
- * Traducción de la lógica del ERP Python a TypeScript.
+ * Traducción exacta de la lógica del ERP Python.
+ *
+ * Fórmula:
+ *   subtotal_items = Σ(quantity * unit_price)
+ *   adm_expense_amount = round(subtotal_items * adm_pct / 100, 0)
+ *   profit_amount = round(subtotal_items * profit_pct / 100, 0)
+ *   net_total = round(subtotal_items + adm_expense + profit, 0)
+ *   tax_amount = round(net_total * tax_pct / 100, 0)
+ *   gross_total = round(net_total + tax_amount, 0)
  */
 
 export interface QuoteLine {
@@ -10,66 +18,70 @@ export interface QuoteLine {
   quantity: number;
   unitPrice: number;
   discountPercent?: number;
-  taxPercent?: number;
 }
 
 export interface QuoteData {
   lines: QuoteLine[];
-  taxRate: number;       // Ej: 19 para IVA Chile
-  marginPercent: number; // Margen de utilidad sobre costos
+  taxPct: number;       // IVA (default 19.0)
+  admMarginPct: number; // % Gastos Administrativos (default 5.0)
+  profitMarginPct: number; // % Utilidad (default 10.0)
 }
 
 export interface QuoteTotals {
   sections: {
-    SERVICIOS: { subtotal: number; total: number };
-    PERSONAL: { subtotal: number; total: number };
-    INSUMOS: { subtotal: number; total: number };
+    SERVICIOS: { subtotal: number; count: number };
+    PERSONAL: { subtotal: number; count: number };
+    INSUMOS: { subtotal: number; count: number };
   };
-  subtotal: number;
-  totalNet: number;    // Sin IVA
-  totalTax: number;    // IVA
-  totalGross: number;  // Con IVA
-  marginAmount: number;
+  subtotalItems: number;
+  admExpenseAmount: number;
+  profitAmount: number;
+  netTotal: number;
+  taxAmount: number;
+  grossTotal: number;
+}
+
+function round(val: number): number {
+  return Math.round(val);
 }
 
 export async function calculateQuoteTotal(quote: QuoteData): Promise<QuoteTotals> {
   const sections: QuoteTotals["sections"] = {
-    SERVICIOS: { subtotal: 0, total: 0 },
-    PERSONAL: { subtotal: 0, total: 0 },
-    INSUMOS: { subtotal: 0, total: 0 },
+    SERVICIOS: { subtotal: 0, count: 0 },
+    PERSONAL: { subtotal: 0, count: 0 },
+    INSUMOS: { subtotal: 0, count: 0 },
   };
 
-  let subtotal = 0;
+  let subtotalItems = 0;
 
   for (const line of quote.lines || []) {
     const qty = Number(line.quantity) || 0;
     const price = Number(line.unitPrice) || 0;
-    const discount = Number(line.discountPercent) || 0;
 
     const lineSubtotal = qty * price;
-    const lineDiscount = lineSubtotal * (discount / 100);
-    const lineTotal = lineSubtotal - lineDiscount;
 
     sections[line.sectionType].subtotal += lineSubtotal;
-    sections[line.sectionType].total += lineTotal;
-    subtotal += lineTotal;
+    sections[line.sectionType].count += 1;
+    subtotalItems += lineSubtotal;
   }
 
-  // Margen de utilidad
-  const marginAmount = subtotal * (quote.marginPercent / 100);
-  const totalNet = subtotal + marginAmount;
+  const taxPct = Number(quote.taxPct) || 19;
+  const admMarginPct = Number(quote.admMarginPct) || 5;
+  const profitMarginPct = Number(quote.profitMarginPct) || 10;
 
-  // IVA
-  const taxRate = Number(quote.taxRate) || 19;
-  const totalTax = totalNet * (taxRate / 100);
-  const totalGross = totalNet + totalTax;
+  const admExpenseAmount = round(subtotalItems * admMarginPct / 100);
+  const profitAmount = round(subtotalItems * profitMarginPct / 100);
+  const netTotal = round(subtotalItems + admExpenseAmount + profitAmount);
+  const taxAmount = round(netTotal * taxPct / 100);
+  const grossTotal = round(netTotal + taxAmount);
 
   return {
     sections,
-    subtotal,
-    totalNet,
-    totalTax,
-    totalGross,
-    marginAmount,
+    subtotalItems,
+    admExpenseAmount,
+    profitAmount,
+    netTotal,
+    taxAmount,
+    grossTotal,
   };
 }

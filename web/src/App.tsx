@@ -7,6 +7,8 @@ import { LoginPage } from "./pages/LoginPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { QuoteList } from "./modules/quotes/QuoteList";
+import { QuoteForm } from "./modules/quotes/QuoteForm";
+import { QuoteDetail } from "./modules/quotes/QuoteDetail";
 import { CustomerList } from "./modules/crm/CustomerList";
 import { CustomerForm } from "./modules/crm/CustomerForm";
 import { CustomerDetail } from "./modules/crm/CustomerDetail";
@@ -33,6 +35,9 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/quotes" element={<QuoteList />} />
+                <Route path="/quotes/new" element={<QuoteForm />} />
+                <Route path="/quotes/:id" element={<QuoteDetail />} />
+                <Route path="/quotes/:id/edit" element={<QuoteForm />} />
 
                 {/* CRM */}
                 <Route path="/crm/customers" element={<CustomerList />} />

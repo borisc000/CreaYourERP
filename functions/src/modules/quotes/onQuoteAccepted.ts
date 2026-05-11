@@ -40,13 +40,22 @@ export const onQuoteAccepted = onDocumentUpdated(
         requiredCourseIds: after.requiredCourseIds || [],
         startDate: after.validUntil || null,
         endDate: null,
-        location: after.location || "",
+        location: after.empresaFaena || "",
         riskLevel: "Medio",
         createdBy: after.createdBy,
         createdAt: new Date().toISOString(),
       });
 
-      // 2. Crear notificación para el creador de la cotización
+      // 2. Actualizar lead a 'won' si existe
+      if (after.leadId) {
+        await db.collection("companies").doc(companyId).collection("leads").doc(after.leadId).update({
+          status: "won",
+          acceptedQuoteId: quoteId,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      // 3. Crear notificación para el creador de la cotización
       await db.collection("companies").doc(companyId).collection("notifications").add({
         userId: after.createdBy,
         type: "quote.accepted",
@@ -57,7 +66,7 @@ export const onQuoteAccepted = onDocumentUpdated(
         createdAt: new Date().toISOString(),
       });
 
-      // 3. Crear tarea de onboarding para la orden
+      // 4. Crear tarea de onboarding para la orden
       await db.collection("companies").doc(companyId).collection("tasks").add({
         companyId,
         title: `Preparar faena: ${after.title}`,
