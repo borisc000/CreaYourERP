@@ -200,22 +200,94 @@ async function seed() {
   }
   console.log("✅ 3 oportunidades demo creadas");
 
-  // 6. Empleados demo
-  const employees = [
-    { firstName: "Juan", lastName: "Pérez", email: "juan@pedroconstruction.cl", status: "active" },
-    { firstName: "María", lastName: "González", email: "maria@pedroconstruction.cl", status: "active" },
-    { firstName: "Carlos", lastName: "Silva", email: "carlos@pedroconstruction.cl", status: "active" },
+  // 6. Departamentos demo
+  const departmentsData = [
+    { name: "Operaciones", code: "OPS", isActive: true },
+    { name: "Prevención de Riesgos", code: "PRC", isActive: true },
+    { name: "Administración", code: "ADM", isActive: true },
+  ];
+  const departmentIds = [];
+  for (const d of departmentsData) {
+    const docRef = await addDoc(collection(db, "companies", user.uid, "departments"), {
+      companyId: user.uid,
+      ...d,
+    });
+    departmentIds.push(docRef.id);
+  }
+  console.log("✅ 3 departamentos demo creados");
+
+  // 6b. Perfiles de cargo demo
+  const profilesData = [
+    { name: "Supervisor de Obra", code: "SUP-001", riskLevel: "Medio", requiredCourseIds: [], requiredRequirementIds: [], isActive: true },
+    { name: "Prevencionista de Riesgos", code: "PRC-001", riskLevel: "Alto", requiredCourseIds: [], requiredRequirementIds: [], isActive: true },
+    { name: "Operario General", code: "OPE-001", riskLevel: "Bajo", requiredCourseIds: [], requiredRequirementIds: [], isActive: true },
+  ];
+  const profileIds = [];
+  for (const p of profilesData) {
+    const docRef = await addDoc(collection(db, "companies", user.uid, "jobProfiles"), {
+      companyId: user.uid,
+      ...p,
+    });
+    profileIds.push(docRef.id);
+  }
+  console.log("✅ 3 perfiles de cargo demo creados");
+
+  // 6c. Empleados demo (completos)
+  const employeesData = [
+    {
+      firstName: "Juan", lastName: "Pérez", fullName: "Juan Pérez",
+      email: "juan@pedroconstruction.cl", workEmail: "juan@pedroconstruction.cl",
+      phone: "+56 9 8765 4321", cedula: "12.345.678-9",
+      departmentId: departmentIds[0], jobProfileId: profileIds[0],
+      hireDate: "2023-03-15", baseSalary: 1500000,
+      healthSystem: "fonasa", afpCode: "CAPITAL",
+      status: "active", isActive: true,
+    },
+    {
+      firstName: "María", lastName: "González", fullName: "María González",
+      email: "maria@pedroconstruction.cl", workEmail: "maria@pedroconstruction.cl",
+      phone: "+56 9 1234 5678", cedula: "15.234.567-0",
+      departmentId: departmentIds[1], jobProfileId: profileIds[1],
+      hireDate: "2022-08-01", baseSalary: 1800000,
+      healthSystem: "isapre", afpCode: "HABITAT",
+      status: "active", isActive: true,
+    },
+    {
+      firstName: "Carlos", lastName: "Silva", fullName: "Carlos Silva",
+      email: "carlos@pedroconstruction.cl", workEmail: "carlos@pedroconstruction.cl",
+      phone: "+56 9 5678 9012", cedula: "10.987.654-3",
+      departmentId: departmentIds[0], jobProfileId: profileIds[2],
+      hireDate: "2024-01-10", baseSalary: 900000,
+      healthSystem: "fonasa", afpCode: "MODELO",
+      status: "onboarding", isActive: true,
+    },
   ];
 
-  for (const e of employees) {
-    await addDoc(collection(db, "companies", user.uid, "employees"), {
+  const employeeIds = [];
+  for (const e of employeesData) {
+    const docRef = await addDoc(collection(db, "companies", user.uid, "employees"), {
       companyId: user.uid,
       ...e,
-      isActive: true,
+      createdAt: new Date().toISOString(),
+    });
+    employeeIds.push(docRef.id);
+  }
+  console.log("✅ 3 empleados demo creados");
+
+  // 6d. Contratos demo
+  const contractsData = [
+    { employeeId: employeeIds[0], contractType: "indefinite", status: "active", startDate: "2023-03-15", salaryAmount: 1500000 },
+    { employeeId: employeeIds[1], contractType: "indefinite", status: "active", startDate: "2022-08-01", salaryAmount: 1800000 },
+    { employeeId: employeeIds[2], contractType: "fixed_term", status: "active", startDate: "2024-01-10", endDate: "2024-12-31", salaryAmount: 900000 },
+  ];
+  for (const c of contractsData) {
+    await addDoc(collection(db, "companies", user.uid, "contracts"), {
+      companyId: user.uid,
+      ...c,
       createdAt: new Date().toISOString(),
     });
   }
-  console.log("✅ 3 empleados demo creados");
+  console.log("✅ 3 contratos demo creados");
 
   // 7. Cotización demo (con leadId y nuevos nombres de campos)
   await addDoc(collection(db, "companies", user.uid, "quotes"), {

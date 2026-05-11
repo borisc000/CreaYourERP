@@ -17,6 +17,10 @@ import { LeadForm } from "./modules/crm/LeadForm";
 import { LeadDetail } from "./modules/crm/LeadDetail";
 import { ServiceOrderList } from "./modules/accreditation/ServiceOrderList";
 import { EmployeeList } from "./modules/hr/EmployeeList";
+import { EmployeeForm } from "./modules/hr/EmployeeForm";
+import { EmployeeDetail } from "./modules/hr/EmployeeDetail";
+import { DepartmentList } from "./modules/hr/DepartmentList";
+import { JobProfileList } from "./modules/hr/JobProfileList";
 import { SignatureCenter } from "./modules/signature/SignatureCenter";
 
 function App() {
@@ -51,6 +55,11 @@ function App() {
 
                 <Route path="/accreditation" element={<ServiceOrderList />} />
                 <Route path="/hr" element={<EmployeeList />} />
+                <Route path="/hr/employees/new" element={<EmployeeForm />} />
+                <Route path="/hr/employees/:id" element={<EmployeeDetail />} />
+                <Route path="/hr/employees/:id/edit" element={<EmployeeForm />} />
+                <Route path="/hr/departments" element={<DepartmentList />} />
+                <Route path="/hr/job-profiles" element={<JobProfileList />} />
                 <Route path="/signature-center" element={<SignatureCenter />} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Route>

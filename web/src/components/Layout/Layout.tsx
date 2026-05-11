@@ -11,6 +11,8 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
+  BuildingOfficeIcon,
+  BriefcaseIcon,
 } from "@heroicons/react/24/outline";
 
 const menuGroups = [
@@ -32,7 +34,9 @@ const menuGroups = [
     title: "Operaciones",
     items: [
       { to: "/accreditation", label: "Acreditaciones", icon: ClipboardDocumentCheckIcon },
-      { to: "/hr", label: "RRHH", icon: UsersIcon },
+      { to: "/hr", label: "Colaboradores", icon: UsersIcon },
+      { to: "/hr/departments", label: "Departamentos", icon: BuildingOfficeIcon },
+      { to: "/hr/job-profiles", label: "Perfiles de Cargo", icon: BriefcaseIcon },
     ],
   },
   {

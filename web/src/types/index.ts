@@ -261,25 +261,66 @@ export interface Quote {
 export interface Employee {
   id: string;
   companyId: string;
+  employeeCode?: string; // EMP-{seq} auto-generado
   firstName: string;
   lastName: string;
+  fullName?: string;
   email: string;
+  workEmail?: string;
+  personalEmail?: string;
   phone?: string;
-  cedula?: string; // Identificación chilena
+  alternatePhone?: string;
+  cedula?: string; // RUN chileno
+  birthDate?: string;
+  gender?: string;
+  maritalStatus?: string;
+  nationality?: string;
+  address?: string;
+  commune?: string;
+  city?: string;
+  region?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  healthSystem?: "fonasa" | "isapre";
+  afpCode?: string;
+  drivingLicense?: string;
+  criminalRecordStatus?: "pending" | "clear" | "observed" | "not_provided";
+  backgroundNotes?: string;
   jobProfileId?: string;
   departmentId?: string;
   hireDate?: string;
-  status: "active" | "on_leave" | "terminated";
+  baseSalary?: number;
+  status: "draft" | "onboarding" | "active" | "on_leave" | "inactive";
   isActive: boolean;
   photoURL?: string;
+  notes?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Department {
   id: string;
   companyId: string;
   name: string;
+  code?: string;
   managerId?: string;
+  managerName?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface EmployeeContract {
+  id: string;
+  companyId: string;
+  employeeId: string;
+  contractType: "indefinite" | "fixed_term" | "internship" | "services";
+  status: "draft" | "active" | "expired" | "terminated";
+  startDate?: string;
+  endDate?: string;
+  salaryAmount?: number;
+  workSchedule?: string;
+  shiftPattern?: string;
+  workLocation?: string;
   createdAt: string;
 }
 

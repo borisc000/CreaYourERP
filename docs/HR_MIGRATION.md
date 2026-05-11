@@ -1,97 +1,128 @@
 # Migración del Módulo HR (RRHH)
 
-> Estado: 🔄 En progreso
+> Estado: ✅ Completado (Phase 1)
 
 ## Análisis del ERP Python
 
-El módulo HR gestiona:
+El módulo HR del ERP Python gestiona:
 
-- **Employees:** Trabajadores de la empresa
-- **Departments:** Departamentos organizacionales
-- **JobProfiles:** Perfiles de cargo (requerimientos, cursos, nivel de riesgo)
-- **EmployeeAccreditation:** Acreditaciones individuales por empleado
+- **Employees / EmployeeProfile:** Trabajadores con datos personales, laborales, contacto de emergencia, salud, AFP
+- **Departments:** Unidades organizacionales
+- **JobProfiles:** Perfiles de cargo con requisitos de acreditación
+- **EmployeeContracts:** Contratos de trabajo (indefinido, plazo fijo, práctica, servicios)
+- **EmployeeAccreditationDocument:** Documentos de acreditación por empleado
 - **CrewAssignments:** Asignación de empleados a órdenes de servicio
+- **AccreditationCheck:** Matriz de cumplimiento Nivel A / Nivel B
 
 ## Traducción de Modelos
 
-### Python → TypeScript/Firestore
+### Campos migrados de EmployeeProfile
 
-| Python (`hr.*`) | Firestore Collection | TypeScript Interface |
-|-----------------|---------------------|----------------------|
-| `hr.employee` | `employees` | `Employee` |
-| `hr.department` | `departments` | `Department` |
-| `hr.job_profile` | `jobProfiles` | `JobProfile` |
-| `hr.employee_accreditation` | `employeeAccreditations` | `EmployeeAccreditation` |
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `employeeCode` | string | Auto-generado `EMP-{seq}` (pendiente implementar) |
+| `firstName`, `lastName` | string | Requeridos |
+| `fullName` | string | Auto-calculado |
+| `email`, `workEmail`, `personalEmail` | string | |
+| `phone`, `alternatePhone` | string | |
+| `cedula` | string | RUN chileno |
+| `birthDate` | string | YYYY-MM-DD |
+| `gender` | string | male / female / other / prefer_not_to_say |
+| `maritalStatus` | string | single / married / divorced / widowed / cohabiting |
+| `nationality` | string | |
+| `address`, `commune`, `city`, `region` | string | Dirección completa |
+| `emergencyContactName`, `emergencyContactPhone` | string | |
+| `healthSystem` | string | fonasa / isapre |
+| `afpCode` | string | CAPITAL, HABITAT, MODELO, PLANVITAL, PROVIDA, UNO, etc. |
+| `drivingLicense` | string | Clase de licencia |
+| `criminalRecordStatus` | string | pending / clear / observed / not_provided |
+| `backgroundNotes` | string | |
+| `departmentId` | string | FK → departments |
+| `jobProfileId` | string | FK → jobProfiles |
+| `hireDate` | string | YYYY-MM-DD |
+| `baseSalary` | number | |
+| `status` | string | draft / onboarding / active / on_leave / inactive |
+| `isActive` | boolean | Soft delete |
+| `notes` | string | |
 
-### Campos clave de Employee
+### EmployeeContract
 
 ```typescript
-interface Employee {
+interface EmployeeContract {
   id: string;
   companyId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  cedula?: string;        // RUN chileno
-  jobProfileId?: string;
-  departmentId?: string;
-  hireDate?: string;
-  status: "active" | "on_leave" | "terminated";
-  isActive: boolean;
-  photoURL?: string;
+  employeeId: string;
+  contractType: "indefinite" | "fixed_term" | "internship" | "services";
+  status: "draft" | "active" | "expired" | "terminated";
+  startDate?: string;
+  endDate?: string;
+  salaryAmount?: number;
+  workSchedule?: string;
+  shiftPattern?: string;
+  workLocation?: string;
   createdAt: string;
 }
 ```
 
-## Cloud Functions existentes
-
-### `onEmployeeHired`
-
-**Ubicación:** `functions/src/modules/hr/onEmployeeHired.ts`
-
-**Estado:** Scaffold creado, lógica pendiente de completar.
-
-**Acciones planificadas:**
-1. Crear tareas de onboarding (documentación, inducción)
-2. Crear `EmployeeAccreditation` pendientes según `JobProfile`
-3. Notificar al manager del departamento
-
-## Componentes React planificados
+## Componentes React
 
 ### EmployeeList
-- Lista de empleados con búsqueda
-- Filtros: estado, departamento, perfil de cargo
-- Stats: total, activos, de licencia
+- Lista de colaboradores con búsqueda (nombre, email, cédula)
+- Filtro por estado (todos, activo, onboarding, licencia, inactivo)
+- Stats cards: total, activos, en inducción, de licencia
+- Avatares con iniciales o foto
+- Badges de estado con colores
 
 ### EmployeeForm
-- Información personal (nombre, email, teléfono, cédula)
-- Datos laborales (departamento, perfil, fecha de contratación)
-- Foto de perfil
+- **Información Personal:** Nombres, apellidos, RUT, nacimiento, género, estado civil, nacionalidad, licencia
+- **Contacto:** 3 emails, 2 teléfonos, dirección completa (calle, comuna, ciudad, región)
+- **Contacto de Emergencia:** Nombre y teléfono
+- **Datos Laborales:** Departamento, perfil de cargo, fecha de contratación, sueldo, salud (FONASA/ISAPRE), AFP, estado
+- **Notas:** Campo libre
 
 ### EmployeeDetail
-- Info completa del empleado
-- Acreditaciones (nivel A y B)
-- Historial de asignaciones a faenas
-- Documentos
+- Header con avatar, nombre, código de empleado, badge de estado
+- **Contacto:** Email, teléfono, dirección
+- **Laboral:** Departamento, perfil, contratación, sueldo, salud, AFP
+- **Emergencia:** Contacto de emergencia
+- **Información Personal:** RUT, nacimiento, género, nacionalidad, licencia, antecedentes
+- **Contratos:** Lista de contratos con tipo, fechas, estado
+- **Notas**
 
-### DepartmentList / DepartmentForm
-- CRUD de departamentos
-- Asignación de manager
+### DepartmentList
+- CRUD simple de departamentos
+- Campo: nombre, código (opcional)
+- Lista con botón eliminar
 
-## Relaciones con otros módulos
+### JobProfileList
+- CRUD simple de perfiles de cargo
+- Campo: nombre, código, nivel de riesgo
+- Lista con botón eliminar
+
+## Seed script
+
+Crea automáticamente:
+- 3 departamentos: Operaciones, Prevención de Riesgos, Administración
+- 3 perfiles: Supervisor de Obra, Prevencionista, Operario General
+- 3 empleados con datos completos (incluyendo departamento, perfil, contrato, salud, AFP)
+- 3 contratos vinculados
+
+## Relaciones
 
 ```
 Employee ──→ Department (N:1)
 Employee ──→ JobProfile (N:1)
-Employee ──→ CrewAssignment (1:N)
-Employee ──→ EmployeeAccreditation (1:N)
-JobProfile ──→ EmployeeAccreditation (1:N, template)
+Employee ──→ EmployeeContract (1:N)
+Employee ──→ CrewAssignment (1:N) [pendiente]
+Employee ──→ EmployeeAccreditation (1:N) [pendiente]
 ```
 
-## Notas para desarrolladores
+## Próximos pasos (Phase 2)
 
-- El `cedula` es el RUN chileno (formato: 12.345.678-9)
-- `JobProfile` define los requisitos obligatorios para un cargo
-- Cuando un empleado es contratado, se crean automáticamente las acreditaciones pendientes
-- El `status` puede ser `active`, `on_leave`, `terminated`
+1. **EmployeeContract CRUD** — Formulario de contratos en EmployeeDetail
+2. **Onboarding workflow** — Cloud Function `onEmployeeHired` completo
+3. **Accreditation matrix** — Nivel A (general) y Nivel B (cliente)
+4. **Crew assignment** — Asignar empleados a órdenes de servicio
+5. **EmployeeCode auto-generation** — `EMP-{seq}` al crear empleado
+6. **Leave management** — Licencias, permisos
+7. **Termination workflow** — Desvinculación con documentos

@@ -9,7 +9,7 @@
 | **Auth / Base** | ✅ Completo | Login, registro, onboarding, roles | `onUserCreated`, custom claims | ✅ |
 | **CRM** | ✅ Completo | Customers, Leads, Contacts (Mandantes) | `onLeadCreated`, `onLeadUpdated`, `onLeadWon` | ✅ |
 | **Quotes** | ✅ Completo | List, Form (3 secciones), Detail | `calculateQuoteTotal`, `onQuoteUpdated`, `onQuoteAccepted` | ✅ |
-| **HR** | 🔄 Pendiente | EmployeeList placeholder | `onEmployeeHired` (scaffold) | ❌ |
+| **HR** | ✅ Completo | EmployeeList, EmployeeForm, EmployeeDetail, DepartmentList, JobProfileList | `onEmployeeHired` (scaffold) | ✅ |
 | **Accreditation** | 🔄 Pendiente | ServiceOrderList placeholder | `checkCrewCompliance` (scaffold) | ❌ |
 | **Signature** | 🔄 Pendiente | SignatureCenter placeholder | — | ❌ |
 | **Safety** | 🔄 Pendiente | — | — | ❌ |
