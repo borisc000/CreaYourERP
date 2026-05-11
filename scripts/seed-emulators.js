@@ -136,6 +136,7 @@ async function seed() {
       description: "Supervisión de obra civil en faena minera. Requiere prevencionista y supervisor.",
       priority: "high",
       status: "open",
+      stageId: "Propuesta",
       expectedRevenue: 45000000,
       probability: 75,
       expectedCloseDate: "2024-07-15",
@@ -154,6 +155,7 @@ async function seed() {
       description: "Construcción de bodega industrial 2000m2 con oficinas.",
       priority: "medium",
       status: "open",
+      stageId: "Negociación",
       expectedRevenue: 120000000,
       probability: 40,
       expectedCloseDate: "2024-08-30",
@@ -172,6 +174,7 @@ async function seed() {
       description: "Mantención preventiva y correctiva de parque eólico.",
       priority: "low",
       status: "won",
+      stageId: "Ganada",
       expectedRevenue: 28000000,
       probability: 100,
       expectedCloseDate: "2024-04-01",
@@ -427,6 +430,23 @@ async function seed() {
     });
   }
   console.log("✅ 3 checks de acreditación creados");
+
+  // 8d. Activity logs demo
+  const activityLogsData = [
+    { leadId: leadIds[0], type: "created", message: "Oportunidad creada con código PRJ-5001", userId: user.uid, createdAt: new Date(Date.now() - 86400000 * 5).toISOString() },
+    { leadId: leadIds[0], type: "updated", message: "Ingreso esperado actualizado: $45.000.000", userId: user.uid, createdAt: new Date(Date.now() - 86400000 * 3).toISOString() },
+    { leadId: leadIds[2], type: "status_changed", message: "Estado cambiado a: Ganada", userId: user.uid, createdAt: new Date(Date.now() - 86400000 * 2).toISOString() },
+    { leadId: leadIds[2], type: "updated", message: "Prioridad cambiada a: Alta", userId: user.uid, createdAt: new Date(Date.now() - 86400000 * 1).toISOString() },
+    { leadId: leadIds[1], type: "created", message: "Oportunidad creada con código PRJ-5002", userId: user.uid, createdAt: new Date(Date.now() - 86400000 * 4).toISOString() },
+  ];
+
+  for (const log of activityLogsData) {
+    await addDoc(collection(db, "companies", user.uid, "activityLogs"), {
+      companyId: user.uid,
+      ...log,
+    });
+  }
+  console.log("✅ 5 activity logs demo creados");
 
   console.log("\n🎉 Seed completo! Puedes iniciar sesión con:");
   console.log("   Email: demo@pedroconstruction.cl");
