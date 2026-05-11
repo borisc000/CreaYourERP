@@ -1,0 +1,38 @@
+{
+  "name": "your-erp-firebase",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:functions\" \"npm run dev:web\" \"npm run emulators\"",
+    "dev:web": "cd web && npm run dev",
+    "dev:functions": "cd functions && npm run build:watch",
+    "emulators": "firebase emulators:start",
+    "build": "npm run build:functions && npm run build:web",
+    "build:functions": "cd functions && npm run build",
+    "build:web": "cd web && npm run build",
+    "lint": "npm run lint:web && npm run lint:functions",
+    "lint:web": "cd web && npm run lint",
+    "lint:functions": "cd functions && npm run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "test": "npm run test:functions && npm run test:web",
+    "test:functions": "cd functions && npm test",
+    "test:web": "cd web && npm test",
+    "seed": "node scripts/seed-emulators.js",
+    "deploy": "firebase deploy",
+    "deploy:staging": "firebase deploy --project staging",
+    "deploy:prod": "firebase deploy --project prod",
+    "generate:module": "cd tools && npx plop module",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "prettier": "^3.1.0",
+    "husky": "^8.0.0",
+    "lint-staged": "^15.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
+    "*.{js,jsx,json,md}": ["prettier --write"]
+  }
+}

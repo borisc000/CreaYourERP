@@ -1,0 +1,34 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [staging]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: |
+          cd web && npm ci
+          cd ../functions && npm ci
+
+      - name: Build
+        run: |
+          cd web && npm run build
+          cd ../functions && npm run build
+
+      - name: Deploy to Firebase Staging
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --project staging
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}

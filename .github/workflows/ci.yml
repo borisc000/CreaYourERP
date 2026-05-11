@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, staging]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: |
+            web/package-lock.json
+            functions/package-lock.json
+
+      - name: Install Dependencies (Root)
+        run: npm install
+
+      - name: Install Dependencies (Web)
+        run: cd web && npm install
+
+      - name: Install Dependencies (Functions)
+        run: cd functions && npm install
+
+      - name: Lint Web
+        run: cd web && npm run lint
+
+      - name: Lint Functions
+        run: cd functions && npm run lint
+
+      - name: Build Web
+        run: cd web && npm run build
+
+      - name: Build Functions
+        run: cd functions && npm run build
+
+      - name: Check Formatting
+        run: npx prettier --check "**/*.{ts,tsx,js,jsx,json,md}"

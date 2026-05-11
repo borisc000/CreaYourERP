@@ -1,0 +1,20 @@
+import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
+
+/**
+ * Cloud Functions para el módulo {{NameCapitalized}}.
+ */
+
+// Ejemplo: trigger al crear un documento
+export const on{{NameCapitalized}}Create = functions.firestore
+  .document('companies/{companyId}/{{collectionName}}/{docId}')
+  .onCreate(async (snap, context) => {
+    const { companyId, docId } = context.params;
+    const data = snap.data();
+
+    console.log(`[{{NameCapitalized}}] Nuevo documento ${docId} en empresa ${companyId}`);
+
+    // TODO: Agregar lógica de negocio
+
+    return null;
+  });

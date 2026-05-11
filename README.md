@@ -1,195 +1,129 @@
-# YOUR ERP - Firebase Edition
+# Your ERP — Firebase Edition
 
-ERP multi-tenant para empresas subcontratistas, construido sobre **Firebase** (Auth, Firestore, Functions, Hosting, Storage).
+ERP modular para empresas de servicios (construcción, minería, industrial) reescrito en Firebase.
 
-## 🏗️ Arquitectura
+## Stack Tecnológico
 
-```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   React 18      │────▶│  Firebase Auth   │────▶│  Custom Claims  │
-│   + Vite        │     │  (JWT Tokens)    │     │  (companyId)    │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-         │                                               │
-         │                                               │
-         ▼                                               ▼
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Firestore     │◀───▶│  Cloud Functions │     │   Security      │
-│   (NoSQL DB)    │     │  (Node.js/TS)    │     │   Rules         │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Firebase       │
-│  Storage        │
-│  (PDFs, fotos)  │
-└─────────────────┘
-```
+| Capa | Tecnología |
+|------|-----------|
+| Frontend | React 18 + Vite + TypeScript + TailwindCSS |
+| Backend | Firebase Cloud Functions (Node.js 20) |
+| Base de datos | Firestore (multi-tenant) |
+| Auth | Firebase Authentication |
+| Hosting | Firebase Hosting |
+| CI/CD | GitHub Actions |
 
-## 📁 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 your-erp-firebase/
-├── firebase.json              # Configuración de Firebase
-├── firestore.rules            # REGLAS DE SEGURIDAD MULTI-TENANT
-├── firestore.indexes.json     # Índices compuestos
-├── storage.rules              # Reglas de Storage
-├── functions/                 # Backend serverless (Cloud Functions)
+├── functions/          # Cloud Functions (backend)
 │   ├── src/
-│   │   ├── index.ts           # Entry point de funciones
-│   │   ├── config.ts          # Config y planes de suscripción
-│   │   ├── auth/
-│   │   │   └── onUserCreate.ts
-│   │   ├── billing/
-│   │   │   └── enforcePlanLimits.ts
-│   │   └── modules/
-│   │       ├── quotes/
-│   │       │   └── calculateTotal.ts
-│   │       └── accreditation/
-│   │           └── checkCrewCompliance.ts
+│   │   ├── index.ts           # Entry point
+│   │   ├── auth/              # Auth triggers
+│   │   ├── billing/           # Stripe & plan limits
+│   │   ├── quotes/            # Quote calculations
+│   │   ├── hr/                # HR & compliance
+│   │   └── services/          # Audit, notifications
 │   └── package.json
-└── web/                       # Frontend React
-    ├── src/
-    │   ├── firebase/config.ts
-    │   ├── contexts/
-    │   │   ├── AuthContext.tsx      # Auth + companyId desde JWT
-    │   │   └── CompanyContext.tsx   # Datos de empresa en tiempo real
-    │   ├── hooks/
-    │   │   └── useFirestore.ts      # Lectura/escritura multi-tenant
-    │   ├── modules/
-    │   │   ├── quotes/
-    │   │   ├── crm/
-    │   │   ├── accreditation/
-    │   │   ├── hr/
-    │   │   └── signature/
-    │   └── types/index.ts           # Modelos TypeScript
-    └── package.json
+├── web/                # Frontend React
+│   ├── src/
+│   │   ├── modules/           # Módulos ERP (CRM, HR, Quotes...)
+│   │   ├── components/        # Componentes compartidos
+│   │   ├── hooks/             # useFirestore, useAuth...
+│   │   ├── contexts/          # AuthContext, CompanyContext
+│   │   └── types/             # TypeScript interfaces
+│   └── package.json
+├── scripts/            # Utilidades (seed, migración)
+├── tools/              # Generadores (plop)
+└── firebase.json       # Configuración Firebase
 ```
 
-## 🔐 Multi-Tenant: Cómo funciona
+## Inicio Rápido
 
-Cada usuario tiene un **JWT token** de Firebase Auth con **custom claims**:
-```json
-{
-  "companyId": "abc123",
-  "role": "admin"
-}
-```
-
-Las **Security Rules** de Firestore filtran automáticamente:
-```javascript
-match /companies/{companyId}/quotes/{quoteId} {
-  allow read: if request.auth.token.companyId == companyId;
-}
-```
-
-Esto significa: **un usuario de "Constructora A" NUNCA puede ver datos de "Constructora B"**, incluso si intenta hackear el frontend.
-
-## 🚀 Quick Start
-
-### 1. Prerrequisitos
-- Node.js 20+
-- Firebase CLI: `npm install -g firebase-tools`
-- Cuenta Firebase (gratis en firebase.google.com)
-
-### 2. Crear proyecto Firebase
-```bash
-firebase login
-firebase projects:create your-erp-dev
-```
-
-### 3. Configurar variables
-```bash
-cp .env.example web/.env.local
-# Editar con tus credenciales de Firebase
-```
-
-### 4. Instalar dependencias
-```bash
-cd functions && npm install && cd ..
-cd web && npm install && cd ..
-```
-
-### 5. Emuladores locales (desarrollo)
-```bash
-firebase emulators:start
-```
-Esto levanta:
-- Auth: http://localhost:9099
-- Firestore: http://localhost:8080
-- Functions: http://localhost:5001
-- Hosting: http://localhost:5000
-- UI: http://localhost:4000
-
-### 6. Frontend en dev mode
-```bash
-cd web && npm run dev
-```
-
-### 7. Deploy a producción
-```bash
-firebase deploy
-```
-
-## 📊 Modelo de Datos (Firestore)
-
-```
-companies/{companyId}
-├── users/{userId}
-├── quotes/{quoteId}
-├── customers/{customerId}
-├── leads/{leadId}
-├── employees/{employeeId}
-├── departments/{deptId}
-├── serviceOrders/{orderId}
-├── crewAssignments/{assignmentId}
-├── accreditationChecks/{checkId}
-├── signatureRequests/{requestId}
-├── safetyDocuments/{docId}
-├── inventoryItems/{itemId}
-├── suppliers/{supplierId}
-└── expenses/{expenseId}
-```
-
-## 💳 Planes de Suscripción
-
-| Plan | Usuarios | Cotizaciones | Órdenes | Precio CLP |
-|------|----------|--------------|---------|------------|
-| Free | 3 | 10/mes | 5 | $0 |
-| Growth | 15 | ∞ | 50/mes | $89.900 |
-| Enterprise | ∞ | ∞ | ∞ | $249.900 |
-
-Los límites se validan en **Cloud Functions** antes de cada creación.
-
-## 🧪 Tests
+### 1. Instalar dependencias
 
 ```bash
-cd functions
-npm run test
-
-cd ../web
-npm run test
+npm install
+cd web && npm install
+cd ../functions && npm install
 ```
 
-## 📦 Módulos Implementados
+### 2. Configurar variables de entorno
 
-- [x] Auth multi-tenant (login, registro, onboarding)
-- [x] Dashboard con stats
-- [x] Cotizaciones (lista básica)
-- [x] Clientes (CRM básico)
-- [x] Acreditaciones (órdenes de servicio)
-- [x] RRHH (lista de empleados)
-- [x] Firmas (centro de firmas)
-- [x] Lógica de negocio server-side (recalcular cotizaciones, verificar acreditaciones)
+```bash
+cp .env.example .env.local
+# Editar .env.local con tus credenciales de Firebase
+```
 
-## 🛣️ Roadmap
+### 3. Iniciar emuladores
 
-1. **Integrar Stripe** para cobros recurrentes
-2. **Integrar DocuSign** para firma legal real
-3. **App móvil** (PWA o Flutter)
-4. **Reportes** con PDF generation
-5. **Facturación SII** (Chile)
-6. **Notificaciones push**
+```bash
+npm run emulators
+```
 
----
+### 4. Iniciar desarrollo
 
-Hecho con ❤️ para empresas subcontratistas chilenas.
+```bash
+# Terminal 1: Frontend
+npm run dev:web
+
+# Terminal 2: Functions watcher
+npm run dev:functions
+```
+
+O todo junto:
+
+```bash
+npm run dev
+```
+
+### 5. Poblar datos demo
+
+```bash
+npm run seed
+```
+
+Credenciales demo:
+- Email: `demo@pedroconstruction.cl`
+- Password: `demo123`
+
+## Scripts Disponibles
+
+| Script | Descripción |
+|--------|-------------|
+| `npm run dev` | Inicia web + functions + emuladores |
+| `npm run emulators` | Solo emuladores de Firebase |
+| `npm run seed` | Puebla emuladores con datos demo |
+| `npm run build` | Build de producción |
+| `npm run lint` | Lint de web + functions |
+| `npm run format` | Formateo con Prettier |
+| `npm run test` | Tests de web + functions |
+| `npm run generate:module` | Genera boilerplate de nuevo módulo |
+
+## Módulos ERP
+
+| Módulo | Estado | Descripción |
+|--------|--------|-------------|
+| Auth | ✅ Listo | Login, registro, roles |
+| CRM | 🔄 Pendiente | Clientes, contactos |
+| Quotes | 🔄 Pendiente | Cotizaciones con cálculos |
+| HR | 🔄 Pendiente | Empleados, brigadas |
+| Accreditation | 🔄 Pendiente | Certificaciones, cursos |
+| Signature | 🔄 Pendiente | DocuSign integration |
+| Safety | 🔄 Pendiente | Inspecciones, accidentes |
+| Billing | 🔄 Pendiente | Stripe, facturación |
+
+## Multi-tenancy
+
+Cada empresa es un documento bajo `/companies/{companyId}`. Todos los recursos pertenecen a esa empresa. Las Firebase Security Rules aíslan los datos a nivel de hardware.
+
+## CI/CD
+
+- `develop` → deploy automático a dev
+- `staging` → deploy automático a staging
+- `main` → deploy automático a producción
+
+## Licencia
+
+Proyecto privado — Pedro Construction.
