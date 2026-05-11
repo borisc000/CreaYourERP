@@ -24,6 +24,7 @@ const menuGroups = [
   {
     title: "Comercial",
     items: [
+      { to: "/crm/leads", label: "Oportunidades", icon: ChartBarIcon },
       { to: "/crm/customers", label: "Clientes", icon: UsersIcon },
     ],
   },
@@ -70,7 +71,7 @@ export function Layout() {
               </h3>
               <ul className="space-y-1">
                 {group.items.map((item) => {
-                  const isActive = location.pathname === item.to;
+                  const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
                   return (
                     <li key={item.to}>
                       <Link

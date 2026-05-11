@@ -25,6 +25,7 @@ export interface Company {
   bankName?: string;
   accountType?: string;
   accountNumber?: string;
+  currentProjectSeq?: number; // Para auto-generar PRJ-XXXX
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -48,19 +49,41 @@ export interface User {
 // CRM
 // ==========================================
 
+export interface Stage {
+  id: string;
+  companyId: string;
+  name: string;
+  order: number;
+  color?: string;
+  isDefault?: boolean;
+}
+
+export interface ServiceType {
+  id: string;
+  companyId: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+}
+
 export interface Customer {
   id: string;
   companyId: string;
   name: string;
   legalName?: string;
-  taxId?: string;
+  taxId?: string; // RUT
   address?: string;
   city?: string;
   country?: string;
   phone?: string;
   email?: string;
+  contactName?: string;
+  paymentTerms?: string;
+  website?: string;
+  notes?: string;
   active: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Mandante {
@@ -71,20 +94,117 @@ export interface Mandante {
   email?: string;
   phone?: string;
   position?: string;
+  department?: string;
+  isPrimary?: boolean;
   active: boolean;
+  createdAt: string;
 }
+
+export type LeadPriority = "low" | "medium" | "high";
+export type LeadStatus = "open" | "won" | "lost";
 
 export interface Lead {
   id: string;
   companyId: string;
-  customerId?: string;
+  projectCode?: string; // PRJ-XXXX auto-generado
   title: string;
   description?: string;
-  stage: "prospect" | "qualified" | "proposal" | "negotiation" | "won" | "lost";
-  expectedValue?: number;
-  probability?: number;
-  expectedCloseDate?: string;
+
+  // Financial / Tracking
+  poNumber?: string;
+  reportNumber?: string;
+  hesNumber?: string;
+  invoiceNumber?: string;
+  isPaid: boolean;
+  serviceName?: string;
+  empresaFaena?: string;
+  aprName?: string;
+  supervisorName?: string;
+  contractAdminName?: string;
+
+  // Relations
+  customerId?: string;
+  mandanteId?: string;
+  stageId?: string;
+  serviceTypeId?: string;
   assignedTo?: string; // userId
+
+  // Metrics
+  expectedRevenue: number;
+  probability: number; // 0-100
+
+  // Classification
+  priority: LeadPriority;
+  status: LeadStatus;
+
+  // Dates / Sources
+  visitDate?: string;
+  quoteDeadline?: string;
+  expectedCloseDate?: string;
+  source?: string;
+
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  companyId: string;
+  leadId: string;
+  type: "created" | "stage_changed" | "status_changed" | "updated" | "note_added" | "document_added";
+  message: string;
+  userId?: string;
+  userName?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface CRMService {
+  id: string;
+  companyId: string;
+  leadId: string;
+  customerId?: string;
+  mandanteId?: string;
+  serviceTypeId?: string;
+  acceptedQuoteId?: string;
+  serviceCode: string;
+  title: string;
+  description?: string;
+  serviceName?: string;
+  empresaFaena?: string;
+  aprName?: string;
+  supervisorName?: string;
+  contractAdminName?: string;
+  commercialStatus: "intake" | "estimating" | "quoted" | "won";
+  operationalStatus: "not_started" | "pending_preop" | "preparing" | "ready" | "in_execution" | "reported";
+  financialStatus: "pre_sale" | "pending_billing" | "hes_requested" | "invoiced" | "paid";
+  statusSnapshot?: Record<string, unknown>;
+  contextSnapshot?: Record<string, unknown>;
+  operationalControl?: Record<string, unknown>;
+  mirrorToken?: string;
+  mirrorEnabled: boolean;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface CRMDocument {
+  id: string;
+  companyId: string;
+  filename: string;
+  filePath: string;
+  mimeType: string;
+  modelName: "Lead" | "Service" | "Customer";
+  recordId: string;
+  uploadedBy: string;
+  category?: string;
+  serviceId?: string;
+  documentType?: string;
+  version: number;
+  isCurrent: boolean;
+  parentDocumentId?: string;
+  metadata?: Record<string, unknown>;
+  signatureRequestId?: string;
+  signedAt?: string;
   createdAt: string;
 }
 

@@ -8,6 +8,11 @@ import { OnboardingPage } from "./pages/OnboardingPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { QuoteList } from "./modules/quotes/QuoteList";
 import { CustomerList } from "./modules/crm/CustomerList";
+import { CustomerForm } from "./modules/crm/CustomerForm";
+import { CustomerDetail } from "./modules/crm/CustomerDetail";
+import { LeadList } from "./modules/crm/LeadList";
+import { LeadForm } from "./modules/crm/LeadForm";
+import { LeadDetail } from "./modules/crm/LeadDetail";
 import { ServiceOrderList } from "./modules/accreditation/ServiceOrderList";
 import { EmployeeList } from "./modules/hr/EmployeeList";
 import { SignatureCenter } from "./modules/signature/SignatureCenter";
@@ -28,7 +33,17 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/quotes" element={<QuoteList />} />
+
+                {/* CRM */}
                 <Route path="/crm/customers" element={<CustomerList />} />
+                <Route path="/crm/customers/new" element={<CustomerForm />} />
+                <Route path="/crm/customers/:id" element={<CustomerDetail />} />
+                <Route path="/crm/customers/:id/edit" element={<CustomerForm />} />
+                <Route path="/crm/leads" element={<LeadList />} />
+                <Route path="/crm/leads/new" element={<LeadForm />} />
+                <Route path="/crm/leads/:id" element={<LeadDetail />} />
+                <Route path="/crm/leads/:id/edit" element={<LeadForm />} />
+
                 <Route path="/accreditation" element={<ServiceOrderList />} />
                 <Route path="/hr" element={<EmployeeList />} />
                 <Route path="/signature-center" element={<SignatureCenter />} />
