@@ -42,6 +42,7 @@ async function seed() {
     country: "Chile",
     plan: "growth",
     defaultTaxRate: 19.0,
+    currentProjectSeq: 5000,
     isActive: true,
     createdAt: new Date().toISOString(),
   });
@@ -57,26 +58,113 @@ async function seed() {
   });
 
   // 4. Clientes demo
-  const customers = [
-    { name: "Constructora Las Nuevas", taxId: "76.234.567-8", city: "Santiago" },
-    { name: "Minería del Sur", taxId: "76.345.678-9", city: "Concepción" },
-    { name: "Energética Verde", taxId: "76.456.789-0", city: "Valparaíso" },
+  const customersData = [
+    { name: "Constructora Las Nuevas", taxId: "76.234.567-8", city: "Santiago", email: "contacto@lasnuevas.cl", phone: "+56 2 2345 6789", contactName: "Jorge Muñoz", address: "Av. Las Condes 1234" },
+    { name: "Minería del Sur", taxId: "76.345.678-9", city: "Concepción", email: "admin@mineriadelsur.cl", phone: "+56 41 234 5678", contactName: "Patricia Soto", address: "Ruta 160 Km 15" },
+    { name: "Energética Verde", taxId: "76.456.789-0", city: "Valparaíso", email: "info@everde.cl", phone: "+56 32 345 6789", contactName: "Roberto Fuentes", address: "Av. Argentina 456" },
   ];
 
-  for (const c of customers) {
-    await addDoc(collection(db, "companies", user.uid, "customers"), {
+  const customerIds = [];
+  for (const c of customersData) {
+    const docRef = await addDoc(collection(db, "companies", user.uid, "customers"), {
       companyId: user.uid,
-      name: c.name,
-      taxId: c.taxId,
-      city: c.city,
+      ...c,
       country: "Chile",
       active: true,
       createdAt: new Date().toISOString(),
     });
+    customerIds.push(docRef.id);
+    console.log(`✅ Cliente creado: ${c.name} (${docRef.id})`);
   }
-  console.log("✅ 3 clientes demo creados");
 
-  // 5. Empleados demo
+  // 4b. Mandantes (contactos) demo
+  const mandantesData = [
+    { customerId: customerIds[0], name: "Jorge Muñoz", email: "jorge@lasnuevas.cl", phone: "+56 9 8765 4321", position: "Gerente de Proyectos", department: "Operaciones", isPrimary: true },
+    { customerId: customerIds[0], name: "Carolina Díaz", email: "carolina@lasnuevas.cl", phone: "+56 9 1234 5678", position: "Jefa de Compras", department: "Comercial" },
+    { customerId: customerIds[1], name: "Patricia Soto", email: "patricia@mineriadelsur.cl", phone: "+56 9 5678 9012", position: "Administradora de Contratos", department: "Legal", isPrimary: true },
+  ];
+
+  for (const m of mandantesData) {
+    await addDoc(collection(db, "companies", user.uid, "mandantes"), {
+      companyId: user.uid,
+      ...m,
+      active: true,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  console.log("✅ 3 contactos (mandantes) demo creados");
+
+  // 5. Leads / Oportunidades demo
+  const leadsData = [
+    {
+      title: "Faena Minera del Sur - Supervisión",
+      customerId: customerIds[1],
+      description: "Supervisión de obra civil en faena minera. Requiere prevencionista y supervisor.",
+      priority: "high",
+      status: "open",
+      expectedRevenue: 45000000,
+      probability: 75,
+      expectedCloseDate: "2024-07-15",
+      visitDate: "2024-05-20",
+      source: "Referido",
+      serviceName: "Supervisión de Obra",
+      empresaFaena: "Minera Los Bronces",
+      aprName: "Luis Herrera",
+      supervisorName: "Pedro Ríos",
+      contractAdminName: "Ana María Vásquez",
+      createdBy: user.uid,
+    },
+    {
+      title: "Construcción Bodega Las Nuevas",
+      customerId: customerIds[0],
+      description: "Construcción de bodega industrial 2000m2 con oficinas.",
+      priority: "medium",
+      status: "open",
+      expectedRevenue: 120000000,
+      probability: 40,
+      expectedCloseDate: "2024-08-30",
+      visitDate: "2024-05-10",
+      source: "Web",
+      serviceName: "Construcción Industrial",
+      empresaFaena: "Constructora Las Nuevas",
+      aprName: "Diego Castillo",
+      supervisorName: "Juan Pérez",
+      contractAdminName: "Jorge Muñoz",
+      createdBy: user.uid,
+    },
+    {
+      title: "Mantención Parque Eólico Everde",
+      customerId: customerIds[2],
+      description: "Mantención preventiva y correctiva de parque eólico.",
+      priority: "low",
+      status: "won",
+      expectedRevenue: 28000000,
+      probability: 100,
+      expectedCloseDate: "2024-04-01",
+      visitDate: "2024-03-15",
+      source: "Licitación",
+      serviceName: "Mantención Industrial",
+      empresaFaena: "Energética Verde",
+      aprName: "Marta González",
+      supervisorName: "Carlos Silva",
+      contractAdminName: "Roberto Fuentes",
+      isPaid: true,
+      poNumber: "OC-2024-0042",
+      createdBy: user.uid,
+    },
+  ];
+
+  for (const l of leadsData) {
+    await addDoc(collection(db, "companies", user.uid, "leads"), {
+      companyId: user.uid,
+      ...l,
+      isPaid: l.isPaid || false,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  console.log("✅ 3 oportunidades demo creadas");
+
+  // 6. Empleados demo
   const employees = [
     { firstName: "Juan", lastName: "Pérez", email: "juan@pedroconstruction.cl", status: "active" },
     { firstName: "María", lastName: "González", email: "maria@pedroconstruction.cl", status: "active" },
@@ -93,7 +181,7 @@ async function seed() {
   }
   console.log("✅ 3 empleados demo creados");
 
-  // 6. Cotización demo
+  // 7. Cotización demo
   await addDoc(collection(db, "companies", user.uid, "quotes"), {
     companyId: user.uid,
     title: "Cotización Faena Minera del Sur",
@@ -114,7 +202,7 @@ async function seed() {
   });
   console.log("✅ Cotización demo creada");
 
-  // 7. Orden de servicio demo
+  // 8. Orden de servicio demo
   await addDoc(collection(db, "companies", user.uid, "serviceOrders"), {
     companyId: user.uid,
     title: "OS-001: Faena Minera del Sur",
@@ -133,6 +221,12 @@ async function seed() {
   console.log("\n🎉 Seed completo! Puedes iniciar sesión con:");
   console.log("   Email: demo@pedroconstruction.cl");
   console.log("   Password: demo123");
+  console.log("\n📊 Datos creados:");
+  console.log("   - 1 empresa (Pedro Construction)");
+  console.log("   - 3 clientes con contactos");
+  console.log("   - 3 oportunidades (1 ganada)");
+  console.log("   - 3 empleados");
+  console.log("   - 1 cotización + 1 orden de servicio");
 }
 
 seed().catch(console.error);

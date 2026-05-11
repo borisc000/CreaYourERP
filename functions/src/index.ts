@@ -6,6 +6,9 @@ import { calculateQuoteTotal } from "./modules/quotes/calculateTotal";
 import { onQuoteAccepted } from "./modules/quotes/onQuoteAccepted";
 import { checkCrewCompliance } from "./modules/accreditation/checkCrewCompliance";
 import { onEmployeeHired } from "./modules/hr/onEmployeeHired";
+import { onLeadCreated } from "./modules/crm/generateProjectCode";
+import { onLeadUpdated } from "./modules/crm/activityLog";
+import { onLeadWon } from "./modules/crm/ensureService";
 import { db } from "./config";
 
 // ==========================================
@@ -80,6 +83,14 @@ export const onCrewAssigned = onDocumentCreated(
     }
   }
 );
+
+// ==========================================
+// CRM MODULE
+// ==========================================
+
+export { onLeadCreated };
+export { onLeadUpdated };
+export { onLeadWon };
 
 // ==========================================
 // HR MODULE
