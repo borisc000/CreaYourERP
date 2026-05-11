@@ -94,6 +94,40 @@ async function seed() {
   }
   console.log("✅ 3 contactos (mandantes) demo creados");
 
+  // 4c. Stages por defecto
+  const stagesData = [
+    { name: "Prospecto", order: 0, color: "#6B7280", isDefault: true },
+    { name: "Calificado", order: 1, color: "#3B82F6", isDefault: true },
+    { name: "Propuesta", order: 2, color: "#8B5CF6", isDefault: true },
+    { name: "Negociación", order: 3, color: "#F59E0B", isDefault: true },
+    { name: "Ganada", order: 4, color: "#10B981", isDefault: true },
+    { name: "Perdida", order: 5, color: "#EF4444", isDefault: true },
+  ];
+
+  for (const s of stagesData) {
+    await addDoc(collection(db, "companies", user.uid, "stages"), {
+      companyId: user.uid,
+      ...s,
+    });
+  }
+  console.log("✅ 6 etapas de pipeline (stages) creadas");
+
+  // 4d. Service Types por defecto
+  const serviceTypesData = [
+    { name: "Supervisión de Obra", description: "Supervisión técnica de faenas", isActive: true },
+    { name: "Prevención de Riesgos", description: "Servicios de prevencionista", isActive: true },
+    { name: "Construcción", description: "Obras civiles e industriales", isActive: true },
+    { name: "Mantención Industrial", description: "Mantención de instalaciones", isActive: true },
+  ];
+
+  for (const st of serviceTypesData) {
+    await addDoc(collection(db, "companies", user.uid, "serviceTypes"), {
+      companyId: user.uid,
+      ...st,
+    });
+  }
+  console.log("✅ 4 tipos de servicio creados");
+
   // 5. Leads / Oportunidades demo
   const leadsData = [
     {
