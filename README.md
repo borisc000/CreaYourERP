@@ -135,7 +135,7 @@ Credenciales demo:
 |---|-------|--------|---------|
 | 1 | `companyId` trust vulnerability | ✅ **Resuelto** | Todas las `onCall` extraen `companyId` de `request.auth.token.companyId` (15 archivos, ~60 funciones) |
 | 2 | `useFirestoreCollection` re-subscriptions | 🔴 Pendiente | `JSON.stringify(constraints)` como dependencia de `useEffect` causa unsubscribe/resubscribe en cada render |
-| 3 | Frontend crashes (promesas sin `.catch`) | 🔴 Pendiente | `BillingDocumentDetail`, `BillingDocumentForm`, `SafetyFolderDetail`, `GanttView` |
+| 3 | Frontend crashes (promesas sin `.catch`) | ✅ **Resuelto** | `BillingDocumentDetail`, `BillingDocumentForm`, `SafetyFolderDetail`, `GanttView` |
 | 4 | `EmployeeDetail.tsx` optional chaining | ✅ **Resuelto** | `baseSalary.toLocaleString()` y `criminalRecordStatus.replace()` crashean si undefined |
 | 5 | `OnboardingPage.tsx` navigate loop | ✅ **Resuelto** | `navigate()` llamado durante render |
 | 6 | Backend queries sin `limit()` | 🔴 Pendiente | Dashboards de billing, expenses, inventory, rentals |

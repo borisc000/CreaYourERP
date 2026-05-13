@@ -101,7 +101,7 @@ OPENAI_API_KEY=...
 | # | Problema | Ubicación | Fix sugerido |
 |---|----------|-----------|--------------|
 | 1 | `useFirestoreCollection` re-subscribe en cada render | `web/src/hooks/useFirestore.ts:63` | Estabilizar dependencias con `useMemo` o clave primitiva |
-| 2 | Promesas sin `.catch()` causan infinite loading | `BillingDocumentDetail`, `BillingDocumentForm`, `SafetyFolderDetail`, `GanttView` | Agregar `.catch()` + estado de error |
+
 | 3 | Queries backend sin `limit()` | Dashboards billing/expenses/inventory/rentals | Agregar `.limit(100)` |
 | 4 | Inventory race condition | `functions/src/modules/inventory/inventoryService.ts` | Usar `FieldValue.increment` o transaction |
 
