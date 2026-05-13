@@ -129,11 +129,29 @@ Credenciales demo:
 | PDF Workspace | ✅ Productivo | Editor de campos de firma sobre PDFs |
 | Cross-Correspondence | ✅ Productivo | Seguimiento de correspondencia entrante/saliente |
 
+## Auditoría de Seguridad Pre-Deploy
+
+| # | Issue | Estado | Detalle |
+|---|-------|--------|---------|
+| 1 | `companyId` trust vulnerability | ✅ **Resuelto** | Todas las `onCall` extraen `companyId` de `request.auth.token.companyId` (15 archivos, ~60 funciones) |
+| 2 | `useFirestoreCollection` re-subscriptions | 🔴 Pendiente | `JSON.stringify(constraints)` como dependencia de `useEffect` causa unsubscribe/resubscribe en cada render |
+| 3 | Frontend crashes (promesas sin `.catch`) | 🔴 Pendiente | `BillingDocumentDetail`, `BillingDocumentForm`, `SafetyFolderDetail`, `GanttView` |
+| 4 | `EmployeeDetail.tsx` optional chaining | 🔴 Pendiente | `baseSalary.toLocaleString()` y `criminalRecordStatus.replace()` crashean si undefined |
+| 5 | `OnboardingPage.tsx` navigate loop | 🔴 Pendiente | `navigate()` llamado durante render |
+| 6 | Backend queries sin `limit()` | 🔴 Pendiente | Dashboards de billing, expenses, inventory, rentals |
+| 7 | Inventory race condition | 🔴 Pendiente | `createInventoryMovement` lee y escribe stock no-atómicamente |
+| 8 | Dark theme broken | 🟡 Bajo | ~8 módulos usan `text-gray-900` / `bg-gray-100` sobre fondo oscuro |
+| 9 | `alert()` nativos | 🟡 Bajo | ~60 llamadas bloqueantes; reemplazar por toasts |
+| 10 | Submit buttons sin estado de carga | 🟡 Bajo | ~15 botones sin `disabled` ni spinner |
+| 11 | Deletes sin confirmación | 🟡 Bajo | `DepartmentList`, `JobProfileList` |
+| 12 | CORS incompleto | 🟡 Bajo | Falta `localhost:5174` en ~30 funciones |
+
 ## Staging vs Producción — Decisiones Pendientes
 
 ### Staging (deploy inmediato)
 - ✅ Firestore indexes definidos (~40 índices compuestos)
 - ✅ Security Rules por colección (catch-all como fallback)
+- ✅ `companyId` forzado desde auth token (no desde client)
 - ⚠️ Email/Notificaciones: solo guardan logs (no envían)
 - ⚠️ Facturación SII: simulación de estado local
 

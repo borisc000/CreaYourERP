@@ -28,6 +28,13 @@
   ```ts
   cors: ["https://your-erp.web.app", "http://localhost:5173", "http://localhost:5174"]
   ```
+  > Nota: ~30 funciones aún no incluyen `localhost:5174`. Agregar cuando se toquen esos archivos.
+- **Firestore hooks**: El hook `useFirestoreCollection` tiene un bug crítico de performance:
+  ```ts
+  // MAL — causa re-subscription en cada render
+  useEffect(() => { ... }, [companyId, collectionPath, JSON.stringify(constraints)]);
+  ```
+  Usar `useMemo` para estabilizar `constraints` en el componente consumidor, o refactorizar el hook para usar una clave primitiva.
 - **No usar `args.companyId`**: Leer siempre de `request.auth.token.companyId`. Las funciones nunca deben confiar en el client para el companyId.
 
 ## Estructura de Módulos
@@ -87,6 +94,27 @@ OPENAI_API_KEY=...
 - `scripts/seed-emulators.js` — Crea datos demo para los 27 módulos + usuario admin
 - `scripts/set-claims.js` — Asigna custom claims `{companyId, role: "admin"}` a un usuario
 - Los emuladores no persisten datos entre reinicios. Siempre re-seedear después de reiniciar.
+
+## Problemas Conocidos Activos (Prioridad)
+
+### Críticos (bloquean deploy)
+| # | Problema | Ubicación | Fix sugerido |
+|---|----------|-----------|--------------|
+| 1 | `useFirestoreCollection` re-subscribe en cada render | `web/src/hooks/useFirestore.ts:63` | Estabilizar dependencias con `useMemo` o clave primitiva |
+| 2 | Promesas sin `.catch()` causan infinite loading | `BillingDocumentDetail`, `BillingDocumentForm`, `SafetyFolderDetail`, `GanttView` | Agregar `.catch()` + estado de error |
+| 3 | `EmployeeDetail.tsx` crashea con datos undefined | `web/src/modules/hr/EmployeeDetail.tsx` | Optional chaining (`baseSalary?.toLocaleString()`) |
+| 4 | `OnboardingPage.tsx` navigate loop | `web/src/modules/auth/OnboardingPage.tsx` | Mover `navigate()` a `useEffect` |
+| 5 | Queries backend sin `limit()` | Dashboards billing/expenses/inventory/rentals | Agregar `.limit(100)` |
+| 6 | Inventory race condition | `functions/src/modules/inventory/inventoryService.ts` | Usar `FieldValue.increment` o transaction |
+
+### Medios (UX)
+| # | Problema | Cantidad | Fix |
+|---|----------|----------|-----|
+| 7 | Dark theme broken (gray-900 sobre fondo oscuro) | ~8 módulos | Reemplazar por `text-foreground` / tokens del tema |
+| 8 | `alert()` nativos bloqueantes | ~60 | Reemplazar por toast/snackbar |
+| 9 | Submit buttons sin estado de carga | ~15 | Agregar `disabled={isSubmitting}` + spinner |
+| 10 | Deletes sin confirmación | 2 listas | Agregar diálogo de confirmación |
+| 11 | CORS incompleto (falta `:5174`) | ~30 funciones | Agregar `http://localhost:5174` al array `cors` |
 
 ## Stubs / Fachadas Conocidas
 
