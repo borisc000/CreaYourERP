@@ -136,8 +136,8 @@ Credenciales demo:
 | 1 | `companyId` trust vulnerability | ✅ **Resuelto** | Todas las `onCall` extraen `companyId` de `request.auth.token.companyId` (15 archivos, ~60 funciones) |
 | 2 | `useFirestoreCollection` re-subscriptions | 🔴 Pendiente | `JSON.stringify(constraints)` como dependencia de `useEffect` causa unsubscribe/resubscribe en cada render |
 | 3 | Frontend crashes (promesas sin `.catch`) | 🔴 Pendiente | `BillingDocumentDetail`, `BillingDocumentForm`, `SafetyFolderDetail`, `GanttView` |
-| 4 | `EmployeeDetail.tsx` optional chaining | 🔴 Pendiente | `baseSalary.toLocaleString()` y `criminalRecordStatus.replace()` crashean si undefined |
-| 5 | `OnboardingPage.tsx` navigate loop | 🔴 Pendiente | `navigate()` llamado durante render |
+| 4 | `EmployeeDetail.tsx` optional chaining | ✅ **Resuelto** | `baseSalary.toLocaleString()` y `criminalRecordStatus.replace()` crashean si undefined |
+| 5 | `OnboardingPage.tsx` navigate loop | ✅ **Resuelto** | `navigate()` llamado durante render |
 | 6 | Backend queries sin `limit()` | 🔴 Pendiente | Dashboards de billing, expenses, inventory, rentals |
 | 7 | Inventory race condition | 🔴 Pendiente | `createInventoryMovement` lee y escribe stock no-atómicamente |
 | 8 | Dark theme broken | 🟡 Bajo | ~8 módulos usan `text-gray-900` / `bg-gray-100` sobre fondo oscuro |
