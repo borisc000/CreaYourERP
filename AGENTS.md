@@ -101,9 +101,8 @@ OPENAI_API_KEY=...
 | # | Problema | Ubicación | Fix sugerido |
 |---|----------|-----------|--------------|
 | 1 | `useFirestoreCollection` re-subscribe en cada render | `web/src/hooks/useFirestore.ts:63` | Estabilizar dependencias con `useMemo` o clave primitiva |
-
-| 3 | Queries backend sin `limit()` | Dashboards billing/expenses/inventory/rentals | Agregar `.limit(100)` |
-| 4 | Inventory race condition | `functions/src/modules/inventory/inventoryService.ts` | Usar `FieldValue.increment` o transaction |
+| 2 | Queries backend sin `limit()` | Dashboards billing/expenses/inventory/rentals | Agregar `.limit(100)` |
+| 3 | Inventory race condition | `functions/src/modules/inventory/inventoryService.ts` | Usar `FieldValue.increment` o transaction |
 
 ### Medios (UX)
 | # | Problema | Cantidad | Fix |
