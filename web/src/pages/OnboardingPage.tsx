@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/firebase/config";
@@ -15,10 +15,11 @@ export function OnboardingPage() {
   const [error, setError] = useState("");
 
   // Si ya tiene companyId, redirigir
-  if (companyId) {
-    navigate("/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (companyId) {
+      navigate("/dashboard");
+    }
+  }, [companyId, navigate]);
 
   const handleCreateCompany = async (e: React.FormEvent) => {
     e.preventDefault();

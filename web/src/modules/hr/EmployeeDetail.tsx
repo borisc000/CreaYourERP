@@ -112,7 +112,7 @@ export function EmployeeDetail() {
                 <img src={employee.photoURL} alt="" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-lg font-medium text-gray-400">
-                  {employee.firstName[0]}{employee.lastName[0]}
+                  {employee.firstName?.[0] ?? ""}{employee.lastName?.[0] ?? ""}
                 </span>
               )}
             </div>
@@ -199,7 +199,7 @@ export function EmployeeDetail() {
               {employee.baseSalary && employee.baseSalary > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Sueldo base</span>
-                  <span className="text-gray-300">${employee.baseSalary.toLocaleString("es-CL")}</span>
+                  <span className="text-gray-300">${(employee.baseSalary ?? 0).toLocaleString("es-CL")}</span>
                 </div>
               )}
               {employee.healthSystem && (
@@ -266,7 +266,7 @@ export function EmployeeDetail() {
               {employee.criminalRecordStatus && (
                 <div>
                   <span className="text-gray-500">Antecedentes</span>
-                  <p className="text-gray-300 capitalize">{employee.criminalRecordStatus.replace("_", " ")}</p>
+                  <p className="text-gray-300 capitalize">{employee.criminalRecordStatus?.replace("_", " ")}</p>
                 </div>
               )}
             </div>
@@ -282,7 +282,7 @@ export function EmployeeDetail() {
                 {contracts.map((c) => (
                   <div key={c.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                     <div>
-                      <p className="text-white text-sm capitalize">{c.contractType.replace("_", " ")}</p>
+                      <p className="text-white text-sm capitalize">{c.contractType?.replace("_", " ")}</p>
                       <p className="text-gray-500 text-xs">{c.startDate} {c.endDate ? `→ ${c.endDate}` : ""}</p>
                     </div>
                     <span className={`px-2 py-0.5 text-xs rounded-full ${
