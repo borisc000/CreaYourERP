@@ -11,8 +11,8 @@ export const getProcedureDashboard = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     const snap = await companyRef(companyId).collection("safetyProcedureTemplates").get();
     const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     return {
@@ -35,8 +35,10 @@ export const createProcedure = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, ...data } = request.data;
-    if (!companyId || !data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, ...data } = request.data;
+    if (!data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
     const count = (await companyRef(companyId).collection("safetyProcedureTemplates").count().get()).data().count;
     const code = `PTS-${String(count + 1).padStart(4, "0")}`;
     const ref = await companyRef(companyId).collection("safetyProcedureTemplates").add({
@@ -58,8 +60,10 @@ export const updateProcedure = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("safetyProcedureTemplates").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }
@@ -71,8 +75,10 @@ export const approveProcedure = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const proc = await companyRef(companyId).collection("safetyProcedureTemplates").doc(id).get();
     if (!proc.exists) throw new HttpsError("not-found", "Procedimiento no encontrado");
 
@@ -96,8 +102,10 @@ export const createProcedureStep = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, procedureId, ...data } = request.data;
-    if (!companyId || !procedureId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, procedureId, ...data } = request.data;
+    if (!procedureId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("safetyProcedureSteps").add({
       companyId, procedureId, phaseName: data.phaseName || "setup", stepTitle: data.stepTitle || "",
       stepDescription: data.stepDescription || "", processName: data.processName || "",
@@ -115,8 +123,10 @@ export const updateProcedureStep = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("safetyProcedureSteps").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }

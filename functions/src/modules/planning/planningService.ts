@@ -22,8 +22,12 @@ function companyRef(companyId: string) {
 export const getPlanningDashboard = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, year } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { year } = request.data;
 
     const cref = companyRef(companyId);
     const targetYear = year || new Date().getFullYear();
@@ -117,8 +121,13 @@ export const getPlanningDashboard = onCall(
 export const createPlanningBudget = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, name, year, scenarioType, openingCash, notes } = request.data;
-    if (!companyId || !name || !year) throw new HttpsError("invalid-argument", "companyId, name y year requeridos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { name, year, scenarioType, openingCash, notes } = request.data;
+    if (!name || !year) throw new HttpsError("invalid-argument", "name y year requeridos");
 
     const cref = companyRef(companyId);
 
@@ -156,8 +165,13 @@ export const createPlanningBudget = onCall(
 export const updatePlanningBudget = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "companyId e id requeridos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
     const cref = companyRef(companyId);
 
@@ -193,9 +207,14 @@ export const updatePlanningBudget = onCall(
 export const createBudgetLine = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, budgetId, lineType, originType, lineName, category, costCenter, leadId, monthStart, monthEnd, plannedAmounts, forecastAmounts, notes } = request.data;
-    if (!companyId || !budgetId || !lineType || !lineName) {
-      throw new HttpsError("invalid-argument", "companyId, budgetId, lineType y lineName requeridos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { budgetId, lineType, originType, lineName, category, costCenter, leadId, monthStart, monthEnd, plannedAmounts, forecastAmounts, notes } = request.data;
+    if (!budgetId || !lineType || !lineName) {
+      throw new HttpsError("invalid-argument", "budgetId, lineType y lineName requeridos");
     }
 
     const ref = await companyRef(companyId).collection("planningBudgetLines").add({
@@ -227,8 +246,13 @@ export const createBudgetLine = onCall(
 export const updateBudgetLine = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "companyId e id requeridos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
     await companyRef(companyId).collection("planningBudgetLines").doc(id).update({
       ...data,
@@ -245,8 +269,13 @@ export const updateBudgetLine = onCall(
 export const deleteBudgetLine = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, id } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "companyId e id requeridos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
     await companyRef(companyId).collection("planningBudgetLines").doc(id).delete();
     return { deleted: true };

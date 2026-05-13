@@ -31,8 +31,11 @@ const AFP_RATES: Record<string, { pension: number; commission: number }> = {
 export const seedPayrollParameters = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     const existing = await companyRef(companyId).collection("payrollLegalParameters").limit(1).get();
     if (!existing.empty) return { alreadySeeded: true };
     for (const p of DEFAULT_PARAMS) {
@@ -63,8 +66,11 @@ export const seedPayrollParameters = onCall(
 export const getPayrollDashboard = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     const [periods, profiles, settlements] = await Promise.all([
       companyRef(companyId).collection("payrollPeriods").get(),
       companyRef(companyId).collection("payrollProfiles").get(),
@@ -83,8 +89,13 @@ export const getPayrollDashboard = onCall(
 export const createPayrollPeriod = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, name, year, month, startDate, endDate, paymentDate } = request.data;
-    if (!companyId || !name || !year || !month) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { name, year, month, startDate, endDate, paymentDate } = request.data;
+    if (!name || !year || !month) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("payrollPeriods").add({
       companyId, name, year, month, startDate: startDate || "", endDate: endDate || "",
       paymentDate: paymentDate || "", status: "draft", notes: "", createdAt: nowIso(), updatedAt: nowIso(),
@@ -96,8 +107,13 @@ export const createPayrollPeriod = onCall(
 export const calculatePeriod = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, periodId } = request.data;
-    if (!companyId || !periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { periodId } = request.data;
+    if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     const period = await companyRef(companyId).collection("payrollPeriods").doc(periodId).get();
     if (!period.exists) throw new HttpsError("not-found", "Período no encontrado");
@@ -233,8 +249,13 @@ export const calculatePeriod = onCall(
 export const approvePeriod = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, periodId } = request.data;
-    if (!companyId || !periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { periodId } = request.data;
+    if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
     for (const d of settlements.docs) {
       await d.ref.update({ status: "approved", approvedBy: request.auth?.uid || "", approvedAt: nowIso(), updatedAt: nowIso() });
@@ -247,8 +268,13 @@ export const approvePeriod = onCall(
 export const closePeriod = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, periodId } = request.data;
-    if (!companyId || !periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { periodId } = request.data;
+    if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
     for (const d of settlements.docs) {
       await d.ref.update({ status: "closed", closedAt: nowIso(), updatedAt: nowIso() });
@@ -261,8 +287,13 @@ export const closePeriod = onCall(
 export const savePayrollProfile = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !data.employeeId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id, ...data } = request.data;
+    if (!data.employeeId) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (id) {
       await companyRef(companyId).collection("payrollProfiles").doc(id).update({ ...data, updatedAt: nowIso() });
       return { id, updated: true };

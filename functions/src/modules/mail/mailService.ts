@@ -23,8 +23,8 @@ export const getMailStatus = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
 
     const accounts = await db.collection("companies").doc(companyId).collection("mailAccounts").get();
     const active = accounts.docs.find((d) => d.data().isActive);
@@ -44,8 +44,9 @@ export const saveMailAccount = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id, ...data } = request.data;
 
     if (data.isDefault) {
       const existing = await db.collection("companies").doc(companyId).collection("mailAccounts").where("isDefault", "==", true).get();
@@ -74,8 +75,10 @@ export const sendEmail = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, accountId, recipients, subject, bodyText, bodyHtml } = request.data;
-    if (!companyId || !recipients?.length || !subject) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { accountId, recipients, subject, bodyText, bodyHtml } = request.data;
+    if (!recipients?.length || !subject) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     const logRef = await db.collection("companies").doc(companyId).collection("emailLogs").add({
       companyId, accountId: accountId || "", recipients, subject, bodyText: bodyText || "", bodyHtml: bodyHtml || "",
@@ -92,8 +95,9 @@ export const getEmailLogs = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, limit = 50 } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { limit = 50 } = request.data;
 
     const snap = await db.collection("companies").doc(companyId).collection("emailLogs").orderBy("createdAt", "desc").limit(limit).get();
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));

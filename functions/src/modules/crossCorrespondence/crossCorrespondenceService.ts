@@ -11,8 +11,8 @@ export const getCorrespondenceDashboard = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     const snap = await companyRef(companyId).collection("crossCorrespondences").orderBy("createdAt", "desc").get();
     const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     return {
@@ -36,8 +36,10 @@ export const createCorrespondence = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, ...data } = request.data;
-    if (!companyId || !data.contractId || !data.subject) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, ...data } = request.data;
+    if (!data.contractId || !data.subject) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("crossCorrespondences").add({
       companyId, contractId: data.contractId, employeeId: data.employeeId || "", leadId: data.leadId || "",
       correspondenceType: data.correspondenceType || "hiring", status: "draft",
@@ -55,8 +57,10 @@ export const updateCorrespondence = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("crossCorrespondences").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }
@@ -68,8 +72,10 @@ export const approveCorrespondence = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const corr = await companyRef(companyId).collection("crossCorrespondences").doc(id).get();
     if (!corr.exists) throw new HttpsError("not-found", "Correspondencia no encontrada");
     if (corr.data()?.status !== "draft" && corr.data()?.status !== "review") {
@@ -96,8 +102,10 @@ export const sendCorrespondenceForSignature = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const corr = await companyRef(companyId).collection("crossCorrespondences").doc(id).get();
     if (!corr.exists) throw new HttpsError("not-found", "Correspondencia no encontrada");
     if (corr.data()?.status !== "approved") {

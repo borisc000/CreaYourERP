@@ -20,8 +20,8 @@ export const getActivityDashboard = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     const [blocks, hazards] = await Promise.all([
       companyRef(companyId).collection("safetyActivityBlocks").get(),
       companyRef(companyId).collection("safetyActivityHazards").get(),
@@ -43,8 +43,10 @@ export const createActivityBlock = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, ...data } = request.data;
-    if (!companyId || !data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, ...data } = request.data;
+    if (!data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
     const count = (await companyRef(companyId).collection("safetyActivityBlocks").count().get()).data().count;
     const code = `BOT-${String(count + 1).padStart(4, "0")}`;
     const ref = await companyRef(companyId).collection("safetyActivityBlocks").add({
@@ -65,8 +67,10 @@ export const updateActivityBlock = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     // Create version snapshot
     const block = await companyRef(companyId).collection("safetyActivityBlocks").doc(id).get();
     if (block.exists) {
@@ -86,8 +90,10 @@ export const createActivityHazard = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, activityBlockId, ...data } = request.data;
-    if (!companyId || !activityBlockId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, activityBlockId, ...data } = request.data;
+    if (!activityBlockId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const risk = calculateRisk(data.probability || 1, data.consequence || 1);
     const ref = await companyRef(companyId).collection("safetyActivityHazards").add({
       companyId, activityBlockId, hazardFactor: data.hazardFactor || "",
@@ -111,8 +117,10 @@ export const updateActivityHazard = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };
     if (data.probability && data.consequence) {
       const risk = calculateRisk(data.probability, data.consequence);

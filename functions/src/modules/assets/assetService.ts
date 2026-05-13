@@ -14,8 +14,11 @@ function nowIso() {
 export const getAssetDashboard = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
 
     const assetsSnap = await db.collection("companies").doc(companyId).collection("assets").get();
     const maintenanceSnap = await db.collection("companies").doc(companyId).collection("assetMaintenance").get();
@@ -48,8 +51,13 @@ export const getAssetDashboard = onCall(
 export const createAsset = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, code, name, category, acquisitionDate, acquisitionCost, depreciationRate, location, assignedTo, assignedToName, supplier, serialNumber, brand, model, plateNumber, maintenanceIntervalMonths, notes } = request.data;
-    if (!companyId || !code || !name) throw new HttpsError("invalid-argument", "companyId, code y name requeridos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { code, name, category, acquisitionDate, acquisitionCost, depreciationRate, location, assignedTo, assignedToName, supplier, serialNumber, brand, model, plateNumber, maintenanceIntervalMonths, notes } = request.data;
+    if (!code || !name) throw new HttpsError("invalid-argument", "code y name requeridos");
 
     const existing = await db.collection("companies").doc(companyId).collection("assets").where("code", "==", code).limit(1).get();
     if (!existing.empty) throw new HttpsError("already-exists", "Ya existe un activo con ese código");
@@ -71,8 +79,13 @@ export const createAsset = onCall(
 export const updateAsset = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "companyId e id requeridos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
     await db.collection("companies").doc(companyId).collection("assets").doc(id).update({
       ...data, updatedAt: nowIso(),
@@ -84,8 +97,13 @@ export const updateAsset = onCall(
 export const deleteAsset = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, id } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "companyId e id requeridos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
     const maintenance = await db.collection("companies").doc(companyId).collection("assetMaintenance").where("assetId", "==", id).limit(1).get();
     if (!maintenance.empty) throw new HttpsError("failed-precondition", "El activo tiene registros de mantenimiento. No se puede eliminar.");
@@ -98,8 +116,13 @@ export const deleteAsset = onCall(
 export const createAssetMaintenance = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, assetId, maintenanceType, description, cost, performedBy, performedByName, performedDate, nextDueDate, notes } = request.data;
-    if (!companyId || !assetId || !description) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { assetId, maintenanceType, description, cost, performedBy, performedByName, performedDate, nextDueDate, notes } = request.data;
+    if (!assetId || !description) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     const ref = await db.collection("companies").doc(companyId).collection("assetMaintenance").add({
       companyId, assetId, maintenanceType: maintenanceType || "preventive", description,

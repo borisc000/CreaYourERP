@@ -11,8 +11,8 @@ export const getAIDashboard = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     const [providers, prompts, agents, executions] = await Promise.all([
       companyRef(companyId).collection("aiProviders").get(),
       companyRef(companyId).collection("aiPromptTemplates").get(),
@@ -34,8 +34,10 @@ export const createAIProvider = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, ...data } = request.data;
-    if (!companyId || !data.name || !data.providerType) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, ...data } = request.data;
+    if (!data.name || !data.providerType) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
       const existing = await companyRef(companyId).collection("aiProviders").where("isDefault", "==", true).get();
       for (const d of existing.docs) await d.ref.update({ isDefault: false });
@@ -57,8 +59,10 @@ export const updateAIProvider = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
       const existing = await companyRef(companyId).collection("aiProviders").where("isDefault", "==", true).get();
       for (const d of existing.docs) await d.ref.update({ isDefault: false });
@@ -74,8 +78,10 @@ export const createAIPromptTemplate = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, ...data } = request.data;
-    if (!companyId || !data.name || !data.userPrompt) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, ...data } = request.data;
+    if (!data.name || !data.userPrompt) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("aiPromptTemplates").add({
       companyId, name: data.name, description: data.description || "",
       systemPrompt: data.systemPrompt || "", userPrompt: data.userPrompt,
@@ -93,8 +99,10 @@ export const updateAIPromptTemplate = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("aiPromptTemplates").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }
@@ -106,8 +114,10 @@ export const createAIAgent = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, ...data } = request.data;
-    if (!companyId || !data.name || !data.role) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, ...data } = request.data;
+    if (!data.name || !data.role) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("aiAgents").add({
       companyId, name: data.name, role: data.role, goal: data.goal || "",
       instructions: data.instructions || "", toolPolicy: data.toolPolicy || "none",
@@ -125,8 +135,10 @@ export const updateAIAgent = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("aiAgents").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }
@@ -138,8 +150,9 @@ export const planAIExecution = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, agentId, promptTemplateId, providerId, inputData } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { agentId, promptTemplateId, providerId, inputData } = request.data;
 
     let renderedSystem = "";
     let renderedUser = "";

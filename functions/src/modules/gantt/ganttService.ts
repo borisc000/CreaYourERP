@@ -13,8 +13,10 @@ export const getOrCreateGanttPlan = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, leadId } = request.data;
-    if (!companyId || !leadId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { leadId } = request.data;
+    if (!leadId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     const existing = await companyRef(companyId).collection("leadGanttPlans").where("leadId", "==", leadId).where("active", "==", true).limit(1).get();
     if (!existing.empty) {
@@ -39,8 +41,10 @@ export const importProcedureToGantt = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, planId, procedureId, mode = "replace" } = request.data;
-    if (!companyId || !planId || !procedureId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { planId, procedureId, mode = "replace" } = request.data;
+    if (!planId || !procedureId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     if (mode === "replace") {
       const existing = await companyRef(companyId).collection("leadGanttTasks").where("planId", "==", planId).get();
@@ -80,8 +84,10 @@ export const createGanttTask = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, planId, ...data } = request.data;
-    if (!companyId || !planId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, planId, ...data } = request.data;
+    if (!planId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const plan = await companyRef(companyId).collection("leadGanttPlans").doc(planId).get();
     const ref = await companyRef(companyId).collection("leadGanttTasks").add({
       companyId, planId, leadId: plan.data()?.leadId || "",
@@ -102,8 +108,10 @@ export const updateGanttTask = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };
     if (data.progressPct !== undefined) {
       update.status = data.progressPct >= 100 ? "done" : data.progressPct > 0 ? "in_progress" : "pending";

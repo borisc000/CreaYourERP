@@ -18,8 +18,11 @@ const DEFAULT_STAGES = [
 export const seedRecruitmentStages = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     const existing = await companyRef(companyId).collection("recruitmentStages").limit(1).get();
     if (!existing.empty) return { alreadySeeded: true };
     for (const stage of DEFAULT_STAGES) {
@@ -32,8 +35,11 @@ export const seedRecruitmentStages = onCall(
 export const getRecruitmentStats = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     const [jobs, candidates, applications] = await Promise.all([
       companyRef(companyId).collection("jobOpenings").get(),
       companyRef(companyId).collection("candidates").get(),
@@ -52,8 +58,13 @@ export const getRecruitmentStats = onCall(
 export const createJobOpening = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, ...data } = request.data;
-    if (!companyId || !data.title) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, ...data } = request.data;
+    if (!data.title) throw new HttpsError("invalid-argument", "Datos incompletos");
     const count = (await companyRef(companyId).collection("jobOpenings").count().get()).data().count;
     const code = `JOB-${String(count + 1).padStart(4, "0")}`;
     const ref = await companyRef(companyId).collection("jobOpenings").add({
@@ -72,8 +83,13 @@ export const createJobOpening = onCall(
 export const updateJobOpening = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("jobOpenings").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }
@@ -82,8 +98,13 @@ export const updateJobOpening = onCall(
 export const createCandidate = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, ...data } = request.data;
-    if (!companyId || !data.fullName) throw new HttpsError("invalid-argument", "Nombre requerido");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, ...data } = request.data;
+    if (!data.fullName) throw new HttpsError("invalid-argument", "Nombre requerido");
     // Calculate completion
     const required = [data.nationalId, data.email, data.phone, data.birthDate, data.address, data.city, data.healthSystem, data.afpCode, data.emergencyContactName, data.emergencyContactPhone, data.criminalRecordStatus];
     const completionPct = Math.round((required.filter(Boolean).length / 11) * 100);
@@ -102,8 +123,13 @@ export const createCandidate = onCall(
 export const updateCandidate = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("candidates").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }
@@ -112,8 +138,13 @@ export const updateCandidate = onCall(
 export const createApplication = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, jobId, candidateId, stageId, ...data } = request.data;
-    if (!companyId || !jobId || !candidateId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { jobId, candidateId, stageId, ...data } = request.data;
+    if (!jobId || !candidateId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const job = await companyRef(companyId).collection("jobOpenings").doc(jobId).get();
     const candidate = await companyRef(companyId).collection("candidates").doc(candidateId).get();
     const stage = stageId ? await companyRef(companyId).collection("recruitmentStages").doc(stageId).get() : null;
@@ -133,8 +164,13 @@ export const createApplication = onCall(
 export const updateApplication = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };
     if (data.stageId) {
       const stage = await companyRef(companyId).collection("recruitmentStages").doc(data.stageId).get();
@@ -148,8 +184,13 @@ export const updateApplication = onCall(
 export const hireApplication = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, applicationId, employeeData } = request.data;
-    if (!companyId || !applicationId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { applicationId, employeeData } = request.data;
+    if (!applicationId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     const appRef = companyRef(companyId).collection("jobApplications").doc(applicationId);
     const app = await appRef.get();
@@ -185,8 +226,13 @@ export const hireApplication = onCall(
 export const createInterview = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, applicationId, ...data } = request.data;
-    if (!companyId || !applicationId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { applicationId, ...data } = request.data;
+    if (!applicationId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("interviews").add({
       companyId, applicationId, interviewType: data.interviewType || "video",
       scheduledAt: data.scheduledAt || nowIso(), durationMinutes: data.durationMinutes || 60,
@@ -201,8 +247,13 @@ export const createInterview = onCall(
 export const updateInterview = onCall(
   { region: "us-central1", cors },
   async (request) => {
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("interviews").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }

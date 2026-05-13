@@ -11,8 +11,10 @@ export const getPdfWorkspace = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, documentId, documentType } = request.data;
-    if (!companyId || !documentId || !documentType) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { documentId, documentType } = request.data;
+    if (!documentId || !documentType) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     const collection = documentType === "template" ? "documentTemplates" : "generatedDocuments";
     const doc = await companyRef(companyId).collection(collection).doc(documentId).get();
@@ -41,8 +43,10 @@ export const savePdfWorkspace = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, documentId, documentType, signatureFields } = request.data;
-    if (!companyId || !documentId || !documentType || !Array.isArray(signatureFields)) {
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { documentId, documentType, signatureFields } = request.data;
+    if (!documentId || !documentType || !Array.isArray(signatureFields)) {
       throw new HttpsError("invalid-argument", "Datos incompletos");
     }
 

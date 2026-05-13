@@ -11,8 +11,8 @@ export const getGoogleWorkspaceDashboard = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId } = request.data;
-    if (!companyId) throw new HttpsError("invalid-argument", "companyId requerido");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     const accounts = await companyRef(companyId).collection("googleWorkspaceAccounts").get();
     const list = accounts.docs.map((d) => ({ id: d.id, ...d.data() }));
     return {
@@ -29,8 +29,10 @@ export const createGoogleWorkspaceAccount = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, ...data } = request.data;
-    if (!companyId || !data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, ...data } = request.data;
+    if (!data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
       const existing = await companyRef(companyId).collection("googleWorkspaceAccounts").where("isDefault", "==", true).get();
       for (const d of existing.docs) await d.ref.update({ isDefault: false });
@@ -52,8 +54,10 @@ export const updateGoogleWorkspaceAccount = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id, ...data } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { companyId: _c, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
       const existing = await companyRef(companyId).collection("googleWorkspaceAccounts").where("isDefault", "==", true).get();
       for (const d of existing.docs) await d.ref.update({ isDefault: false });
@@ -69,8 +73,10 @@ export const testGoogleWorkspaceAccount = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, id } = request.data;
-    if (!companyId || !id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { id } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     // TODO: Implement real Google API connection test
     await companyRef(companyId).collection("googleWorkspaceAccounts").doc(id).update({
       lastTestStatus: "ok", lastTestMessage: "Conexión simulada exitosa", lastTestedAt: nowIso(), updatedAt: nowIso(),
@@ -85,8 +91,10 @@ export const listGoogleDriveFiles = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión");
     }
-    const { companyId, accountId, query: _query } = request.data;
-    if (!companyId || !accountId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    const { accountId, query: _query } = request.data;
+    if (!accountId) throw new HttpsError("invalid-argument", "Datos incompletos");
     // TODO: Implement real Google Drive API call
     return {
       files: [
