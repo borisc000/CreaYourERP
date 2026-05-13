@@ -60,7 +60,10 @@ export function useFirestoreCollection<T extends { id: string }>(
     );
 
     return () => unsubscribe();
-  }, [companyId, collectionPath, JSON.stringify(constraints)]);
+  }, [companyId, collectionPath, constraints.length]);
+  // Note: constraints are compared by length only. If you need to react to
+  // constraint *value* changes (e.g. where("status","==","X") → "Y"),
+  // wrap constraints in useMemo() or force re-mount with a key.
 
   return { data, isLoading, error };
 }

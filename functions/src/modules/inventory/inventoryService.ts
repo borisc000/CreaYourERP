@@ -62,7 +62,7 @@ export const getInventoryDashboard = onCall(
         movementsSnap,
         backupsSnap,
       ] = await Promise.all([
-        cref.collection("inventoryItems").get(),
+        cref.collection("inventoryItems").limit(500).get(),
         cref.collection("inventoryMovements").orderBy("createdAt", "desc").limit(10).get(),
         cref.collection("inventoryBackups").orderBy("createdAt", "desc").limit(5).get(),
       ]);
@@ -476,91 +476,100 @@ export const createInventoryMovement = onCall(
     try {
       const cref = companyRef(companyId);
       const itemRef = cref.collection("inventoryItems").doc(payload.itemId);
-      const itemSnap = await itemRef.get();
-      if (!itemSnap.exists) {
-        throw new HttpsError("not-found", "Item no encontrado");
-      }
 
-      const item = itemSnap.data() as any;
-      const stockBefore = Number(item.currentStock) || 0;
-      const averageCost = Number(item.averageCost) || 0;
-      const unitCost = Math.max(0, Number(payload.unitCost) || 0);
+      const performedBy = request.auth!.uid;
+      const performedByName = request.auth!.token.name || "";
 
-      let stockAfter = stockBefore;
-      let newAverageCost = averageCost;
-      let totalCost = 0;
-
-      if (isIn) {
-        stockAfter = stockBefore + quantity;
-        if (unitCost > 0 && stockAfter > 0) {
-          const currentValue = stockBefore * averageCost;
-          const incomingValue = quantity * unitCost;
-          newAverageCost = (currentValue + incomingValue) / stockAfter;
-          newAverageCost = Math.round(newAverageCost * 100) / 100;
+      const result = await db.runTransaction(async (t) => {
+        const itemSnap = await t.get(itemRef);
+        if (!itemSnap.exists) {
+          throw new HttpsError("not-found", "Item no encontrado");
         }
-        totalCost = Math.round(quantity * unitCost * 100) / 100;
-      } else {
-        stockAfter = stockBefore - quantity;
-        if (stockAfter < 0) {
-          throw new HttpsError("failed-precondition", "No hay stock suficiente para realizar este movimiento");
+
+        const item = itemSnap.data() as any;
+        const stockBefore = Number(item.currentStock) || 0;
+        const averageCost = Number(item.averageCost) || 0;
+        const unitCost = Math.max(0, Number(payload.unitCost) || 0);
+
+        let stockAfter = stockBefore;
+        let newAverageCost = averageCost;
+        let totalCost = 0;
+
+        if (isIn) {
+          stockAfter = stockBefore + quantity;
+          if (unitCost > 0 && stockAfter > 0) {
+            const currentValue = stockBefore * averageCost;
+            const incomingValue = quantity * unitCost;
+            newAverageCost = (currentValue + incomingValue) / stockAfter;
+            newAverageCost = Math.round(newAverageCost * 100) / 100;
+          }
+          totalCost = Math.round(quantity * unitCost * 100) / 100;
+        } else {
+          stockAfter = stockBefore - quantity;
+          if (stockAfter < 0) {
+            throw new HttpsError("failed-precondition", "No hay stock suficiente para realizar este movimiento");
+          }
+          totalCost = Math.round(quantity * averageCost * 100) / 100;
         }
-        totalCost = Math.round(quantity * averageCost * 100) / 100;
-      }
 
-      const now = new Date().toISOString();
-      const movementDate = payload.movementDate || now;
+        const now = new Date().toISOString();
+        const movementDate = payload.movementDate || now;
 
-      // Update item
-      const stockStatus = computeStockStatus(stockAfter, item.minimumStock || 0, item.status || "active");
-      const healthRatio = computeHealthRatio(stockAfter, item.minimumStock || 0);
-      const inventoryValue = computeInventoryValue(stockAfter, newAverageCost);
-      const needsRestock = stockStatus === "low" || stockStatus === "out";
+        // Update item atomically
+        const stockStatus = computeStockStatus(stockAfter, item.minimumStock || 0, item.status || "active");
+        const healthRatio = computeHealthRatio(stockAfter, item.minimumStock || 0);
+        const inventoryValue = computeInventoryValue(stockAfter, newAverageCost);
+        const needsRestock = stockStatus === "low" || stockStatus === "out";
 
-      await itemRef.update({
-        currentStock: stockAfter,
-        averageCost: newAverageCost,
-        lastMovementAt: now,
-        inventoryValue,
-        stockStatus,
-        healthRatio,
-        needsRestock,
-        updatedAt: now,
+        t.update(itemRef, {
+          currentStock: stockAfter,
+          averageCost: newAverageCost,
+          lastMovementAt: now,
+          inventoryValue,
+          stockStatus,
+          healthRatio,
+          needsRestock,
+          updatedAt: now,
+        });
+
+        // Create movement atomically
+        const movementRef = cref.collection("inventoryMovements").doc();
+        t.set(movementRef, {
+          itemId: payload.itemId,
+          companyId,
+          itemName: item.name || "",
+          itemCode: item.code || "",
+          itemUnit: item.unit || "",
+          movementType: payload.movementType,
+          movementLabel: payload.movementType === "in" ? "Entrada" : payload.movementType === "out" ? "Salida" : payload.movementType === "adjustment_in" ? "Ajuste de entrada" : "Ajuste de salida",
+          movementDirection: isIn ? "in" : "out",
+          quantity,
+          signedQuantity: quantity,
+          stockBefore,
+          stockAfter,
+          unitCost,
+          totalCost,
+          reference: payload.reference?.trim() || "",
+          reason: payload.reason?.trim() || "",
+          destination: payload.destination?.trim() || "",
+          deliveredByName: payload.deliveredByName?.trim() || "",
+          receivedByName: payload.receivedByName?.trim() || "",
+          hasPhotoEvidence: Boolean(payload.hasPhotoEvidence),
+          hasSignatureEvidence: Boolean(payload.hasSignatureEvidence),
+          evidenceAvailable: Boolean(payload.hasPhotoEvidence) || Boolean(payload.hasSignatureEvidence),
+          evidencePhotoData: payload.evidencePhotoData?.trim() || "",
+          evidenceSignatureData: payload.evidenceSignatureData?.trim() || "",
+          notes: payload.notes?.trim() || "",
+          performedBy,
+          performedByName,
+          movementDate,
+          createdAt: now,
+        });
+
+        return { movementId: movementRef.id, stockAfter, newAverageCost };
       });
 
-      // Create movement
-      const movementRef = await cref.collection("inventoryMovements").add({
-        itemId: payload.itemId,
-        companyId,
-        itemName: item.name || "",
-        itemCode: item.code || "",
-        itemUnit: item.unit || "",
-        movementType: payload.movementType,
-        movementLabel: payload.movementType === "in" ? "Entrada" : payload.movementType === "out" ? "Salida" : payload.movementType === "adjustment_in" ? "Ajuste de entrada" : "Ajuste de salida",
-        movementDirection: isIn ? "in" : "out",
-        quantity,
-        signedQuantity: quantity,
-        stockBefore,
-        stockAfter,
-        unitCost,
-        totalCost,
-        reference: payload.reference?.trim() || "",
-        reason: payload.reason?.trim() || "",
-        destination: payload.destination?.trim() || "",
-        deliveredByName: payload.deliveredByName?.trim() || "",
-        receivedByName: payload.receivedByName?.trim() || "",
-        hasPhotoEvidence: Boolean(payload.hasPhotoEvidence),
-        hasSignatureEvidence: Boolean(payload.hasSignatureEvidence),
-        evidenceAvailable: Boolean(payload.hasPhotoEvidence) || Boolean(payload.hasSignatureEvidence),
-        evidencePhotoData: payload.evidencePhotoData?.trim() || "",
-        evidenceSignatureData: payload.evidenceSignatureData?.trim() || "",
-        notes: payload.notes?.trim() || "",
-        performedBy: request.auth.uid,
-        performedByName: request.auth.token.name || "",
-        movementDate,
-        createdAt: now,
-      });
-
-      return { success: true, movementId: movementRef.id, stockAfter, newAverageCost };
+      return { success: true, ...result };
     } catch (error: any) {
       console.error("[createInventoryMovement] Error:", error);
       if (error instanceof HttpsError) throw error;

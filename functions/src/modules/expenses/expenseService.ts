@@ -82,7 +82,7 @@ export const getExpenseDashboard = onCall(
       const cref = companyRef(companyId);
 
       const [expensesSnap, backupsSnap, leadsSnap] = await Promise.all([
-        cref.collection("expenses").get(),
+        cref.collection("expenses").limit(500).get(),
         cref.collection("expenseBackups").orderBy("createdAt", "desc").limit(5).get(),
         cref.collection("leads").where("status", "==", "open").limit(20).get(),
       ]);

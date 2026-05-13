@@ -72,9 +72,9 @@ export const getPayrollDashboard = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     const [periods, profiles, settlements] = await Promise.all([
-      companyRef(companyId).collection("payrollPeriods").get(),
-      companyRef(companyId).collection("payrollProfiles").get(),
-      companyRef(companyId).collection("payrollSettlements").get(),
+      companyRef(companyId).collection("payrollPeriods").limit(200).get(),
+      companyRef(companyId).collection("payrollProfiles").limit(200).get(),
+      companyRef(companyId).collection("payrollSettlements").limit(500).get(),
     ]);
     const activePeriods = periods.docs.filter((d) => d.data().status === "calculated" || d.data().status === "approved").length;
     const totalNetPay = settlements.docs.reduce((sum, d) => sum + (d.data().netPay || 0), 0);

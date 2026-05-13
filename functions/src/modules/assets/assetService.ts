@@ -20,8 +20,8 @@ export const getAssetDashboard = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
 
-    const assetsSnap = await db.collection("companies").doc(companyId).collection("assets").get();
-    const maintenanceSnap = await db.collection("companies").doc(companyId).collection("assetMaintenance").get();
+    const assetsSnap = await db.collection("companies").doc(companyId).collection("assets").limit(500).get();
+    const maintenanceSnap = await db.collection("companies").doc(companyId).collection("assetMaintenance").limit(100).get();
 
     const assets = assetsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const maintenance = maintenanceSnap.docs.map((d) => ({ id: d.id, ...d.data() }));

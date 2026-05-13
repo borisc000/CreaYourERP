@@ -31,9 +31,9 @@ export const getRentalDashboard = onCall(
     const cref = companyRef(companyId);
 
     const [assetsSnap, contractsSnap, linesSnap] = await Promise.all([
-      cref.collection("rentalAssets").get(),
-      cref.collection("rentalContracts").get(),
-      cref.collection("rentalContractLines").get(),
+      cref.collection("rentalAssets").limit(500).get(),
+      cref.collection("rentalContracts").limit(500).get(),
+      cref.collection("rentalContractLines").limit(500).get(),
     ]);
 
     const assets = assetsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any));

@@ -124,7 +124,7 @@ export const getBillingDashboard = onCall(
 
     try {
       const cref = companyRef(companyId);
-      const docsSnap = await cref.collection("billingDocuments").get();
+      const docsSnap = await cref.collection("billingDocuments").limit(500).get();
       const docs = docsSnap.docs.map((d) => d.data() as any);
 
       const totalDocuments = docs.length;

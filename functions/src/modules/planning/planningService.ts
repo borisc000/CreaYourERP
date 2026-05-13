@@ -34,7 +34,7 @@ export const getPlanningDashboard = onCall(
 
     const [budgetsSnap, linesSnap] = await Promise.all([
       cref.collection("planningBudgets").where("year", "==", targetYear).get(),
-      cref.collection("planningBudgetLines").get(),
+      cref.collection("planningBudgetLines").limit(500).get(),
     ]);
 
     const budgets = budgetsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
