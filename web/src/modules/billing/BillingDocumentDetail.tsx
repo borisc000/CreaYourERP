@@ -92,29 +92,35 @@ export function BillingDocumentDetail() {
     }
 
     setLoading(true);
-    getDoc(doc(db, "companies", companyId, "billingDocuments", id)).then((snap) => {
-      if (snap.exists()) {
-        setDocData(snap.data() as BillingDocument);
-      }
-      setLoading(false);
-    });
+    getDoc(doc(db, "companies", companyId, "billingDocuments", id))
+      .then((snap) => {
+        if (snap.exists()) {
+          setDocData(snap.data() as BillingDocument);
+        }
+      })
+      .catch((err) => console.error("Error cargando documento:", err))
+      .finally(() => setLoading(false));
 
     const linesQ = query(
       collection(db, "companies", companyId, "billingLines"),
       where("documentId", "==", id)
     );
-    const unsubLines = onSnapshot(linesQ, (snap) => {
-      setLines(snap.docs.map((d) => d.data() as BillingLine));
-    });
+    const unsubLines = onSnapshot(
+      linesQ,
+      (snap) => setLines(snap.docs.map((d) => d.data() as BillingLine)),
+      (err) => console.error("Error lines snapshot:", err)
+    );
 
     const eventsQ = query(
       collection(db, "companies", companyId, "billingEvents"),
       where("documentId", "==", id),
       orderBy("occurredAt", "desc")
     );
-    const unsubEvents = onSnapshot(eventsQ, (snap) => {
-      setEvents(snap.docs.map((d) => d.data() as BillingEvent));
-    });
+    const unsubEvents = onSnapshot(
+      eventsQ,
+      (snap) => setEvents(snap.docs.map((d) => d.data() as BillingEvent)),
+      (err) => console.error("Error events snapshot:", err)
+    );
 
     return () => {
       unsubLines();

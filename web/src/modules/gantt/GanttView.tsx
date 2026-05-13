@@ -22,10 +22,12 @@ export default function GanttView() {
 
   useEffect(() => {
     if (!companyId || !leadId) return;
-    httpsCallable(functions, "getOrCreateGanttPlan")({ companyId: companyId, leadId }).then((r: any) => {
-      setPlan(r.data.plan);
-      setLoading(false);
-    });
+    httpsCallable(functions, "getOrCreateGanttPlan")({ companyId: companyId, leadId })
+      .then((r: any) => {
+        setPlan(r.data.plan);
+      })
+      .catch((err) => console.error("Error cargando plan:", err))
+      .finally(() => setLoading(false));
   }, [companyId, leadId]);
 
   const filteredTasks = plan ? tasks.filter((t) => t.planId === plan.id && t.active).sort((a, b) => a.displayOrder - b.displayOrder) : [];

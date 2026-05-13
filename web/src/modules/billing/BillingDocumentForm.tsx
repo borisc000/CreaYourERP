@@ -108,42 +108,51 @@ export function BillingDocumentForm() {
     let unsubLines: (() => void) | null = null;
 
     const load = async () => {
-      const snap = await getDoc(doc(db, "companies", companyId, "billingDocuments", id));
-      if (snap.exists()) {
-        const data = snap.data() as BillingDocument;
-        setForm({
-          documentNumber: data.documentNumber,
-          documentType: data.documentType,
-          customerId: data.customerId,
-          customerName: data.customerName,
-          customerTaxId: data.customerTaxId,
-          customerEmail: data.customerEmail,
-          customerContactName: data.customerContactName,
-          createdFrom: data.createdFrom,
-          referenceDocumentId: data.referenceDocumentId,
-          referenceDocumentNumber: data.referenceDocumentNumber,
-          referenceDocumentType: data.referenceDocumentType,
-          correctionMode: data.correctionMode,
-          correctionReason: data.correctionReason,
-          issueDate: data.issueDate,
-          dueDate: data.dueDate,
-          paymentTerms: data.paymentTerms,
-          currency: data.currency,
-          taxRate: data.taxRate,
-          customerMessage: data.customerMessage,
-          internalNotes: data.internalNotes,
-        });
-        // Load lines
-        const linesQ = query(
-          collection(db, "companies", companyId, "billingLines"),
-          where("documentId", "==", id)
-        );
-        unsubLines = onSnapshot(linesQ, (lSnap) => {
-          const loaded = lSnap.docs.map((d) => d.data() as BillingLine);
-          setLines(loaded.sort((a, b) => (a.id > b.id ? 1 : -1)));
-        });
+      try {
+        const snap = await getDoc(doc(db, "companies", companyId, "billingDocuments", id));
+        if (snap.exists()) {
+          const data = snap.data() as BillingDocument;
+          setForm({
+            documentNumber: data.documentNumber,
+            documentType: data.documentType,
+            customerId: data.customerId,
+            customerName: data.customerName,
+            customerTaxId: data.customerTaxId,
+            customerEmail: data.customerEmail,
+            customerContactName: data.customerContactName,
+            createdFrom: data.createdFrom,
+            referenceDocumentId: data.referenceDocumentId,
+            referenceDocumentNumber: data.referenceDocumentNumber,
+            referenceDocumentType: data.referenceDocumentType,
+            correctionMode: data.correctionMode,
+            correctionReason: data.correctionReason,
+            issueDate: data.issueDate,
+            dueDate: data.dueDate,
+            paymentTerms: data.paymentTerms,
+            currency: data.currency,
+            taxRate: data.taxRate,
+            customerMessage: data.customerMessage,
+            internalNotes: data.internalNotes,
+          });
+          // Load lines
+          const linesQ = query(
+            collection(db, "companies", companyId, "billingLines"),
+            where("documentId", "==", id)
+          );
+          unsubLines = onSnapshot(
+            linesQ,
+            (lSnap) => {
+              const loaded = lSnap.docs.map((d) => d.data() as BillingLine);
+              setLines(loaded.sort((a, b) => (a.id > b.id ? 1 : -1)));
+            },
+            (err) => console.error("Error lines snapshot:", err)
+          );
+        }
+      } catch (err) {
+        console.error("Error cargando documento:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     load();

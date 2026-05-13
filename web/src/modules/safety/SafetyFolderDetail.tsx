@@ -98,54 +98,70 @@ export function SafetyFolderDetail() {
       collection(db, "companies", companyId, "safetyFolderDocuments"),
       where("folderId", "==", id)
     );
-    const unsubDocs = onSnapshot(qDocs, (snap) =>
-      setDocuments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SafetyFolderDocument)))
+    const unsubDocs = onSnapshot(
+      qDocs,
+      (snap) => setDocuments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SafetyFolderDocument))),
+      (err) => console.error("Error docs snapshot:", err)
     );
 
     const qMatrix = query(
       collection(db, "companies", companyId, "safetyRiskMatrices"),
       where("folderId", "==", id)
     );
-    const unsubMatrix = onSnapshot(qMatrix, (snap) => {
-      if (!snap.empty) setMatrix({ id: snap.docs[0].id, ...snap.docs[0].data() } as SafetyRiskMatrix);
-      else setMatrix(null);
-    });
+    const unsubMatrix = onSnapshot(
+      qMatrix,
+      (snap) => {
+        if (!snap.empty) setMatrix({ id: snap.docs[0].id, ...snap.docs[0].data() } as SafetyRiskMatrix);
+        else setMatrix(null);
+      },
+      (err) => console.error("Error matrix snapshot:", err)
+    );
 
     const qIRL = query(
       collection(db, "companies", companyId, "safetyIRLRecords"),
       where("folderId", "==", id)
     );
-    const unsubIRL = onSnapshot(qIRL, (snap) =>
-      setIrlRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SafetyIRLRecord)))
+    const unsubIRL = onSnapshot(
+      qIRL,
+      (snap) => setIrlRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SafetyIRLRecord))),
+      (err) => console.error("Error IRL snapshot:", err)
     );
 
     const qPPE = query(
       collection(db, "companies", companyId, "safetyPPEDeliveries"),
       where("folderId", "==", id)
     );
-    const unsubPPE = onSnapshot(qPPE, (snap) =>
-      setPpeDeliveries(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SafetyPPEDelivery)))
+    const unsubPPE = onSnapshot(
+      qPPE,
+      (snap) => setPpeDeliveries(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SafetyPPEDelivery))),
+      (err) => console.error("Error PPE snapshot:", err)
     );
 
     const qTalks = query(
       collection(db, "companies", companyId, "safetyTalks"),
       where("folderId", "==", id)
     );
-    const unsubTalks = onSnapshot(qTalks, (snap) =>
-      setTalks(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SafetyTalk)))
+    const unsubTalks = onSnapshot(
+      qTalks,
+      (snap) => setTalks(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SafetyTalk))),
+      (err) => console.error("Error talks snapshot:", err)
     );
 
     const qChecklists = query(
       collection(db, "companies", companyId, "safetyChecklists"),
       where("folderId", "==", id)
     );
-    const unsubChecklists = onSnapshot(qChecklists, (snap) =>
-      setChecklists(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SafetyChecklistRun)))
+    const unsubChecklists = onSnapshot(
+      qChecklists,
+      (snap) => setChecklists(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SafetyChecklistRun))),
+      (err) => console.error("Error checklists snapshot:", err)
     );
 
     const qEmployees = query(collection(db, "companies", companyId, "employees"));
-    const unsubEmployees = onSnapshot(qEmployees, (snap) =>
-      setEmployees(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Employee)))
+    const unsubEmployees = onSnapshot(
+      qEmployees,
+      (snap) => setEmployees(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Employee))),
+      (err) => console.error("Error employees snapshot:", err)
     );
 
     return () => {
@@ -162,11 +178,11 @@ export function SafetyFolderDetail() {
   // Fetch lead
   useEffect(() => {
     if (!companyId || !folder?.leadId) return;
-    getDocs(query(collection(db, "companies", companyId, "leads"), where("__name__", "==", folder.leadId))).then(
-      (snap) => {
+    getDocs(query(collection(db, "companies", companyId, "leads"), where("__name__", "==", folder.leadId)))
+      .then((snap) => {
         if (!snap.empty) setLead({ id: snap.docs[0].id, ...snap.docs[0].data() } as Lead);
-      }
-    );
+      })
+      .catch((err) => console.error("Error cargando lead:", err));
   }, [companyId, folder?.leadId]);
 
   const handleGenerateMatrix = async () => {
