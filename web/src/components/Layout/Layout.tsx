@@ -13,6 +13,17 @@ import {
   ArrowLeftOnRectangleIcon,
   BuildingOfficeIcon,
   BriefcaseIcon,
+  CubeIcon,
+  TruckIcon,
+  ClockIcon,
+  CheckCircleIcon,
+  WrenchIcon,
+  EnvelopeIcon,
+  BanknotesIcon,
+  ReceiptRefundIcon,
+  CalendarDaysIcon,
+  MapIcon,
+  CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
 
 const menuGroups = [
@@ -28,6 +39,7 @@ const menuGroups = [
     items: [
       { to: "/crm/leads", label: "Oportunidades", icon: ChartBarIcon },
       { to: "/crm/customers", label: "Clientes", icon: UsersIcon },
+      { to: "/suppliers", label: "Proveedores", icon: TruckIcon },
     ],
   },
   {
@@ -37,18 +49,69 @@ const menuGroups = [
       { to: "/hr", label: "Colaboradores", icon: UsersIcon },
       { to: "/hr/departments", label: "Departamentos", icon: BuildingOfficeIcon },
       { to: "/hr/job-profiles", label: "Perfiles de Cargo", icon: BriefcaseIcon },
+      { to: "/attendance", label: "Asistencia", icon: ClockIcon },
+      { to: "/tasks", label: "Tareas", icon: CheckCircleIcon },
+    ],
+  },
+  {
+    title: "RRHH Avanzado",
+    items: [
+      { to: "/recruitment", label: "Reclutamiento", icon: BriefcaseIcon },
+      { to: "/payroll", label: "Remuneraciones", icon: CurrencyDollarIcon },
+    ],
+  },
+  {
+    title: "Activos e Inventario",
+    items: [
+      { to: "/inventory", label: "Inventario", icon: CubeIcon },
+      { to: "/assets", label: "Activos", icon: WrenchIcon },
     ],
   },
   {
     title: "Documentos",
     items: [
+      { to: "/document-center", label: "Centro Documental", icon: DocumentTextIcon },
       { to: "/signature-center", label: "Firmas", icon: PencilSquareIcon },
+      { to: "/riohs", label: "RIOHS", icon: DocumentTextIcon },
+      { to: "/pdf-workspace", label: "PDF Workspace", icon: DocumentTextIcon },
+      { to: "/cross-correspondence", label: "Correspondencia", icon: EnvelopeIcon },
     ],
   },
   {
     title: "Seguridad",
     items: [
       { to: "/safety", label: "Prevención", icon: ShieldCheckIcon },
+      { to: "/safety/procedures", label: "Procedimientos", icon: ClipboardDocumentCheckIcon },
+      { to: "/safety/activities", label: "Actividades", icon: WrenchIcon },
+    ],
+  },
+  {
+    title: "Finanzas",
+    items: [
+      { to: "/billing", label: "Facturación", icon: BanknotesIcon },
+      { to: "/expenses", label: "Gastos", icon: ReceiptRefundIcon },
+      { to: "/rentals", label: "Arriendos", icon: TruckIcon },
+      { to: "/planning", label: "Planificación", icon: CalendarDaysIcon },
+    ],
+  },
+  {
+    title: "Inteligencia",
+    items: [
+      { to: "/ai", label: "IA & Agentes", icon: ChartBarIcon },
+      { to: "/google-workspace", label: "Google Workspace", icon: DocumentTextIcon },
+    ],
+  },
+  {
+    title: "Operaciones de Campo",
+    items: [
+      { to: "/reports", label: "Reportes de Terreno", icon: ClipboardDocumentCheckIcon },
+    ],
+  },
+  {
+    title: "Configuración",
+    items: [
+      { to: "/notifications", label: "Notificaciones", icon: EnvelopeIcon },
+      { to: "/mail", label: "Correo", icon: EnvelopeIcon },
     ],
   },
 ];

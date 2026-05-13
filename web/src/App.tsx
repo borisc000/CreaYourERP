@@ -24,6 +24,115 @@ import { EmployeeDetail } from "./modules/hr/EmployeeDetail";
 import { DepartmentList } from "./modules/hr/DepartmentList";
 import { JobProfileList } from "./modules/hr/JobProfileList";
 import { SignatureCenter } from "./modules/signature/SignatureCenter";
+import { SafetyFolderList } from "./modules/safety/SafetyFolderList";
+import { SafetyFolderForm } from "./modules/safety/SafetyFolderForm";
+import { SafetyFolderDetail } from "./modules/safety/SafetyFolderDetail";
+import { DocumentCenterPage } from "./modules/documentCenter/DocumentCenterPage";
+
+// Inventory
+import { InventoryDashboard } from "./modules/inventory/InventoryDashboard";
+import { InventoryItemList } from "./modules/inventory/InventoryItemList";
+import { InventoryItemForm } from "./modules/inventory/InventoryItemForm";
+import { InventoryItemDetail } from "./modules/inventory/InventoryItemDetail";
+
+// Suppliers
+import { SupplierList } from "./modules/suppliers/SupplierList";
+import { SupplierFormPage } from "./modules/suppliers/SupplierFormPage";
+import { SupplierDetailPage } from "./modules/suppliers/SupplierDetailPage";
+
+// RIOHS
+import { RiohsList } from "./modules/riohs/RiohsList";
+import { RiohsEditorPage } from "./modules/riohs/RiohsEditorPage";
+
+// Attendance
+import { AttendanceDashboard } from "./modules/attendance/AttendanceDashboard";
+import { AttendanceRegister } from "./modules/attendance/AttendanceRegister";
+import { AttendancePolicyForm } from "./modules/attendance/AttendancePolicyForm";
+
+// Tasks
+import { TaskBoard } from "./modules/tasks/TaskBoard";
+import { TaskFormPage } from "./modules/tasks/TaskFormPage";
+import { TaskDetailPage } from "./modules/tasks/TaskDetailPage";
+
+// Assets
+import { AssetDashboard } from "./modules/assets/AssetDashboard";
+import { AssetList } from "./modules/assets/AssetList";
+import { AssetForm } from "./modules/assets/AssetForm";
+
+// Mail
+import { MailSettings } from "./modules/mail/MailSettings";
+
+// Billing
+import { BillingDashboard } from "./modules/billing/BillingDashboard";
+import { BillingDocumentList } from "./modules/billing/BillingDocumentList";
+import { BillingDocumentForm } from "./modules/billing/BillingDocumentForm";
+import { BillingDocumentDetail } from "./modules/billing/BillingDocumentDetail";
+
+// Expenses
+import { ExpenseDashboard } from "./modules/expenses/ExpenseDashboard";
+import { ExpenseList } from "./modules/expenses/ExpenseList";
+import { ExpenseForm } from "./modules/expenses/ExpenseForm";
+
+// Rentals
+import { RentalDashboard } from "./modules/rentals/RentalDashboard";
+import { RentalAssetList } from "./modules/rentals/RentalAssetList";
+import { RentalContractList } from "./modules/rentals/RentalContractList";
+import { RentalContractForm } from "./modules/rentals/RentalContractForm";
+import { RentalContractDetail } from "./modules/rentals/RentalContractDetail";
+
+// Planning
+import { PlanningDashboard } from "./modules/planning/PlanningDashboard";
+import { PlanningBudgetList } from "./modules/planning/PlanningBudgetList";
+import { PlanningBudgetForm } from "./modules/planning/PlanningBudgetForm";
+import { PlanningBudgetDetail } from "./modules/planning/PlanningBudgetDetail";
+
+// Recruitment
+import { RecruitmentDashboard } from "./modules/recruitment/RecruitmentDashboard";
+import { JobOpeningList } from "./modules/recruitment/JobOpeningList";
+import { JobOpeningForm } from "./modules/recruitment/JobOpeningForm";
+import { CandidateList } from "./modules/recruitment/CandidateList";
+import { CandidateForm } from "./modules/recruitment/CandidateForm";
+
+// Payroll
+import { PayrollDashboard } from "./modules/payroll/PayrollDashboard";
+import { PayrollPeriodList } from "./modules/payroll/PayrollPeriodList";
+import { PayrollPeriodForm } from "./modules/payroll/PayrollPeriodForm";
+import { PayrollPeriodDetail } from "./modules/payroll/PayrollPeriodDetail";
+import { PayrollProfileList } from "./modules/payroll/PayrollProfileList";
+
+// Safety Procedures
+import { ProcedureList } from "./modules/safetyProcedures";
+import { ProcedureForm } from "./modules/safetyProcedures";
+import { ProcedureDetail } from "./modules/safetyProcedures";
+
+// Safety Activities
+import { ActivityList } from "./modules/safetyActivities";
+import { ActivityForm } from "./modules/safetyActivities";
+import { ActivityDetail } from "./modules/safetyActivities";
+
+// Gantt
+import { GanttView } from "./modules/gantt";
+
+// Reports
+import { ReportList } from "./modules/reports";
+import { ReportForm } from "./modules/reports";
+import { ReportDetail } from "./modules/reports";
+
+// Notifications
+import { NotificationDashboard } from "./modules/notifications";
+
+// Google Workspace
+import { GoogleWorkspaceDashboard } from "./modules/googleWorkspace";
+
+// AI
+import { AIDashboard } from "./modules/ai";
+
+// PDF Workspace
+import { PdfWorkspacePage } from "./modules/pdfWorkspace";
+
+// Cross Correspondence
+import { CrossCorrespondenceList } from "./modules/crossCorrespondence";
+import { CrossCorrespondenceForm } from "./modules/crossCorrespondence";
 
 function App() {
   return (
@@ -65,7 +174,135 @@ function App() {
                 <Route path="/hr/employees/:id/edit" element={<EmployeeForm />} />
                 <Route path="/hr/departments" element={<DepartmentList />} />
                 <Route path="/hr/job-profiles" element={<JobProfileList />} />
+                <Route path="/safety" element={<SafetyFolderList />} />
+                <Route path="/safety/new" element={<SafetyFolderForm />} />
+                <Route path="/safety/:id" element={<SafetyFolderDetail />} />
+                <Route path="/safety/:id/edit" element={<SafetyFolderForm />} />
+                <Route path="/document-center" element={<DocumentCenterPage />} />
                 <Route path="/signature-center" element={<SignatureCenter />} />
+
+                {/* Inventory */}
+                <Route path="/inventory" element={<InventoryDashboard />} />
+                <Route path="/inventory/items" element={<InventoryItemList />} />
+                <Route path="/inventory/items/new" element={<InventoryItemForm />} />
+                <Route path="/inventory/items/:id" element={<InventoryItemDetail />} />
+                <Route path="/inventory/items/:id/edit" element={<InventoryItemForm />} />
+
+                {/* Suppliers */}
+                <Route path="/suppliers" element={<SupplierList />} />
+                <Route path="/suppliers/new" element={<SupplierFormPage />} />
+                <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
+                <Route path="/suppliers/:id/edit" element={<SupplierFormPage />} />
+
+                {/* RIOHS */}
+                <Route path="/riohs" element={<RiohsList />} />
+                <Route path="/riohs/new" element={<RiohsEditorPage />} />
+                <Route path="/riohs/:id/edit" element={<RiohsEditorPage />} />
+
+                {/* Attendance */}
+                <Route path="/attendance" element={<AttendanceDashboard />} />
+                <Route path="/attendance/register" element={<AttendanceRegister />} />
+                <Route path="/attendance/policies" element={<AttendancePolicyForm />} />
+
+                {/* Tasks */}
+                <Route path="/tasks" element={<TaskBoard />} />
+                <Route path="/tasks/new" element={<TaskFormPage />} />
+                <Route path="/tasks/:id" element={<TaskDetailPage />} />
+                <Route path="/tasks/:id/edit" element={<TaskFormPage />} />
+
+                {/* Assets */}
+                <Route path="/assets" element={<AssetDashboard />} />
+                <Route path="/assets/list" element={<AssetList />} />
+                <Route path="/assets/new" element={<AssetForm />} />
+                <Route path="/assets/:id" element={<AssetForm />} />
+                <Route path="/assets/:id/edit" element={<AssetForm />} />
+
+                {/* Mail */}
+                <Route path="/mail" element={<MailSettings />} />
+
+                {/* Billing */}
+                <Route path="/billing" element={<BillingDashboard />} />
+                <Route path="/billing/documents" element={<BillingDocumentList />} />
+                <Route path="/billing/documents/new" element={<BillingDocumentForm />} />
+                <Route path="/billing/documents/:id" element={<BillingDocumentDetail />} />
+                <Route path="/billing/documents/:id/edit" element={<BillingDocumentForm />} />
+
+                {/* Expenses */}
+                <Route path="/expenses" element={<ExpenseDashboard />} />
+                <Route path="/expenses/records" element={<ExpenseList />} />
+                <Route path="/expenses/records/new" element={<ExpenseForm />} />
+                <Route path="/expenses/records/:id/edit" element={<ExpenseForm />} />
+
+                {/* Rentals */}
+                <Route path="/rentals" element={<RentalDashboard />} />
+                <Route path="/rentals/assets" element={<RentalAssetList />} />
+                <Route path="/rentals/contracts" element={<RentalContractList />} />
+                <Route path="/rentals/contracts/new" element={<RentalContractForm />} />
+                <Route path="/rentals/contracts/:id" element={<RentalContractDetail />} />
+                <Route path="/rentals/contracts/:id/edit" element={<RentalContractForm />} />
+
+                {/* Planning */}
+                <Route path="/planning" element={<PlanningDashboard />} />
+                <Route path="/planning/budgets" element={<PlanningBudgetList />} />
+                <Route path="/planning/budgets/new" element={<PlanningBudgetForm />} />
+                <Route path="/planning/budgets/:id" element={<PlanningBudgetDetail />} />
+                <Route path="/planning/budgets/:id/edit" element={<PlanningBudgetForm />} />
+
+                {/* Recruitment */}
+                <Route path="/recruitment" element={<RecruitmentDashboard />} />
+                <Route path="/recruitment/jobs" element={<JobOpeningList />} />
+                <Route path="/recruitment/jobs/new" element={<JobOpeningForm />} />
+                <Route path="/recruitment/jobs/:id" element={<JobOpeningForm />} />
+                <Route path="/recruitment/jobs/:id/edit" element={<JobOpeningForm />} />
+                <Route path="/recruitment/candidates" element={<CandidateList />} />
+                <Route path="/recruitment/candidates/new" element={<CandidateForm />} />
+                <Route path="/recruitment/candidates/:id" element={<CandidateForm />} />
+                <Route path="/recruitment/candidates/:id/edit" element={<CandidateForm />} />
+
+                {/* Payroll */}
+                <Route path="/payroll" element={<PayrollDashboard />} />
+                <Route path="/payroll/periods" element={<PayrollPeriodList />} />
+                <Route path="/payroll/periods/new" element={<PayrollPeriodForm />} />
+                <Route path="/payroll/periods/:id" element={<PayrollPeriodDetail />} />
+                <Route path="/payroll/profiles" element={<PayrollProfileList />} />
+
+                {/* Safety Procedures */}
+                <Route path="/safety/procedures" element={<ProcedureList />} />
+                <Route path="/safety/procedures/new" element={<ProcedureForm />} />
+                <Route path="/safety/procedures/:id" element={<ProcedureDetail />} />
+                <Route path="/safety/procedures/:id/edit" element={<ProcedureForm />} />
+
+                {/* Safety Activities */}
+                <Route path="/safety/activities" element={<ActivityList />} />
+                <Route path="/safety/activities/new" element={<ActivityForm />} />
+                <Route path="/safety/activities/:id" element={<ActivityDetail />} />
+                <Route path="/safety/activities/:id/edit" element={<ActivityForm />} />
+
+                {/* Gantt */}
+                <Route path="/crm/leads/:leadId/gantt" element={<GanttView />} />
+
+                {/* Reports */}
+                <Route path="/reports" element={<ReportList />} />
+                <Route path="/reports/new" element={<ReportForm />} />
+                <Route path="/reports/:id" element={<ReportDetail />} />
+                <Route path="/reports/:id/edit" element={<ReportForm />} />
+
+                {/* Notifications */}
+                <Route path="/notifications" element={<NotificationDashboard />} />
+
+                {/* Google Workspace */}
+                <Route path="/google-workspace" element={<GoogleWorkspaceDashboard />} />
+
+                {/* AI */}
+                <Route path="/ai" element={<AIDashboard />} />
+
+                {/* PDF Workspace */}
+                <Route path="/pdf-workspace" element={<PdfWorkspacePage />} />
+
+                {/* Cross Correspondence */}
+                <Route path="/cross-correspondence" element={<CrossCorrespondenceList />} />
+                <Route path="/cross-correspondence/new" element={<CrossCorrespondenceForm />} />
+
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Route>
             </Route>

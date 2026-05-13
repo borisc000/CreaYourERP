@@ -6,27 +6,22 @@ service cloud.firestore {
     // FUNCIONES AUXILIARES
     // ==========================================
 
-    // Verifica que el usuario esté autenticado
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Obtiene el companyId del token JWT (custom claim)
     function getCompanyId() {
       return request.auth.token.companyId;
     }
 
-    // Obtiene el rol del usuario
     function getRole() {
       return request.auth.token.role;
     }
 
-    // Verifica si el usuario pertenece a la empresa del documento
     function belongsToCompany(companyId) {
       return isAuthenticated() && getCompanyId() == companyId;
     }
 
-    // Verifica si es admin de la empresa
     function isCompanyAdmin(companyId) {
       return belongsToCompany(companyId) && getRole() == 'admin';
     }
@@ -35,31 +30,28 @@ service cloud.firestore {
     // COLECCIONES GLOBALES
     // ==========================================
 
-    // companies: cualquiera puede leer su propia empresa, solo admins pueden modificar
+    // Perfil global de usuario (creado por trigger de Auth con Admin SDK)
+    // El frontend solo puede leer/escribir su propio perfil
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Empresas
     match /companies/{companyId} {
       allow read: if belongsToCompany(companyId);
       allow create: if isAuthenticated(); // Solo en onboarding inicial
       allow update: if isCompanyAdmin(companyId);
-      allow delete: if false; // Nunca borrar empresas
+      allow delete: if false;
     }
 
     // ==========================================
-    // SUB-COLECCIONES POR EMPRESA
+    // SUB-COLECCIONES POR EMPRESA (Reglas explícitas)
     // ==========================================
-
-    // Usuarios de la empresa
-    match /companies/{companyId}/users/{userId} {
-      allow read: if belongsToCompany(companyId);
-      allow create: if isCompanyAdmin(companyId);
-      allow update: if belongsToCompany(companyId) && request.auth.uid == userId;
-      allow delete: if isCompanyAdmin(companyId);
-    }
 
     // Cotizaciones
     match /companies/{companyId}/quotes/{quoteId} {
       allow read: if belongsToCompany(companyId);
-      allow create: if belongsToCompany(companyId);
-      allow update: if belongsToCompany(companyId);
+      allow create, update: if belongsToCompany(companyId);
       allow delete: if isCompanyAdmin(companyId);
     }
 
@@ -98,6 +90,12 @@ service cloud.firestore {
       allow delete: if isCompanyAdmin(companyId);
     }
 
+    match /companies/{companyId}/jobProfiles/{profileId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
     // Acreditaciones
     match /companies/{companyId}/serviceOrders/{orderId} {
       allow read: if belongsToCompany(companyId);
@@ -117,13 +115,84 @@ service cloud.firestore {
       allow delete: if isCompanyAdmin(companyId);
     }
 
+    match /companies/{companyId}/accreditationRequirements/{reqId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
     // Seguridad
+    match /companies/{companyId}/safetyFolders/{folderId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
     match /companies/{companyId}/safetyDocuments/{docId} {
       allow read, create, update: if belongsToCompany(companyId);
       allow delete: if isCompanyAdmin(companyId);
     }
 
     match /companies/{companyId}/safetyChecks/{checkId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyRiskMatrices/{matrixId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyIRLRecords/{irlId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyPPEItems/{ppeId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyPPEDeliveries/{deliveryId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyTalks/{talkId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyChecklists/{checklistId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyChecklistRuns/{runId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyProcedureTemplates/{templateId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyProcedureVersions/{versionId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyProcedureSteps/{stepId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyActivityBlocks/{blockId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyActivityHazards/{hazardId} {
       allow read, create, update: if belongsToCompany(companyId);
       allow delete: if isCompanyAdmin(companyId);
     }
@@ -136,13 +205,33 @@ service cloud.firestore {
       allow delete: if isCompanyAdmin(companyId);
     }
 
-    // Inventario / Activos
+    match /companies/{companyId}/signatureLogs/{logId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    // Inventario / Activos / Proveedores
     match /companies/{companyId}/inventoryItems/{itemId} {
       allow read, create, update: if belongsToCompany(companyId);
       allow delete: if isCompanyAdmin(companyId);
     }
 
+    match /companies/{companyId}/inventoryMovements/{movementId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
     match /companies/{companyId}/suppliers/{supplierId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/assets/{assetId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/assetMaintenance/{maintId} {
       allow read, create, update: if belongsToCompany(companyId);
       allow delete: if isCompanyAdmin(companyId);
     }
@@ -151,6 +240,251 @@ service cloud.firestore {
     match /companies/{companyId}/expenses/{expenseId} {
       allow read, create: if belongsToCompany(companyId);
       allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    // Facturación
+    match /companies/{companyId}/billingDocuments/{docId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/billingLines/{lineId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/billingEvents/{eventId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    // Planificación
+    match /companies/{companyId}/planningBudgets/{budgetId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/planningBudgetLines/{lineId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Arriendos
+    match /companies/{companyId}/rentalAssets/{assetId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/rentalContracts/{contractId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/rentalContractLines/{lineId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Reclutamiento
+    match /companies/{companyId}/jobOpenings/{jobId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/candidates/{candidateId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/jobApplications/{appId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/interviews/{interviewId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/recruitmentStages/{stageId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Remuneraciones
+    match /companies/{companyId}/payrollPeriods/{periodId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/payrollProfiles/{profileId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/payrollSettlements/{settlementId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/payrollTaxBrackets/{bracketId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/payrollLegalParameters/{paramId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Tareas
+    match /companies/{companyId}/tasks/{taskId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Asistencia
+    match /companies/{companyId}/attendanceRecords/{recordId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/attendancePolicies/{policyId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/attendanceEvents/{eventId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Reportes de terreno
+    match /companies/{companyId}/reports/{reportId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/reportCheckpoints/{cpId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/reportPhotos/{photoId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    // Correspondencia
+    match /companies/{companyId}/crossCorrespondences/{corrId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/crossCorrespondenceEvents/{eventId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    // Notificaciones
+    match /companies/{companyId}/notificationTemplates/{templateId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/notificationLogs/{logId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/notificationPreferences/{prefId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Mail
+    match /companies/{companyId}/mailAccounts/{accountId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/emailLogs/{logId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    // AI
+    match /companies/{companyId}/aiProviders/{providerId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/aiPromptTemplates/{templateId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/aiAgents/{agentId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/aiExecutions/{execId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    // Google Workspace
+    match /companies/{companyId}/googleWorkspaceAccounts/{accountId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // RIOHS
+    match /companies/{companyId}/riohsConfigs/{configId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Centro Documental
+    match /companies/{companyId}/documentTemplates/{templateId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/generatedDocuments/{docId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/documentEventLogs/{logId} {
+      allow read, create: if belongsToCompany(companyId);
+      allow update, delete: if isCompanyAdmin(companyId);
+    }
+
+    // Gantt
+    match /companies/{companyId}/leadGanttPlans/{planId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/leadGanttTasks/{taskId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Usuarios de la empresa
+    match /companies/{companyId}/users/{userId} {
+      allow read: if belongsToCompany(companyId);
+      allow create: if isCompanyAdmin(companyId);
+      allow update: if belongsToCompany(companyId) && request.auth.uid == userId;
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Invitaciones pendientes
+    match /companies/{companyId}/pendingInvites/{inviteId} {
+      allow read: if isCompanyAdmin(companyId);
+      allow create, update, delete: if isCompanyAdmin(companyId);
     }
 
     // Configuración de la empresa
@@ -163,22 +497,29 @@ service cloud.firestore {
     // COLECCIONES GLOBALES DE PLATAFORMA
     // ==========================================
 
-    // Catálogos globales (servicios estándar, cursos, etc.)
-    // Estos son compartidos entre todas las empresas (solo lectura)
     match /catalogs/{catalogId} {
       allow read: if isAuthenticated();
-      allow write: if false; // Solo admin de plataforma via console
+      allow write: if false;
     }
 
-    // Subscriptions (Stripe) - solo el usuario puede ver su propia sub
     match /subscriptions/{subId} {
       allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
-      allow write: if false; // Solo Cloud Functions/webhooks de Stripe
+      allow write: if false;
     }
 
     // ==========================================
-    // BLOQUEO POR DEFECTO
+    // CATCH-ALL (último recurso)
     // ==========================================
+    // IMPORTANTE: Este catch-all cubre cualquier colección no declarada
+    // explícitamente arriba. En staging es aceptable, pero para producción
+    // se recomienda eliminarlo y declarar todas las colecciones explícitamente.
+    match /companies/{companyId}/{collection}/{docId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    // Bloqueo por defecto
     match /{document=**} {
       allow read, write: if false;
     }

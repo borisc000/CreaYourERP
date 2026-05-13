@@ -117,19 +117,36 @@ export const onQuoteAccepted = onDocumentUpdated({
 
 ---
 
-## Tabla de triggers a implementar
+## Tabla de triggers implementados
+
+| Trigger | Disparador | Acciones | Estado |
+|---------|-----------|----------|--------|
+| `onQuoteAccepted` | `quote.status` → accepted | Crear serviceOrder, notificar | ✅ |
+| `onQuoteCreated` | `quote` creado | Numeración COT-XXXX-NN | ✅ |
+| `onQuoteUpdated` | `quote` modificado | Recalcular totales | ✅ |
+| `onCrewAssigned` | `crewAssignment` creado | Verificar acreditación | ✅ |
+| `onLeadCreated` | `lead` creado | Generar PRJ-XXXX | ✅ |
+| `onLeadUpdated` | `lead` modificado | ActivityLog, sync service | ✅ |
+| `onLeadWon` | `lead.status` → won | Crear CRMService + ServiceOrder | ✅ |
+| `onEmployeeHired` | `employee` creado | Scaffold onboarding | ✅ |
+| `ensureServiceSync` | `crmService` modificado | Sincroniza Lead ↔ Service | ✅ |
+| `seedDefaultCompanyData` | On demand | Crea 12 stages + 4 serviceTypes | ✅ |
+| `seedSafetyCatalogs` | On demand | Crea catálogos base Safety | ✅ |
+| `generateRiskMatrix` | On demand | Genera matriz MIPER con filas | ✅ |
+| `refreshFolderMetrics` | On demand | Calcula readiness + semáforo | ✅ |
+| `generateWorkerDocument` | On demand | Genera PDF con pdf-lib + Storage | ✅ |
+
+## Tabla de triggers pendientes
 
 | Trigger | Disparador | Acciones | Prioridad |
 |---------|-----------|----------|-----------|
-| `onQuoteAccepted` | `quote.status` → accepted | Crear serviceOrder, notificar | 🔴 Alta |
-| `onCrewAssigned` | `crewAssignment` creado | Verificar acreditación | 🔴 Alta |
-| `onAccreditationFailed` | `accreditationCheck.overallStatus` → non_compliant | Bloquear asignación, notificar | 🔴 Alta |
+| `onAccreditationFailed` | `accreditationCheck` → non_compliant | Bloquear asignación, notificar | 🔴 Alta |
 | `onContractCreated` | `contract` creado | Generar PDF, crear signatureRequest | 🟡 Media |
 | `onDocumentSigned` | DocuSign webhook | Actualizar contrato/orden | 🟡 Media |
-| `onEmployeeHired` | `employee` creado | Onboarding tasks, cursos | 🟡 Media |
 | `onServiceOrderCompleted` | `serviceOrder.status` → completed | Factura borrador, liberar cuadrilla | 🟢 Baja |
 | `onExpenseApproved` | `expense` aprobado | Generar pago, contabilizar | 🟢 Baja |
 | `onInvoicePaid` | Stripe webhook | Actualizar estado, notificar | 🟢 Baja |
+| `onSafetyFolderReady` | `safetyFolder` → ready | Auto-generar documentos base | 🟡 Media |
 
 ## Patrón: Event Bus con Firestore
 

@@ -28,31 +28,36 @@ Lo que estamos haciendo:
 
 ## El esfuerzo real
 
-| Módulo | Líneas Python | Esfuerzo de migración | Por qué |
-|--------|--------------|----------------------|---------|
-| Base (Users, Companies) | ~500 | Bajo | Solo CRUD, ya está en el scaffold |
-| CRM (Customers, Leads) | ~800 | Medio | Relaciones simples |
-| Quotes (Cotizaciones) | ~1.900 | **Alto** | Mucha lógica de cálculo, se traduce línea por línea |
-| Accreditation | ~1.200 | **Alto** | Lógica compleja de checks |
-| HR (Empleados, Contratos) | ~1.500 | Medio | CRUD + workflows |
-| Signature | ~1.600 | Medio | Hay que reemplazar por DocuSign |
-| Safety | ~1.100 | Medio | Documentos + checklists |
-| Billing | ~600 | Bajo | Nuevo, se integra con Stripe |
+| Módulo | Líneas Python | Estado Firebase | Esfuerzo estimado | Notas |
+|--------|--------------|-----------------|-------------------|-------|
+| Base (Users, Companies) | ~500 | ✅ Completo | Bajo | Scaffold inicial |
+| CRM (Customers, Leads) | ~800 | ✅ Completo | Medio | Relaciones simples |
+| Quotes (Cotizaciones) | ~1.900 | ✅ Completo | Alto | Cálculos HH, numeración automática |
+| Accreditation | ~1.200 | ✅ Completo | Alto | Checks de cuadrilla, matriz |
+| HR (Empleados, Contratos) | ~1.500 | ✅ Completo | Medio | CRUD + workflows |
+| Safety | ~9.169 | ✅ Completo | **Alto** | MIPER, IRL, EPP, charlas, checklists, exportación |
+| Document Center | ~3.500 | ✅ Completo | Alto | Templates, generación PDF, ciclo de vida |
+| Signature | ~1.600 | 🔄 Pendiente | Medio | Reemplazar por DocuSign/firma digital |
+| Billing | ~600 | 🔄 Pendiente | Bajo | Stripe, plan limits ya parcial |
 
-**Total estimado:** 2-3 semanas de trabajo concentrado por un desarrollador que sepa TypeScript, traduciendo módulo por módulo.
+**Total estimado original:** 2-3 semanas
+**Progreso actual:** ~75% de los módulos core migrados
 
 ## Estrategia recomendada: Módulo por módulo
 
 NO hagas la migración de todo de una vez. Hazla **módulo por módulo**, empezando por el más simple.
 
-**Orden recomendado:**
-1. Base (Users, Companies) - Ya está en el scaffold
-2. CRM (Customers, Mandantes) - Para aprender el patrón
-3. Quotes - El más importante para ventas
-4. HR - Empleados
-5. Accreditation - La joya de la corona
-6. Signature - Reemplazar por DocuSign
-7. Safety, Inventory, etc.
+**Orden recomendado (actualizado con progreso):**
+1. ✅ Base (Users, Companies) - Ya está en el scaffold
+2. ✅ CRM (Customers, Mandantes) - Para aprender el patrón
+3. ✅ Quotes - El más importante para ventas
+4. ✅ HR - Empleados
+5. ✅ Accreditation - La joya de la corona
+6. ✅ Safety - Prevención de riesgos (módulo más grande)
+7. ✅ Document Center - Centro documental transversal
+8. 🔄 Signature - Firma digital
+9. 🔄 Billing - Stripe, facturación
+10. ❌ Inventory, Rentals, Payroll, etc. - Futuro
 
 Cada módulo sigue este patrón:
 1. Traducir modelo Python → interfaz TypeScript

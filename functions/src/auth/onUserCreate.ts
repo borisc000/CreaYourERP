@@ -14,11 +14,6 @@ export const onUserCreated = beforeUserCreated(async (event) => {
   const email = user.email || "";
   const displayName = user.displayName || email.split("@")[0];
 
-  // Verificar si es invitación a empresa existente
-  const invitationToken = event.additionalUserInfo?.isNewUser
-    ? null
-    : event.credential?.providerId;
-
   // En el frontend, al invitar, se genera un enlace con companyId en el token
   // Aquí asumimos que el companyId viene en custom claims previos (seteados por admin)
   // O si es nuevo, creamos empresa

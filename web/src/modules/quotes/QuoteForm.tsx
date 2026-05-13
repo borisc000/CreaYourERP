@@ -168,7 +168,6 @@ export function QuoteForm() {
 
       if (isEdit && id) {
         await getDoc(doc(db, "companies", companyId, "quotes", id)); // verify exists
-        await getDoc(doc(db, "companies", companyId, "quotes", id));
         // Use updateDoc directly
         const { updateDoc: firestoreUpdateDoc } = await import("firebase/firestore");
         await firestoreUpdateDoc(doc(db, "companies", companyId, "quotes", id), {

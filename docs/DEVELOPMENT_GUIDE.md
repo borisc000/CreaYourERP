@@ -73,14 +73,16 @@ your-erp-firebase/
 ├── functions/              # Cloud Functions (Node.js/TS)
 │   ├── src/
 │   │   ├── index.ts        # Entry point
-│   │   ├── config.ts       # Firebase Admin, Stripe config
+│   │   ├── config.ts       # Firebase Admin, Stripe, Storage
 │   │   ├── auth/           # Auth triggers
 │   │   ├── billing/        # Stripe, plan limits
 │   │   ├── modules/
 │   │   │   ├── crm/        # CRM functions
 │   │   │   ├── quotes/     # Quote calculations
 │   │   │   ├── hr/         # HR functions
-│   │   │   └── accreditation/ # Crew compliance
+│   │   │   ├── accreditation/ # Crew compliance
+│   │   │   ├── safety/     # Safety: MIPER, IRL, EPP, talks, checklists
+│   │   │   └── documentCenter/ # Templates, generation, lifecycle
 │   │   └── services/       # Audit, notifications
 │   └── package.json
 │
@@ -91,6 +93,8 @@ your-erp-firebase/
 │   │   │   ├── quotes/     # Quotes
 │   │   │   ├── hr/         # Employees
 │   │   │   ├── accreditation/ # ServiceOrders
+│   │   │   ├── safety/     # Safety folders, MIPER, IRL, EPP
+│   │   │   ├── documentCenter/ # Templates, generated docs
 │   │   │   └── signature/  # DocuSign
 │   │   ├── components/     # Componentes compartidos
 │   │   ├── hooks/          # useFirestore, useAuth
@@ -121,6 +125,18 @@ your-erp-firebase/
 ### Nombres de colecciones en Firestore
 - Plural, camelCase: `customers`, `serviceOrders`, `crewAssignments`
 - Subcolecciones bajo `companies/{companyId}/`
+
+**Colecciones principales:**
+```
+customers, leads, quotes, employees, departments, jobProfiles
+serviceOrders, crewAssignments, accreditationChecks, accreditationRequirements
+documentGenerationRequests, signatureRequests
+safetyFolders, safetyFolderDocuments, safetyRiskMatrices, safetyRiskMatrices/{id}/rows
+safetyIRLRecords, safetyPPEDeliveries, safetyTalks, safetyChecklists
+safetyMasterRisks, safetyProtocols, safetyPPEItems, safetyServiceProfiles
+documentTemplates, generatedDocuments, documentBatches, documentEventLogs
+activityLogs, notifications, tasks, users
+```
 
 ### Tipos TypeScript
 - Interfaces en `web/src/types/index.ts`
@@ -245,13 +261,34 @@ firebase deploy --project prod
 
 Los pushes a `develop`, `staging` y `main` despliegan automáticamente vía GitHub Actions.
 
+## Dependencias importantes
+
+| Librería | Uso | Ubicación |
+|----------|-----|-----------|
+| `firebase-admin` | Admin SDK | functions |
+| `firebase-functions` | Cloud Functions v2 | functions |
+| `stripe` | Pagos | functions |
+| `pdf-lib` | Generación PDF (MIPER, documentos) | functions |
+| `dayjs` | Fechas | functions |
+
 ## Troubleshooting
 
-### `npm install` falla en Windows
+### `npm install` falla en Windows / `tsc` no reconocido
 
 Ejecuta PowerShell como administrador y habilita scripts:
 ```powershell
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Luego recarga la sesión o reinicia la terminal.
+
+### `npm run build` falla por `tsc`
+
+Si `tsc` no está en PATH después de `npm install`, usa:
+```powershell
+npx tsc
+# o
+.\node_modules\.bin\tsc
 ```
 
 ### Errores de CORS en functions

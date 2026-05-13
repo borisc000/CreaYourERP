@@ -4,7 +4,7 @@ import { doc, getDoc, collection, query, where, orderBy, onSnapshot } from "fire
 import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFirestoreDoc } from "@/hooks/useFirestore";
-import type { Lead, Customer, LeadPriority, LeadStatus } from "@/types";
+import type { Lead, Customer, Stage, ServiceType, User, LeadPriority, LeadStatus } from "@/types";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 
 export function LeadForm() {
@@ -16,11 +16,19 @@ export function LeadForm() {
   const { create, update } = useFirestoreDoc<Lead>("leads");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [mandantes, setMandantes] = useState<Array<{ id: string; name: string }>>([]);
 
   const [form, setForm] = useState<Partial<Lead>>({
     title: "",
     description: "",
     customerId: "",
+    stageId: "",
+    serviceTypeId: "",
+    assignedTo: "",
+    mandanteId: "",
     priority: "medium",
     status: "open",
     expectedRevenue: 0,
@@ -34,21 +42,75 @@ export function LeadForm() {
     aprName: "",
     supervisorName: "",
     contractAdminName: "",
+    poNumber: "",
+    reportNumber: "",
+    hesNumber: "",
+    invoiceNumber: "",
     isPaid: false,
   });
 
   useEffect(() => {
     if (!companyId) return;
-    const q = query(
+    const qCustomers = query(
       collection(db, "companies", companyId, "customers"),
       where("active", "==", true),
       orderBy("name")
     );
-    const unsub = onSnapshot(q, (snap) => {
+    const unsubCustomers = onSnapshot(qCustomers, (snap) => {
       setCustomers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Customer)));
     });
-    return () => unsub();
+
+    const qStages = query(
+      collection(db, "companies", companyId, "stages"),
+      orderBy("order")
+    );
+    const unsubStages = onSnapshot(qStages, (snap) => {
+      setStages(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Stage)));
+    });
+
+    const qServiceTypes = query(
+      collection(db, "companies", companyId, "serviceTypes"),
+      where("isActive", "==", true),
+      orderBy("name")
+    );
+    const unsubServiceTypes = onSnapshot(qServiceTypes, (snap) => {
+      setServiceTypes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ServiceType)));
+    });
+
+    const qUsers = query(
+      collection(db, "companies", companyId, "users"),
+      where("isActive", "==", true),
+      orderBy("name")
+    );
+    const unsubUsers = onSnapshot(qUsers, (snap) => {
+      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as User)));
+    });
+
+    return () => {
+      unsubCustomers();
+      unsubStages();
+      unsubServiceTypes();
+      unsubUsers();
+    };
   }, [companyId]);
+
+  // Load mandantes when customer changes
+  useEffect(() => {
+    if (!companyId || !form.customerId) {
+      setMandantes([]);
+      return;
+    }
+    const q = query(
+      collection(db, "companies", companyId, "mandantes"),
+      where("customerId", "==", form.customerId),
+      where("active", "==", true),
+      orderBy("name")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setMandantes(snap.docs.map((d) => ({ id: d.id, name: d.data().name })));
+    });
+    return () => unsub();
+  }, [companyId, form.customerId]);
 
   useEffect(() => {
     if (!id || !companyId) return;
@@ -60,6 +122,10 @@ export function LeadForm() {
           title: data.title,
           description: data.description,
           customerId: data.customerId,
+          stageId: data.stageId,
+          serviceTypeId: data.serviceTypeId,
+          assignedTo: data.assignedTo,
+          mandanteId: data.mandanteId,
           priority: data.priority,
           status: data.status,
           expectedRevenue: data.expectedRevenue,
@@ -73,6 +139,11 @@ export function LeadForm() {
           aprName: data.aprName,
           supervisorName: data.supervisorName,
           contractAdminName: data.contractAdminName,
+          poNumber: data.poNumber,
+          reportNumber: data.reportNumber,
+          hesNumber: data.hesNumber,
+          invoiceNumber: data.invoiceNumber,
+          isPaid: data.isPaid,
         });
       }
     };
@@ -141,13 +212,78 @@ export function LeadForm() {
               <label className="block text-sm font-medium text-gray-300 mb-1">Cliente</label>
               <select
                 value={form.customerId || ""}
-                onChange={(e) => setForm({ ...form, customerId: e.target.value || undefined })}
+                onChange={(e) => setForm({ ...form, customerId: e.target.value || undefined, mandanteId: undefined })}
                 className={fieldClass}
               >
                 <option value="">Seleccionar cliente...</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Contacto (Mandante)</label>
+              <select
+                value={form.mandanteId || ""}
+                onChange={(e) => setForm({ ...form, mandanteId: e.target.value || undefined })}
+                className={fieldClass}
+                disabled={!form.customerId}
+              >
+                <option value="">{form.customerId ? "Seleccionar contacto..." : "Primero seleccione cliente"}</option>
+                {mandantes.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Etapa</label>
+              <select
+                value={form.stageId || ""}
+                onChange={(e) => setForm({ ...form, stageId: e.target.value || undefined })}
+                className={fieldClass}
+              >
+                <option value="">Seleccionar etapa...</option>
+                {stages.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.order}. {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Tipo de Servicio</label>
+              <select
+                value={form.serviceTypeId || ""}
+                onChange={(e) => setForm({ ...form, serviceTypeId: e.target.value || undefined })}
+                className={fieldClass}
+              >
+                <option value="">Seleccionar tipo...</option>
+                {serviceTypes.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Asignado a</label>
+              <select
+                value={form.assignedTo || ""}
+                onChange={(e) => setForm({ ...form, assignedTo: e.target.value || undefined })}
+                className={fieldClass}
+              >
+                <option value="">Seleccionar usuario...</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
                   </option>
                 ))}
               </select>
@@ -302,6 +438,62 @@ export function LeadForm() {
                 onChange={(e) => setForm({ ...form, quoteDeadline: e.target.value })}
                 className={fieldClass}
               />
+            </div>
+          </div>
+        </div>
+
+        {/* Documents & Tracking */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Documentos y Seguimiento</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">OC / PO Number</label>
+              <input
+                type="text"
+                value={form.poNumber || ""}
+                onChange={(e) => setForm({ ...form, poNumber: e.target.value })}
+                className={fieldClass}
+                placeholder="N° Orden de Compra"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">N° Reporte</label>
+              <input
+                type="text"
+                value={form.reportNumber || ""}
+                onChange={(e) => setForm({ ...form, reportNumber: e.target.value })}
+                className={fieldClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">N° HES</label>
+              <input
+                type="text"
+                value={form.hesNumber || ""}
+                onChange={(e) => setForm({ ...form, hesNumber: e.target.value })}
+                className={fieldClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">N° Factura</label>
+              <input
+                type="text"
+                value={form.invoiceNumber || ""}
+                onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })}
+                className={fieldClass}
+              />
+            </div>
+            <div className="flex items-center gap-3 md:col-span-2">
+              <input
+                id="isPaid"
+                type="checkbox"
+                checked={form.isPaid || false}
+                onChange={(e) => setForm({ ...form, isPaid: e.target.checked })}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="isPaid" className="text-sm font-medium text-gray-300">
+                Pagado
+              </label>
             </div>
           </div>
         </div>

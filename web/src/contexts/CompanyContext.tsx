@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { Outlet } from "react-router-dom";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { useAuth } from "./AuthContext";
@@ -11,7 +12,7 @@ interface CompanyContextType {
 
 const CompanyContext = createContext<CompanyContextType | null>(null);
 
-export function CompanyProvider({ children }: { children: ReactNode }) {
+export function CompanyProvider({ children }: { children?: ReactNode }) {
   const { companyId, isAuthenticated, isLoading: authLoading } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,7 +55,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   return (
     <CompanyContext.Provider value={{ company, isLoading }}>
-      {children}
+      {children ?? <Outlet />}
     </CompanyContext.Provider>
   );
 }

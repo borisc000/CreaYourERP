@@ -36,8 +36,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         // Obtener custom claims (companyId, role) del token
         const tokenResult = await firebaseUser.getIdTokenResult(true);
-        const claimsCompanyId = tokenResult.claims.companyId as string | undefined;
-        const claimsRole = tokenResult.claims.role as string | undefined;
+        let claimsCompanyId = tokenResult.claims.companyId as string | undefined;
+        let claimsRole = tokenResult.claims.role as string | undefined;
+
+        // Fallback para emulador/desarrollo: si no hay claims,
+        // inferir companyId desde el UID del usuario (patrón del seed script)
+        if (!claimsCompanyId) {
+          try {
+            const userDoc = await getDoc(doc(db, "companies", firebaseUser.uid, "users", firebaseUser.uid));
+            if (userDoc.exists()) {
+              claimsCompanyId = firebaseUser.uid;
+              claimsRole = userDoc.data().role as string | undefined;
+            }
+          } catch {
+            // Silenciar error en fallback
+          }
+        }
 
         setCompanyId(claimsCompanyId || null);
         setRole(claimsRole || null);

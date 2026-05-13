@@ -39,47 +39,50 @@ Si el módulo tiene cálculos complejos, crea una Cloud Function.
 
 ---
 
-## Orden recomendado de migración
+## Orden recomendado de migración (progreso actual)
 
-### Fase 1: Fundamentos (Semana 1)
+### ✅ Fase 1: Fundamentos
 **Módulo: Base (Users, Companies)**
-- ✅ Ya está en el scaffold
-- Tarea: Probar onboarding completo
+- Login, registro, onboarding, roles, custom claims
 
 **Módulo: CRM (Customers, Mandantes, Leads)**
-- Modelos simples
 - Relaciones: Lead → Customer, Lead → Mandante
-- Lógica: Stages de pipeline
-- **Es fácil y te enseña el patrón**
+- 12 stages de pipeline, ActivityLog, PRJ-XXXX auto
 
-### Fase 2: Dinero (Semana 2)
+### ✅ Fase 2: Comercial
 **Módulo: Quotes (Cotizaciones)**
-- Modelo más complejo (Quote + QuoteLines)
-- Lógica de cálculo server-side
-- **Es el módulo que más vende el ERP**
-- Cloud Function `calculateQuoteTotal` ya está creada
+- Modelo complejo (Quote + QuoteLines)
+- Cálculos server-side, numeración COT-XXXX-NN
+- Cloud Function `calculateQuoteTotal`
 
-### Fase 3: Personas (Semana 3)
+### ✅ Fase 3: Personas
 **Módulo: HR (Empleados, Contratos, Departamentos)**
-- CRUD simple
+- CRUD + workflows
 - Relaciones: Employee → Department, Employee → JobProfile
-- Validaciones: RUT chileno
 
-### Fase 4: Operaciones (Semana 4)
+### ✅ Fase 4: Operaciones
 **Módulo: Accreditation**
 - ServiceOrders + CrewAssignments + AccreditationChecks
-- Lógica compleja de verificación
-- Cloud Function `checkCrewCompliance` ya está creada
+- Cloud Function `checkCrewCompliance`
 
-### Fase 5: Documentos (Semana 5)
-**Módulo: Signature**
-- Reemplazar tu firma custom por **DocuSign API**
-- DocuSign tiene SDK en Node.js
-- Guardar en Firestore el estado de cada solicitud
+### ✅ Fase 5: Seguridad
+**Módulo: Safety (Prevención de Riesgos)**
+- Motor MIPER con generación automática de matrices
+- IRL, EPP, charlas, checklists
+- Exportación CSV/HTML
 
-### Fase 6: Seguridad y misc (Semana 6)
-**Módulos: Safety, Inventory, Suppliers**
-- CRUDs relativamente simples
+### ✅ Fase 6: Documentos
+**Módulo: Document Center**
+- Templates con metadatos y Storage
+- Generación PDF con `pdf-lib` para trabajadores
+- Ciclo de vida documental completo
+
+### 🔄 Fase 7: Firma y facturación
+**Módulo: Signature** — Reemplazar firma custom por DocuSign API
+**Módulo: Billing** — Stripe checkout, webhooks, plan limits
+
+### ❌ Fase 8: Futuro
+**Módulos:** Inventory, Suppliers, Payroll, Rentals, Reports
 
 ---
 
@@ -132,17 +135,19 @@ Crear clientes, editar, eliminar. Verificar que los Security Rules bloquean acce
 
 ## Tiempo estimado por módulo
 
-| Módulo | Días de trabajo | Complejidad |
-|--------|----------------|-------------|
-| Base | 1 día | ⭐ |
-| CRM | 3 días | ⭐⭐ |
-| Quotes | 5 días | ⭐⭐⭐⭐ |
-| HR | 4 días | ⭐⭐⭐ |
-| Accreditation | 5 días | ⭐⭐⭐⭐ |
-| Signature | 3 días | ⭐⭐⭐ |
-| Safety | 3 días | ⭐⭐ |
-| Inventory | 2 días | ⭐⭐ |
-| Suppliers | 2 días | ⭐⭐ |
-| **TOTAL** | **~28 días (6 semanas)** | |
+| Módulo | Estado | Días reales | Complejidad |
+|--------|--------|-------------|-------------|
+| Base | ✅ | 1 día | ⭐ |
+| CRM | ✅ | 3 días | ⭐⭐ |
+| Quotes | ✅ | 5 días | ⭐⭐⭐⭐ |
+| HR | ✅ | 4 días | ⭐⭐⭐ |
+| Accreditation | ✅ | 5 días | ⭐⭐⭐⭐ |
+| Safety | ✅ | 7 días | ⭐⭐⭐⭐⭐ |
+| Document Center | ✅ | 5 días | ⭐⭐⭐⭐ |
+| Signature | 🔄 | 3 días (est.) | ⭐⭐⭐ |
+| Billing | 🔄 | 2 días (est.) | ⭐⭐ |
+| Inventory | ❌ | 2 días (est.) | ⭐⭐ |
+| Suppliers | ❌ | 2 días (est.) | ⭐⭐ |
+| **TOTAL completado** | **~75%** | **~30 días** | |
 
 Esto asume 1 desarrollador trabajando 4-6 horas al día. Con vibe-coding (IA asistiendo), puede ser 30-40% más rápido.

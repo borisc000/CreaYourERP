@@ -4,7 +4,7 @@ import { orderBy, limit } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
-import type { Quote, Lead, ServiceOrder, Employee, CrewAssignment, AccreditationCheck, ActivityLog } from "@/types";
+import type { Quote, Lead, ServiceOrder, Employee, CrewAssignment, AccreditationCheck, ActivityLog, Stage } from "@/types";
 import {
   DocumentTextIcon,
   ClipboardDocumentCheckIcon,
@@ -35,8 +35,9 @@ export function DashboardPage() {
   const { data: crewAssignments } = useFirestoreCollection<CrewAssignment>("crewAssignments");
   const { data: checks } = useFirestoreCollection<AccreditationCheck>("accreditationChecks");
   const { data: activityLogs } = useFirestoreCollection<ActivityLog>("activityLogs", [orderBy("createdAt", "desc"), limit(10)]);
+  const { data: stages, isLoading: stagesLoading } = useFirestoreCollection<Stage>("stages", [orderBy("order")]);
 
-  const isLoading = quotesLoading || leadsLoading || ordersLoading || empLoading;
+  const isLoading = quotesLoading || leadsLoading || ordersLoading || empLoading || stagesLoading;
 
   // KPI Calculations
   const stats = useMemo(() => {
@@ -59,16 +60,25 @@ export function DashboardPage() {
     const pendingAuthorizations = crewAssignments.filter((c) => c.authorizationStatus === "pending").length;
     const nonCompliantChecks = checks.filter((c) => c.overallStatus === "non_compliant").length;
 
-    // Stage breakdown
-    const stageGroups: Record<string, { count: number; value: number }> = {};
+    // Stage breakdown with names
+    const stageMap: Record<string, string> = {};
+    stages.forEach((s) => { stageMap[s.id] = `${s.order}. ${s.name}`; });
+
+    const stageGroups: Record<string, { count: number; value: number; name: string; order: number }> = {};
     leads
       .filter((l) => l.status === "open")
       .forEach((l) => {
-        const stage = l.stageId || "Sin etapa";
-        if (!stageGroups[stage]) stageGroups[stage] = { count: 0, value: 0 };
-        stageGroups[stage].count++;
-        stageGroups[stage].value += (l.expectedRevenue * (l.probability || 0)) / 100;
+        const stageId = l.stageId || "none";
+        const stageName = stageMap[stageId] || "Sin etapa";
+        if (!stageGroups[stageId]) stageGroups[stageId] = { count: 0, value: 0, name: stageName, order: stages.find((s) => s.id === stageId)?.order || 99 };
+        stageGroups[stageId].count++;
+        stageGroups[stageId].value += (l.expectedRevenue * (l.probability || 0)) / 100;
       });
+
+    // Sort stage groups by order
+    const sortedStageGroups = Object.entries(stageGroups)
+      .sort((a, b) => a[1].order - b[1].order)
+      .reduce((acc, [key, val]) => { acc[key] = val; return acc; }, {} as typeof stageGroups);
 
     return {
       totalQuotes,
@@ -84,7 +94,7 @@ export function DashboardPage() {
       onboardingEmployees,
       pendingAuthorizations,
       nonCompliantChecks,
-      stageGroups,
+      stageGroups: sortedStageGroups,
     };
   }, [quotes, leads, orders, employees, crewAssignments, checks]);
 
@@ -229,13 +239,13 @@ export function DashboardPage() {
             <p className="text-gray-500 text-sm text-center py-8">No hay oportunidades abiertas</p>
           ) : (
             <div className="space-y-4">
-              {Object.entries(stats.stageGroups).map(([stage, data]) => {
+              {Object.entries(stats.stageGroups).map(([stageId, data]) => {
                 const maxCount = Math.max(...Object.values(stats.stageGroups).map((s) => s.count));
                 const width = maxCount > 0 ? (data.count / maxCount) * 100 : 0;
                 return (
-                  <div key={stage} className="group cursor-pointer" onClick={() => navigate("/crm/leads")}>
+                  <div key={stageId} className="group cursor-pointer" onClick={() => navigate("/crm/leads")}>
                     <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-gray-300">{stage === "Sin etapa" ? "Sin etapa definida" : `Etapa ${stage}`}</span>
+                      <span className="text-gray-300">{data.name}</span>
                       <div className="flex items-center gap-3">
                         <span className="text-gray-500">{data.count} op.</span>
                         <span className="text-gray-400 font-medium">

@@ -15,9 +15,13 @@ service firebase.storage {
     }
 
     // Documentos por empresa: /companies/{companyId}/documents/...
+    // /companies/{companyId}/signatures/...
+    // /companies/{companyId}/safety/...
     match /companies/{companyId}/{allPaths=**} {
       allow read: if belongsToCompany(companyId);
-      allow write: if belongsToCompany(companyId);
+      allow write: if belongsToCompany(companyId)
+        && request.resource.size < 20 * 1024 * 1024  // max 20 MB
+        && request.resource.contentType.matches('application/pdf|image/.*|application/vnd.openxmlformats-officedocument.*|text/.*');
     }
 
     // Bloquear todo lo demás

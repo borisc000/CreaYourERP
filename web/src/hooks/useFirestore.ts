@@ -30,6 +30,7 @@ export function useFirestoreCollection<T extends { id: string }>(
 
   useEffect(() => {
     if (!companyId) {
+      console.warn(`[useFirestoreCollection] companyId is null, skipping query for "${collectionPath}"`);
       setData([]);
       setIsLoading(false);
       return;
@@ -60,6 +61,52 @@ export function useFirestoreCollection<T extends { id: string }>(
 
     return () => unsubscribe();
   }, [companyId, collectionPath, JSON.stringify(constraints)]);
+
+  return { data, isLoading, error };
+}
+
+/**
+ * Hook genérico para leer un documento específico de Firestore.
+ */
+export function useFirestoreDocument<T extends { id: string }>(
+  collectionPath: string,
+  docId: string | undefined
+) {
+  const { companyId } = useAuth();
+  const [data, setData] = useState<T | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (!companyId || !docId) {
+      setData(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    const docRef = doc(db, "companies", companyId, collectionPath, docId);
+
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          setData({ id: snapshot.id, ...snapshot.data() } as T);
+        } else {
+          setData(null);
+        }
+        setIsLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error(`Error en ${collectionPath}/${docId}:`, err);
+        setError(err);
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [companyId, collectionPath, docId]);
 
   return { data, isLoading, error };
 }
