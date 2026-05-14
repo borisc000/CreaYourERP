@@ -38,6 +38,6 @@ jobs:
       - name: Deploy to Firebase Staging
         uses: w9jds/firebase-action@master
         with:
-          args: deploy --project staging --only hosting,functions,firestore:rules,firestore:indexes,storage:rules
+          args: deploy --project staging --only hosting,functions,firestore:rules,firestore:indexes,storage
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}
