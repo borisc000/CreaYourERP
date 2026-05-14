@@ -12,7 +12,7 @@ import { db } from "../../config";
 import * as crypto from "crypto";
 
 const cors = [
-  "https://your-erp.web.app",
+  "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com",
   "http://localhost:5173",
 ];
 

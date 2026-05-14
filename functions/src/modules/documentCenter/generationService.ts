@@ -139,7 +139,7 @@ async function buildWorkerPDF(
 export const generateWorkerDocument = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
     memory: "512MiB",
   },
   async (request) => {

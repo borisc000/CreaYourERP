@@ -4,7 +4,7 @@ import { db } from "../../config";
 const cors = [
   "http://localhost:5173",
   "http://localhost:5000",
-  "https://your-erp.web.app",
+  "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com",
 ];
 
 function nowIso() {

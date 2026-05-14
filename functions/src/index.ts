@@ -1,6 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { onUserCreated } from "./auth/onUserCreate";
+import { createInitialCompany } from "./auth/onboarding";
 import { enforcePlanLimits } from "./billing/enforcePlanLimits";
 import { calculateQuoteTotal } from "./modules/quotes/calculateTotal";
 import { onQuoteAccepted } from "./modules/quotes/onQuoteAccepted";
@@ -20,7 +20,7 @@ import { db } from "./config";
 // AUTH TRIGGERS
 // ==========================================
 
-export const onAuthUserCreated = onUserCreated;
+export { createInitialCompany };
 
 // ==========================================
 // BILLING / PLAN LIMITS
@@ -281,7 +281,7 @@ export { getCorrespondenceDashboard, createCorrespondence, updateCorrespondence,
 export const getDashboardStats = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
