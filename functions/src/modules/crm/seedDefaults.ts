@@ -32,7 +32,7 @@ export const DEFAULT_SERVICE_TYPES = [
 export const seedDefaultCompanyData = onDocumentCreated(
   {
     document: "companies/{companyId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId } = event.params;

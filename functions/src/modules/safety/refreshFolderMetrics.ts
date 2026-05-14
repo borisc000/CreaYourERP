@@ -15,7 +15,7 @@ import { db } from "../../config";
 export const refreshFolderMetrics = onDocumentUpdated(
   {
     document: "companies/{companyId}/safetyFolders/{folderId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, folderId } = event.params;

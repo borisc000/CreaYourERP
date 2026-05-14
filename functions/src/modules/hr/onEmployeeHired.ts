@@ -9,7 +9,7 @@ import { db } from "../../config";
 export const onEmployeeHired = onDocumentCreated(
   {
     document: "companies/{companyId}/employees/{employeeId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, employeeId } = event.params;

@@ -54,7 +54,7 @@ const PRIORITY_LABELS: Record<string, string> = {
 export const onLeadUpdated = onDocumentUpdated(
   {
     document: "companies/{companyId}/leads/{leadId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, leadId } = event.params;

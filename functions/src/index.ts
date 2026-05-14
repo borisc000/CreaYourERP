@@ -38,7 +38,7 @@ export { onQuoteCreated };
 export const onQuoteUpdated = onDocumentUpdated(
   {
     document: "companies/{companyId}/quotes/{quoteId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, quoteId } = event.params;
@@ -84,7 +84,7 @@ export const onQuoteUpdated = onDocumentUpdated(
 export const onCrewAssigned = onDocumentCreated(
   {
     document: "companies/{companyId}/crewAssignments/{assignmentId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, assignmentId } = event.params;

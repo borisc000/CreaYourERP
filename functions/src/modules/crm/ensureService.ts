@@ -55,7 +55,7 @@ function buildServicePayload(lead: any, existingService?: any) {
 export const onLeadWon = onDocumentUpdated(
   {
     document: "companies/{companyId}/leads/{leadId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, leadId } = event.params;
@@ -145,7 +145,7 @@ export const onLeadWon = onDocumentUpdated(
 export const ensureServiceSync = onDocumentUpdated(
   {
     document: "companies/{companyId}/leads/{leadId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, leadId } = event.params;
