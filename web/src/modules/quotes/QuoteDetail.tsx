@@ -12,6 +12,7 @@ import {
   XCircleIcon,
   TrashIcon,
   DocumentTextIcon,
+  PrinterIcon,
 } from "@heroicons/react/24/outline";
 
 export function QuoteDetail() {
@@ -127,6 +128,13 @@ export function QuoteDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate(`/quotes/${id}/preview`)}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-blue-900/60 hover:bg-blue-800 text-blue-100 text-sm font-medium rounded-lg transition-colors"
+          >
+            <PrinterIcon className="w-4 h-4" />
+            Vista PDF
+          </button>
           {quote.status === "draft" && (
             <>
               <button

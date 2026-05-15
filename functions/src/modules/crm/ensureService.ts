@@ -13,6 +13,20 @@ function buildServicePayload(lead: any, existingService?: any) {
     existingService?.serviceCode ||
     lead.projectCode ||
     `SRV-${lead.id?.slice(-6).toUpperCase() || "000000"}`;
+  const financialStatus = lead.isPaid
+    ? "paid"
+    : lead.invoiceNumber
+      ? "invoiced"
+      : lead.hesNumber
+        ? "hes_requested"
+        : lead.status === "won"
+          ? "pending_billing"
+          : existingService?.financialStatus || "pre_sale";
+  const commercialStatus =
+    lead.status === "won"
+      ? "won"
+      : existingService?.commercialStatus || "intake";
+  const operationalStatus = existingService?.operationalStatus || "not_started";
 
   return {
     leadId: lead.id,
@@ -29,13 +43,15 @@ function buildServicePayload(lead: any, existingService?: any) {
     aprName: lead.aprName || "",
     supervisorName: lead.supervisorName || "",
     contractAdminName: lead.contractAdminName || "",
-    commercialStatus:
-      lead.status === "won"
-        ? "won"
-        : existingService?.commercialStatus || "intake",
-    operationalStatus: existingService?.operationalStatus || "not_started",
-    financialStatus: existingService?.financialStatus || "pre_sale",
-    statusSnapshot: existingService?.statusSnapshot || {},
+    commercialStatus,
+    operationalStatus,
+    financialStatus,
+    statusSnapshot: {
+      commercialStatus,
+      operationalStatus,
+      financialStatus,
+      updatedAt: new Date().toISOString(),
+    },
     contextSnapshot: {
       projectCode: lead.projectCode || "",
       serviceName: lead.serviceName || "",
@@ -76,22 +92,40 @@ export const onLeadWon = onDocumentUpdated(
         .limit(1)
         .get();
 
-      if (!existingSnap.empty) {
-        console.log(`[onLeadWon] Service already exists for lead ${leadId}`);
-        return;
+      const existingServiceDoc = existingSnap.empty ? null : existingSnap.docs[0];
+      const payload = buildServicePayload(
+        { ...after, id: leadId },
+        existingServiceDoc ? existingServiceDoc.data() : undefined
+      );
+      const serviceRef = existingServiceDoc
+        ? existingServiceDoc.ref
+        : db.collection("companies").doc(companyId).collection("crmServices").doc();
+
+      if (existingServiceDoc) {
+        await serviceRef.update({
+          ...payload,
+          updatedAt: new Date().toISOString(),
+        });
+      } else {
+        await serviceRef.set({
+          ...payload,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
       }
 
-      const payload = buildServicePayload({ ...after, id: leadId });
-      const serviceRef = db
+      const existingOrder = await db
         .collection("companies")
         .doc(companyId)
-        .collection("crmServices")
-        .doc();
+        .collection("serviceOrders")
+        .where("leadId", "==", leadId)
+        .limit(1)
+        .get();
 
-      await serviceRef.set({
-        ...payload,
-        createdAt: new Date().toISOString(),
-      });
+      if (!existingOrder.empty) {
+        console.log(`[onLeadWon] Service order already exists for lead ${leadId}`);
+        return;
+      }
 
       // Create ServiceOrder
       const orderRef = db.collection("companies").doc(companyId).collection("serviceOrders").doc();

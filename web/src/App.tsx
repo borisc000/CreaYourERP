@@ -9,12 +9,15 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { QuoteList } from "./modules/quotes/QuoteList";
 import { QuoteForm } from "./modules/quotes/QuoteForm";
 import { QuoteDetail } from "./modules/quotes/QuoteDetail";
+import { QuotePreview } from "./modules/quotes/QuotePreview";
 import { CustomerList } from "./modules/crm/CustomerList";
 import { CustomerForm } from "./modules/crm/CustomerForm";
 import { CustomerDetail } from "./modules/crm/CustomerDetail";
 import { LeadList } from "./modules/crm/LeadList";
 import { LeadForm } from "./modules/crm/LeadForm";
 import { LeadDetail } from "./modules/crm/LeadDetail";
+import { CRMSettings } from "./modules/crm/CRMSettings";
+import { ServiceMirror } from "./modules/crm/ServiceMirror";
 import { ServiceOrderList } from "./modules/accreditation/ServiceOrderList";
 import { ServiceOrderForm } from "./modules/accreditation/ServiceOrderForm";
 import { ServiceOrderDetail } from "./modules/accreditation/ServiceOrderDetail";
@@ -147,6 +150,7 @@ function App() {
           {/* Protegidas */}
           <Route element={<ProtectedRoute />}>
             <Route element={<CompanyProvider />}>
+              <Route path="/quotes/:id/preview" element={<QuotePreview />} />
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/quotes" element={<QuoteList />} />
@@ -163,6 +167,8 @@ function App() {
                 <Route path="/crm/leads/new" element={<LeadForm />} />
                 <Route path="/crm/leads/:id" element={<LeadDetail />} />
                 <Route path="/crm/leads/:id/edit" element={<LeadForm />} />
+                <Route path="/crm/settings" element={<CRMSettings />} />
+                <Route path="/crm/services/:id/mirror" element={<ServiceMirror />} />
 
                 <Route path="/accreditation" element={<ServiceOrderList />} />
                 <Route path="/accreditation/new" element={<ServiceOrderForm />} />

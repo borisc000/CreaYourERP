@@ -39,6 +39,7 @@ const menuGroups = [
     items: [
       { to: "/crm/leads", label: "Oportunidades", icon: ChartBarIcon },
       { to: "/crm/customers", label: "Clientes", icon: UsersIcon },
+      { to: "/crm/settings", label: "Config CRM", icon: Cog6ToothIcon },
       { to: "/suppliers", label: "Proveedores", icon: TruckIcon },
     ],
   },

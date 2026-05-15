@@ -38,6 +38,8 @@ export interface User {
   name: string;
   phone?: string;
   role: "admin" | "manager" | "user";
+  allowedModules?: string[];
+  serviceActions?: ServiceAction[];
   isActive: boolean;
   language: string;
   timezone: string;
@@ -56,6 +58,9 @@ export interface Stage {
   order: number;
   color?: string;
   isDefault?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ServiceType {
@@ -155,11 +160,46 @@ export interface ActivityLog {
   id: string;
   companyId: string;
   leadId: string;
-  type: "created" | "stage_changed" | "status_changed" | "updated" | "note_added" | "document_added";
+  type: "created" | "stage_changed" | "status_changed" | "updated" | "note_added" | "document_added" | string;
   message: string;
   userId?: string;
   userName?: string;
   metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export type ServiceAction =
+  | "service.view_internal"
+  | "service.edit_context"
+  | "service.edit_operational_control"
+  | "service.close_operational_step"
+  | "service.manage_documents"
+  | "service.version_documents"
+  | "service.request_report_signature"
+  | "service.view_mirror_internal"
+  | "service.publish_mirror"
+  | "service.view_financial"
+  | "service.edit_financial"
+  | "crm.create_lead"
+  | "crm.edit_lead"
+  | "crm.delete_lead"
+  | "crm.manage_pipeline";
+
+export interface ServicePermissionContext {
+  uid: string;
+  companyId: string;
+  role: string;
+  allowedModules: string[];
+  serviceActions: ServiceAction[];
+}
+
+export interface LeadNote {
+  id: string;
+  companyId: string;
+  leadId: string;
+  body: string;
+  createdBy: string;
+  createdByName?: string;
   createdAt: string;
 }
 
@@ -205,20 +245,68 @@ export interface CRMDocument {
   companyId: string;
   filename: string;
   filePath: string;
+  storagePath?: string;
   mimeType: string;
   modelName: "Lead" | "Service" | "Customer";
   recordId: string;
   uploadedBy: string;
+  uploadedByName?: string;
   category?: string;
+  leadId?: string;
+  customerId?: string;
   serviceId?: string;
   documentType?: string;
   version: number;
   isCurrent: boolean;
   parentDocumentId?: string;
+  publishToMirror?: boolean;
   metadata?: CRMDocumentMetadata;
   signatureRequestId?: string;
   signedAt?: string;
+  status?: "pending_upload" | "ready" | "failed";
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CRMDocumentVersion extends CRMDocument {
+  replacedByDocumentId?: string;
+}
+
+export interface LeadDossier {
+  lead: Lead;
+  customer?: Customer | null;
+  mandante?: Mandante | null;
+  stage?: Stage | null;
+  serviceType?: ServiceType | null;
+  assignedUser?: User | null;
+  service?: CRMService | null;
+  quotes: Quote[];
+  reports: Report[];
+  expenses: any[];
+  rentals: any[];
+  documents: CRMDocument[];
+  activity: ActivityLog[];
+  notes: LeadNote[];
+  summary: {
+    expectedRevenue: number;
+    weightedRevenue: number;
+    quotesCount: number;
+    reportsCount: number;
+    documentsCount: number;
+    currentDocumentsCount: number;
+    notesCount: number;
+    hasService: boolean;
+  };
+}
+
+export interface ServiceMirrorPayload {
+  service: CRMService;
+  lead?: Lead | null;
+  customer?: Customer | null;
+  mandante?: Mandante | null;
+  serviceType?: ServiceType | null;
+  documents: CRMDocument[];
+  activity: ActivityLog[];
 }
 
 // ==========================================

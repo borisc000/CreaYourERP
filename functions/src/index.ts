@@ -5,6 +5,7 @@ import { enforcePlanLimits } from "./billing/enforcePlanLimits";
 import { calculateQuoteTotal } from "./modules/quotes/calculateTotal";
 import { onQuoteAccepted } from "./modules/quotes/onQuoteAccepted";
 import { onQuoteCreated } from "./modules/quotes/onQuoteCreated";
+import { getQuoteExportData } from "./modules/quotes/exportData";
 import { checkCrewCompliance } from "./modules/accreditation/checkCrewCompliance";
 import { onEmployeeHired } from "./modules/hr/onEmployeeHired";
 import { onLeadCreated } from "./modules/crm/generateProjectCode";
@@ -34,6 +35,7 @@ export const checkPlanLimits = enforcePlanLimits;
 
 export { onQuoteAccepted };
 export { onQuoteCreated };
+export { getQuoteExportData };
 
 export const onQuoteUpdated = onDocumentUpdated(
   {
@@ -108,6 +110,32 @@ export { onLeadUpdated };
 export { onLeadWon };
 export { ensureServiceSync };
 export { seedDefaultCompanyData };
+export {
+  crmCreateLead,
+  crmUpdateLead,
+  crmDeleteLeadCascade,
+  crmGetLeadDossier,
+  crmAddLeadNote,
+  crmListStages,
+  crmCreateStage,
+  crmUpdateStage,
+  crmDeleteStage,
+  crmReorderStages,
+  crmListServiceTypes,
+  crmCreateServiceType,
+  crmUpdateServiceType,
+  crmDeleteServiceType,
+  crmGetService,
+  crmGetServiceByLead,
+  crmUpdateServiceOperationalControl,
+  crmCreateDocumentUpload,
+  crmFinalizeDocumentUpload,
+  crmListDocuments,
+  crmGetDocumentDownloadUrl,
+  crmUpdateDocumentMirrorFlag,
+  crmGetServiceMirror,
+  crmGetCRMStats,
+} from "./modules/crm";
 
 // ==========================================
 // HR MODULE

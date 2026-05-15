@@ -26,6 +26,18 @@ service cloud.firestore {
       return belongsToCompany(companyId) && getRole() == 'admin';
     }
 
+    function isServerManagedCRMCollection(collectionName) {
+      return collectionName in [
+        'leads',
+        'activityLogs',
+        'leadNotes',
+        'stages',
+        'serviceTypes',
+        'crmServices',
+        'crmDocuments'
+      ];
+    }
+
     // ==========================================
     // COLECCIONES GLOBALES
     // ==========================================
@@ -63,13 +75,43 @@ service cloud.firestore {
     }
 
     match /companies/{companyId}/leads/{leadId} {
-      allow read, create, update: if belongsToCompany(companyId);
-      allow delete: if isCompanyAdmin(companyId);
+      allow read: if belongsToCompany(companyId);
+      allow create, update, delete: if false;
     }
 
     match /companies/{companyId}/mandantes/{mandanteId} {
       allow read, create, update: if belongsToCompany(companyId);
       allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/activityLogs/{logId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update, delete: if false;
+    }
+
+    match /companies/{companyId}/leadNotes/{noteId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update, delete: if false;
+    }
+
+    match /companies/{companyId}/stages/{stageId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update, delete: if false;
+    }
+
+    match /companies/{companyId}/serviceTypes/{typeId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update, delete: if false;
+    }
+
+    match /companies/{companyId}/crmServices/{serviceId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update, delete: if false;
+    }
+
+    match /companies/{companyId}/crmDocuments/{docId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update, delete: if false;
     }
 
     // Empleados / RRHH
@@ -138,6 +180,11 @@ service cloud.firestore {
     }
 
     match /companies/{companyId}/safetyRiskMatrices/{matrixId} {
+      allow read, create, update: if belongsToCompany(companyId);
+      allow delete: if isCompanyAdmin(companyId);
+    }
+
+    match /companies/{companyId}/safetyRiskMatrices/{matrixId}/rows/{rowId} {
       allow read, create, update: if belongsToCompany(companyId);
       allow delete: if isCompanyAdmin(companyId);
     }
@@ -477,7 +524,21 @@ service cloud.firestore {
     match /companies/{companyId}/users/{userId} {
       allow read: if belongsToCompany(companyId);
       allow create: if isCompanyAdmin(companyId);
-      allow update: if belongsToCompany(companyId) && request.auth.uid == userId;
+      allow update: if isCompanyAdmin(companyId)
+        || (
+          belongsToCompany(companyId)
+          && request.auth.uid == userId
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'role',
+            'allowedModules',
+            'allowed_modules',
+            'modules',
+            'serviceActions',
+            'service_actions',
+            'companyId',
+            'isActive'
+          ])
+        );
       allow delete: if isCompanyAdmin(companyId);
     }
 
@@ -515,8 +576,8 @@ service cloud.firestore {
     // se recomienda eliminarlo y declarar todas las colecciones explícitamente.
     match /companies/{companyId}/{collection}/{docId} {
       allow read: if belongsToCompany(companyId);
-      allow create, update: if belongsToCompany(companyId);
-      allow delete: if isCompanyAdmin(companyId);
+      allow create, update: if belongsToCompany(companyId) && !isServerManagedCRMCollection(collection);
+      allow delete: if isCompanyAdmin(companyId) && !isServerManagedCRMCollection(collection);
     }
 
     // Bloqueo por defecto
