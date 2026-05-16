@@ -1,5 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { createInitialCompany } from "./auth/onboarding";
 import { enforcePlanLimits } from "./billing/enforcePlanLimits";
 import { calculateQuoteTotal } from "./modules/quotes/calculateTotal";
@@ -149,9 +149,18 @@ export const onAccreditationUpdated = onDocumentUpdated(
     const before = event.data?.before.data();
     if (!after) return;
 
-    // Solo recompute si el status cambió a "valid"
-    const becameValid = after.status === "valid" && before?.status !== "valid";
-    if (!becameValid) return;
+    // Recompute si cambió cualquier campo relevante para compliance
+    const relevantFields = [
+      "status",
+      "expiresOn",
+      "validUntil",
+      "documentUrl",
+      "verificationStatus",
+      "signatureStatus",
+      "signedDocumentUrl",
+    ];
+    const changed = relevantFields.some((f) => after[f] !== before?.[f]);
+    if (!changed) return;
 
     try {
       // Buscar asignaciones activas de este empleado
@@ -177,6 +186,42 @@ export const onAccreditationUpdated = onDocumentUpdated(
       }
     } catch (error) {
       console.error("[onAccreditationUpdated] Error:", error);
+    }
+  }
+);
+
+export const onAccreditationDeleted = onDocumentDeleted(
+  {
+    document: "companies/{companyId}/employees/{employeeId}/accreditations/{accreditationId}",
+    region: "southamerica-west1",
+  },
+  async (event) => {
+    const { companyId, employeeId } = event.params;
+    if (!companyId || !employeeId) return;
+
+    try {
+      const assignmentsSnap = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("crewAssignments")
+        .where("employeeId", "==", employeeId)
+        .where("status", "in", ["assigned", "active"])
+        .get();
+
+      for (const doc of assignmentsSnap.docs) {
+        const data = doc.data();
+        try {
+          await checkCrewCompliance(companyId, doc.id, {
+            serviceOrderId: data.serviceOrderId,
+            employeeId: data.employeeId,
+            role: data.role || "worker",
+          });
+        } catch (err) {
+          console.error(`[onAccreditationDeleted] Recompute falló para assignment ${doc.id}:`, err);
+        }
+      }
+    } catch (error) {
+      console.error("[onAccreditationDeleted] Error:", error);
     }
   }
 );
