@@ -9,6 +9,8 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db, storage } from "../../config";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { checkCrewCompliance } from "../accreditation/checkCrewCompliance";
+import { registerAccreditationDocument } from "../accreditation/registerAccreditationDocument";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -312,6 +314,58 @@ export const signDocument = onCall(
           .collection("generatedDocuments")
           .doc(sigData.generatedDocumentId)
           .update({ status: "signed", signedAt: now, updatedAt: now });
+      }
+
+      // Cierre de loop para documentos de acreditación
+      if (sigData.sourceModule === "accreditation") {
+        try {
+          // Buscar DocumentGenerationRequest vinculado
+          const dgrSnap = await companyRef(resolvedCompanyId)
+            .collection("documentGenerationRequests")
+            .where("signatureRequestId", "==", id)
+            .limit(1)
+            .get();
+
+          if (!dgrSnap.empty) {
+            const dgrDoc = dgrSnap.docs[0];
+            const dgrData = dgrDoc.data();
+            await dgrDoc.ref.update({ status: "signed", completedAt: now });
+
+            // Registrar acreditación como aprobada
+            await registerAccreditationDocument({
+              companyId: resolvedCompanyId,
+              employeeId: dgrData.employeeId,
+              requirementId: dgrData.requirementId,
+              generatedDocumentId: dgrData.generatedDocumentId,
+              storagePath: signedPath,
+              verificationStatus: "approved",
+              signatureStatus: "signed",
+              signedDocumentUrl: signedPath,
+              validUntil: dgrData.validUntil || null,
+            });
+
+            // Recompute check
+            const assignmentSnap = await companyRef(resolvedCompanyId)
+              .collection("crewAssignments")
+              .where("serviceOrderId", "==", dgrData.serviceOrderId)
+              .where("employeeId", "==", dgrData.employeeId)
+              .where("status", "in", ["assigned", "active"])
+              .limit(1)
+              .get();
+
+            if (!assignmentSnap.empty) {
+              const assignmentDoc = assignmentSnap.docs[0];
+              await checkCrewCompliance(resolvedCompanyId, assignmentDoc.id, {
+                serviceOrderId: dgrData.serviceOrderId,
+                employeeId: dgrData.employeeId,
+                role: assignmentDoc.data().role || "worker",
+              });
+            }
+          }
+        } catch (loopErr: any) {
+          console.error("[signDocument] Error cerrando loop de acreditación:", loopErr);
+          // No fallamos la firma si el loop falla
+        }
       }
 
       await companyRef(resolvedCompanyId).collection("signatureLogs").add({
