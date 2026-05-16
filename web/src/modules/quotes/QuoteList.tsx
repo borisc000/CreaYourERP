@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { orderBy } from "firebase/firestore";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
+import { usePermission } from "@/hooks/usePermission";
 import type { Quote } from "@/types";
 import {
   DocumentTextIcon,
@@ -13,6 +14,7 @@ import {
 
 export function QuoteList() {
   const navigate = useNavigate();
+  const { hasPermission } = usePermission();
   const { data: quotes, isLoading } = useFirestoreCollection<Quote>("quotes", [
     orderBy("createdAt", "desc"),
   ]);
@@ -61,13 +63,15 @@ export function QuoteList() {
             {quotes.length} {quotes.length === 1 ? "cotización" : "cotizaciones"} registradas
           </p>
         </div>
-        <button
-          onClick={() => navigate("/quotes/new")}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <PlusIcon className="w-4 h-4" />
-          Nueva Cotización
-        </button>
+        {hasPermission("quote.create") && (
+          <button
+            onClick={() => navigate("/quotes/new")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Nueva Cotización
+          </button>
+        )}
       </div>
 
       {/* Stats */}

@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 import {
   cors,
   cleanString,
@@ -18,6 +19,8 @@ export const authorizeCrew = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "accreditation.authorize_crew", { companyId });
 
     const assignmentIds = request.data?.assignmentIds;
     if (!Array.isArray(assignmentIds) || assignmentIds.length === 0) {

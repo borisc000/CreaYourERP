@@ -4,6 +4,7 @@ import { doc, getDoc, onSnapshot, collection, query, where, orderBy } from "fire
 import { db } from "@/firebase/config";
 import { assignCrewMember, removeCrewMember, authorizeCrew, recomputeChecks, triggerDocumentGeneration, bulkAssignCrew, checkExpiringDocuments } from "@/services/accreditation";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import type { ServiceOrder, Lead, Customer, Employee, CrewAssignment, AccreditationCheck, AccreditationRequirement } from "@/types";
 import {
   ArrowLeftIcon,
@@ -32,6 +33,7 @@ export function ServiceOrderDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const [order, setOrder] = useState<ServiceOrder | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -259,12 +261,14 @@ export function ServiceOrderDetail() {
             </div>
           </div>
         </div>
-        <button
-          onClick={() => navigate(`/accreditation/${id}/edit`)}
-          className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
-        >
-          Editar
-        </button>
+        {hasPermission("accreditation.edit_service_order") && (
+          <button
+            onClick={() => navigate(`/accreditation/${id}/edit`)}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            Editar
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -350,15 +354,17 @@ export function ServiceOrderDetail() {
                 </h2>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={handleRecompute}
-                  disabled={recomputing}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <ArrowPathIcon className={`w-3.5 h-3.5 ${recomputing ? "animate-spin" : ""}`} />
-                  {recomputing ? "Recomputando..." : "Recomputar"}
-                </button>
-                {pendingCrew.length > 0 && (
+                {hasPermission("accreditation.recompute_checks") && (
+                  <button
+                    onClick={handleRecompute}
+                    disabled={recomputing}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <ArrowPathIcon className={`w-3.5 h-3.5 ${recomputing ? "animate-spin" : ""}`} />
+                    {recomputing ? "Recomputando..." : "Recomputar"}
+                  </button>
+                )}
+                {pendingCrew.length > 0 && hasPermission("accreditation.authorize_crew") && (
                   <button
                     onClick={handleAuthorize}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded-lg transition-colors"
@@ -367,20 +373,24 @@ export function ServiceOrderDetail() {
                     Autorizar
                   </button>
                 )}
-                <button
-                  onClick={() => setShowBulkAssign(!showBulkAssign)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 text-xs font-medium rounded-lg transition-colors"
-                >
-                  <PlusIcon className="w-3.5 h-3.5" />
-                  Bulk
-                </button>
-                <button
-                  onClick={() => setShowAddCrew(!showAddCrew)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-xs font-medium rounded-lg transition-colors"
-                >
-                  <PlusIcon className="w-3.5 h-3.5" />
-                  Agregar
-                </button>
+                {hasPermission("accreditation.assign_crew") && (
+                  <>
+                    <button
+                      onClick={() => setShowBulkAssign(!showBulkAssign)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 text-xs font-medium rounded-lg transition-colors"
+                    >
+                      <PlusIcon className="w-3.5 h-3.5" />
+                      Bulk
+                    </button>
+                    <button
+                      onClick={() => setShowAddCrew(!showAddCrew)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-xs font-medium rounded-lg transition-colors"
+                    >
+                      <PlusIcon className="w-3.5 h-3.5" />
+                      Agregar
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -513,12 +523,14 @@ export function ServiceOrderDetail() {
                             {overallStatusLabels[check.overallStatus]}
                           </span>
                         )}
-                        <button
-                          onClick={() => handleRemoveCrew(member.id)}
-                          className="p-1.5 text-gray-600 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
+                        {hasPermission("accreditation.remove_crew") && (
+                          <button
+                            onClick={() => handleRemoveCrew(member.id)}
+                            className="p-1.5 text-gray-600 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -601,14 +613,16 @@ export function ServiceOrderDetail() {
                               );
                             })}
                           </div>
-                          <button
-                            onClick={() => handleGenerateMissing(check.id)}
-                            disabled={generatingFor === check.id}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-xs rounded transition-colors disabled:opacity-50"
-                          >
-                            <DocumentTextIcon className="w-3 h-3" />
-                            {generatingFor === check.id ? "Generando..." : "Generar faltantes"}
-                          </button>
+                          {hasPermission("accreditation.generate_documents") && (
+                            <button
+                              onClick={() => handleGenerateMissing(check.id)}
+                              disabled={generatingFor === check.id}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-xs rounded transition-colors disabled:opacity-50"
+                            >
+                              <DocumentTextIcon className="w-3 h-3" />
+                              {generatingFor === check.id ? "Generando..." : "Generar faltantes"}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

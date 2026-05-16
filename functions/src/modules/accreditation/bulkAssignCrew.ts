@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 import { cors, cleanString, companyRef, getServiceOrder } from "./accreditationService";
 import { checkCrewCompliance } from "./checkCrewCompliance";
 
@@ -14,6 +15,8 @@ export const bulkAssignCrew = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "accreditation.assign_crew", { companyId });
 
     const serviceOrderId = cleanString(request.data?.serviceOrderId);
     const assignments = request.data?.assignments;

@@ -2,7 +2,7 @@
 
 > **Ultima actualizacion:** 2026-05-15  
 > **Rama revisada:** `staging`  
-> **Ultimo commit funcional documentado:** `cdab176` (`feat(accreditation): Brechas remanentes post-P0.1`)
+> **Ultimo commit funcional documentado:** `b4d4d77` (`feat(rbac): P0.2 RBAC transversal para Quotes, HR y Accreditation`)
 
 ## Resumen General (Legacy vs Staging)
 
@@ -143,6 +143,37 @@ Módulos **Quotes**, **HR** y **Accreditation**: escrituras directas desde clien
 - `web/` compila sin errores (`tsc`).
 - Lint preexistente no afecta el deploy.
 
+### RBAC Transversal P0.2 (2026-05-15)
+
+Extensión del patrón RBAC existente de CRM a Quotes, HR y Accreditation.
+
+**Backend (`functions/src/shared/rbac.ts`):**
+- `assertAction` genérico reemplaza `assertCRMAction`; mantiene retrocompatibilidad vía re-export en `modules/crm/rbac.ts`.
+- `SERVICE_ACTIONS` ampliado con 22 acciones nuevas:
+  - Quotes: `quote.create`, `quote.edit`, `quote.delete`, `quote.send`, `quote.accept`, `quote.reject`, `quote.cancel`, `quote.view_preview`, `quote.view_export`
+  - HR: `hr.create_employee`, `hr.edit_employee`, `hr.delete_employee`, `hr.view_contracts`, `hr.manage_contracts`
+  - Accreditation: `accreditation.create_service_order`, `accreditation.edit_service_order`, `accreditation.delete_service_order`, `accreditation.assign_crew`, `accreditation.remove_crew`, `accreditation.authorize_crew`, `accreditation.generate_documents`, `accreditation.recompute_checks`, `accreditation.view_compliance`
+- `moduleMap` asocia cada acción a módulos para fallback por `allowedModules`.
+- `actionAllowed`: admin bypass → `serviceActions` explícitos → fallback por rol vía `moduleMap`.
+
+**Callables protegidos (16 total):**
+- Quotes ×6: `createQuote`, `updateQuote`, `sendQuote`, `acceptQuote`, `rejectQuote`, `cancelQuote`
+- HR ×2: `createEmployee`, `updateEmployee`
+- Accreditation ×8: `createServiceOrder`, `updateServiceOrder`, `assignCrewMember`, `removeCrewMember`, `authorizeCrew`, `bulkAssignCrew`, `recomputeChecks`, `triggerDocumentGeneration`
+
+**Frontend (`web/src/hooks/usePermission.ts`):**
+- Hook `usePermission` replica la lógica de `actionAllowed` del backend.
+- Componentes con controles condicionales:
+  - `QuoteList`: oculta "Nueva Cotización" sin `quote.create`
+  - `QuoteDetail`: condiciona Enviar/Editar/Aceptar/Rechazar/Cancelar
+  - `EmployeeList`: oculta "Nuevo Colaborador" sin `hr.create_employee`
+  - `EmployeeDetail`: condiciona Editar
+  - `ServiceOrderList`: oculta "Nueva Orden" sin `accreditation.create_service_order`
+  - `ServiceOrderDetail`: condiciona Editar, Recomputar, Autorizar, Bulk, Agregar crew, Eliminar crew, Generar faltantes
+
+**Build status:**
+- `functions/` y `web/` compilan sin errores (`tsc --noEmit`).
+
 ---
 
 ## Arquitectura multi-tenant
@@ -189,7 +220,7 @@ Cada empresa vive bajo `/companies/{companyId}`. Los modulos usan colecciones hi
 
 1. **CI/lint:** el workflow de CI falla por deuda amplia de ESLint (`any`, imports no usados, warnings de hooks). Hay que decidir si se corrige deuda o se ajusta el gating por fases.
 2. **Deploy:** confirmar que el workflow de staging termina y publica Hosting/Functions con el SHA esperado.
-3. **RBAC:** extender `allowedModules` y permisos por accion a Quotes, Billing, Reports, Safety, Document Center, HR y Accreditation.
+3. **RBAC:** P0.2 completado para Quotes, HR y Accreditation. Pendiente: Billing, Reports, Safety, Document Center.
 4. **Server-side writes:** mover flujos criticos restantes desde escrituras directas Firestore a callables (Quotes, HR, Accreditation, Billing).
 5. **Tests:** faltan tests de emuladores para permisos, multi-company denial, side effects cross-module y documentos.
 6. **Motor de plantillas DOCX:** el legacy usa DOCX+LibreOffice; el staging usa `pdf-lib` manual. Se requiere decision arquitectonica.
@@ -205,7 +236,7 @@ Cada empresa vive bajo `/companies/{companyId}`. Los modulos usan colecciones hi
 2. Cerrar Quotes P0: CRUD server-side, send/accept/delete con validaciones y ActivityLog.
 3. Cerrar HR P0: validacion RUT, auto-codigo `EMP-{seq}`, sincronizacion de estado, contratos, licencias, desvinculaciones.
 4. Cerrar Accreditation P0: `compute_check` real con Level A/B, vencimiento, `DocumentGenerationRequest`, triggers post-firma.
-5. Extender RBAC transversal: permisos por accion en todos los modulos criticos.
+5. ~~Extender RBAC transversal~~ — **P0.2 completado** para Quotes, HR, Accreditation. Pendiente: Billing, Reports, Safety, Document Center.
 
 ### P1 — Alto (funcionalidad core incompleta)
 

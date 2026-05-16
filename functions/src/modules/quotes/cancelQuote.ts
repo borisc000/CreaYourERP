@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 import {
   cors,
   cleanString,
@@ -18,6 +19,8 @@ export const cancelQuote = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "quote.cancel", { companyId });
 
     const quoteId = cleanString(request.data?.quoteId);
     if (!quoteId) {

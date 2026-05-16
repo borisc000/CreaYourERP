@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import {
   cors,
   cleanString,
@@ -18,6 +19,8 @@ export const updateServiceOrder = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "accreditation.edit_service_order", { companyId });
 
     const orderId = cleanString(request.data?.id || request.data?.orderId);
     if (!orderId) {

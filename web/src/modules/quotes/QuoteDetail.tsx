@@ -4,6 +4,7 @@ import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { sendQuote, acceptQuote, rejectQuote, cancelQuote } from "@/services/quotes";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import type { Quote, Lead, Customer } from "@/types";
 import {
   ArrowLeftIcon,
@@ -20,6 +21,7 @@ export function QuoteDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -143,48 +145,50 @@ export function QuoteDetail() {
             <PrinterIcon className="w-4 h-4" />
             Vista PDF
           </button>
-          {quote.status === "draft" && (
-            <>
-              <button
-                onClick={handleSend}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <PaperAirplaneIcon className="w-4 h-4" />
-                Enviar
-              </button>
-              <button
-                onClick={() => navigate(`/quotes/${id}/edit`)}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
-              >
-                <PencilIcon className="w-4 h-4" />
-                Editar
-              </button>
-            </>
+          {quote.status === "draft" && hasPermission("quote.send") && (
+            <button
+              onClick={handleSend}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <PaperAirplaneIcon className="w-4 h-4" />
+              Enviar
+            </button>
           )}
-          {quote.status === "sent" && (
-            <>
-              <button
-                onClick={handleAccept}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <CheckCircleIcon className="w-4 h-4" />
-                Aceptar
-              </button>
-              <button
-                onClick={handleReject}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <XCircleIcon className="w-4 h-4" />
-                Rechazar
-              </button>
-            </>
+          {quote.status === "draft" && hasPermission("quote.edit") && (
+            <button
+              onClick={() => navigate(`/quotes/${id}/edit`)}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+            >
+              <PencilIcon className="w-4 h-4" />
+              Editar
+            </button>
           )}
-          <button
-            onClick={handleDelete}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-red-500/20 hover:text-red-400 text-gray-300 text-sm font-medium rounded-lg transition-colors"
-          >
-            <TrashIcon className="w-4 h-4" />
-          </button>
+          {quote.status === "sent" && hasPermission("quote.accept") && (
+            <button
+              onClick={handleAccept}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <CheckCircleIcon className="w-4 h-4" />
+              Aceptar
+            </button>
+          )}
+          {quote.status === "sent" && hasPermission("quote.reject") && (
+            <button
+              onClick={handleReject}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <XCircleIcon className="w-4 h-4" />
+              Rechazar
+            </button>
+          )}
+          {hasPermission("quote.cancel") && (
+            <button
+              onClick={handleDelete}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-red-500/20 hover:text-red-400 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+            >
+              <TrashIcon className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

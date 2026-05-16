@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { orderBy } from "firebase/firestore";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
+import { usePermission } from "@/hooks/usePermission";
 import type { ServiceOrder } from "@/types";
 import {
   ClipboardDocumentCheckIcon,
@@ -12,6 +13,7 @@ import {
 
 export function ServiceOrderList() {
   const navigate = useNavigate();
+  const { hasPermission } = usePermission();
   const { data: orders, isLoading } = useFirestoreCollection<ServiceOrder>("serviceOrders", [
     orderBy("createdAt", "desc"),
   ]);
@@ -51,13 +53,15 @@ export function ServiceOrderList() {
           <h1 className="text-2xl font-bold text-white">Órdenes de Servicio</h1>
           <p className="text-gray-400 text-sm mt-1">Gestiona faenas, cuadrillas y acreditaciones</p>
         </div>
-        <button
-          onClick={() => navigate("/accreditation/new")}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <PlusIcon className="w-4 h-4" />
-          Nueva Orden
-        </button>
+        {hasPermission("accreditation.create_service_order") && (
+          <button
+            onClick={() => navigate("/accreditation/new")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Nueva Orden
+          </button>
+        )}
       </div>
 
       {/* Stats */}

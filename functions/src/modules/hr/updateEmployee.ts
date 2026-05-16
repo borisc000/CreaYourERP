@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import {
   cors,
   cleanString,
@@ -18,6 +19,8 @@ export const updateEmployee = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "hr.edit_employee", { companyId });
 
     const employeeId = cleanString(request.data?.id || request.data?.employeeId);
     if (!employeeId) {
