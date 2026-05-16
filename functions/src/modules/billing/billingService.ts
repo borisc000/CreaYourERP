@@ -580,6 +580,9 @@ export const simulateSii = onCall(
       if (doc.siiStatus === "accepted") {
         throw new HttpsError("failed-precondition", "El documento ya fue aceptado por el SII");
       }
+      if (doc.status === "draft") {
+        throw new HttpsError("failed-precondition", "El documento debe ser enviado al cliente o marcado como listo antes de simular SII");
+      }
 
       const now = nowIso();
       let newSiiStatus = doc.siiStatus;

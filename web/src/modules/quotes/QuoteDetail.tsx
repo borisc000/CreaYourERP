@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { sendQuote, acceptQuote, rejectQuote, deleteQuote } from "@/services/quotes";
+import { createBillingDocumentFromQuote } from "@/services/billing";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
 import type { Quote, Lead, Customer } from "@/types";
@@ -16,6 +17,7 @@ import {
   DocumentTextIcon,
   PrinterIcon,
   TruckIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/outline";
 
 export function QuoteDetail() {
@@ -75,6 +77,20 @@ export function QuoteDetail() {
     if (!confirm("¿Eliminar definitivamente esta cotización?")) return;
     await deleteQuote(id);
     navigate("/quotes");
+  };
+
+  const handleGenerateInvoice = async () => {
+    if (!id) return;
+    try {
+      const result = await createBillingDocumentFromQuote(id);
+      if (result.alreadyExists) {
+        navigate(`/billing/documents/${result.documentId}`);
+      } else {
+        navigate(`/billing/documents/${result.documentId}`);
+      }
+    } catch (e: any) {
+      alert(e.message || "Error generando documento de billing");
+    }
   };
 
   if (loading) {
@@ -174,6 +190,15 @@ export function QuoteDetail() {
             >
               <CheckCircleIcon className="w-4 h-4" />
               Aceptar
+            </button>
+          )}
+          {quote.status === "accepted" && hasPermission("billing.create_document") && (
+            <button
+              onClick={handleGenerateInvoice}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <BanknotesIcon className="w-4 h-4" />
+              Generar factura
             </button>
           )}
           {quote.status === "sent" && hasPermission("quote.reject") && (
