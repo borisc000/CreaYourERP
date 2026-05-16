@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { doc, getDoc, onSnapshot, collection, query, where, orderBy } from "firebase/firestore";
 import { db } from "@/firebase/config";
-import { assignCrewMember, removeCrewMember, authorizeCrew } from "@/services/accreditation";
+import { assignCrewMember, removeCrewMember, authorizeCrew, recomputeChecks, triggerDocumentGeneration } from "@/services/accreditation";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ServiceOrder, Lead, Customer, Employee, CrewAssignment, AccreditationCheck, AccreditationRequirement } from "@/types";
 import {
@@ -14,6 +14,8 @@ import {
   UserGroupIcon,
   CheckCircleIcon,
   XCircleIcon,
+  ArrowPathIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -41,6 +43,8 @@ export function ServiceOrderDetail() {
   const [showAddCrew, setShowAddCrew] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedRole, setSelectedRole] = useState("worker");
+  const [recomputing, setRecomputing] = useState(false);
+  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id || !companyId) return;
@@ -127,6 +131,32 @@ export function ServiceOrderDetail() {
       .map((c) => c.id);
     if (pendingIds.length > 0) {
       await authorizeCrew(pendingIds);
+    }
+  };
+
+  const handleRecompute = async () => {
+    if (!id || !companyId) return;
+    setRecomputing(true);
+    try {
+      const result = await recomputeChecks(id);
+      alert(`Checks recomputados: ${result.checksComputed} de ${result.totalAssignments}`);
+    } catch (err: any) {
+      alert("Error al recomputar: " + (err.message || "desconocido"));
+    } finally {
+      setRecomputing(false);
+    }
+  };
+
+  const handleGenerateMissing = async (checkId: string) => {
+    setGeneratingFor(checkId);
+    try {
+      const result = await triggerDocumentGeneration(checkId);
+      const msg = result.requests.map((r) => `${r.status}`).join(", ");
+      alert(`Generación completada: ${result.generated} generados, ${result.skipped} sin template`);
+    } catch (err: any) {
+      alert("Error al generar documentos: " + (err.message || "desconocido"));
+    } finally {
+      setGeneratingFor(null);
     }
   };
 
@@ -268,6 +298,14 @@ export function ServiceOrderDetail() {
                 </h2>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRecompute}
+                  disabled={recomputing}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <ArrowPathIcon className={`w-3.5 h-3.5 ${recomputing ? "animate-spin" : ""}`} />
+                  {recomputing ? "Recomputando..." : "Recomputar"}
+                </button>
                 {pendingCrew.length > 0 && (
                   <button
                     onClick={handleAuthorize}
@@ -435,8 +473,33 @@ export function ServiceOrderDetail() {
                         </div>
                       </div>
                       {(check.levelAMissingIds.length > 0 || check.levelBMissingIds.length > 0) && (
-                        <div className="mt-2 text-xs text-gray-500">
-                          Faltantes: {check.levelAMissingIds.length + check.levelBMissingIds.length} documentos
+                        <div className="mt-3 space-y-2">
+                          <div className="flex flex-wrap gap-1">
+                            {check.levelAMissingIds.map((reqId) => {
+                              const req = requirements.find((r) => r.id === reqId);
+                              return (
+                                <span key={reqId} className="px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-[10px]">
+                                  A: {req?.name || reqId}
+                                </span>
+                              );
+                            })}
+                            {check.levelBMissingIds.map((reqId) => {
+                              const req = requirements.find((r) => r.id === reqId);
+                              return (
+                                <span key={reqId} className="px-1.5 py-0.5 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded text-[10px]">
+                                  B: {req?.name || reqId}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <button
+                            onClick={() => handleGenerateMissing(check.id)}
+                            disabled={generatingFor === check.id}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-xs rounded transition-colors disabled:opacity-50"
+                          >
+                            <DocumentTextIcon className="w-3 h-3" />
+                            {generatingFor === check.id ? "Generando..." : "Generar faltantes"}
+                          </button>
                         </div>
                       )}
                     </div>
