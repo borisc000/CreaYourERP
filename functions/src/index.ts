@@ -6,8 +6,21 @@ import { calculateQuoteTotal } from "./modules/quotes/calculateTotal";
 import { onQuoteAccepted } from "./modules/quotes/onQuoteAccepted";
 import { onQuoteCreated } from "./modules/quotes/onQuoteCreated";
 import { getQuoteExportData } from "./modules/quotes/exportData";
+import { createQuote } from "./modules/quotes/createQuote";
+import { updateQuote } from "./modules/quotes/updateQuote";
+import { sendQuote } from "./modules/quotes/sendQuote";
+import { acceptQuote } from "./modules/quotes/acceptQuote";
+import { rejectQuote } from "./modules/quotes/rejectQuote";
+import { cancelQuote } from "./modules/quotes/cancelQuote";
 import { checkCrewCompliance } from "./modules/accreditation/checkCrewCompliance";
+import { createServiceOrder } from "./modules/accreditation/createServiceOrder";
+import { updateServiceOrder } from "./modules/accreditation/updateServiceOrder";
+import { assignCrewMember } from "./modules/accreditation/assignCrewMember";
+import { removeCrewMember } from "./modules/accreditation/removeCrewMember";
+import { authorizeCrew } from "./modules/accreditation/authorizeCrew";
 import { onEmployeeHired } from "./modules/hr/onEmployeeHired";
+import { createEmployee } from "./modules/hr/createEmployee";
+import { updateEmployee } from "./modules/hr/updateEmployee";
 import { onLeadCreated } from "./modules/crm/generateProjectCode";
 import { onLeadUpdated } from "./modules/crm/activityLog";
 import { onLeadWon, ensureServiceSync } from "./modules/crm/ensureService";
@@ -36,6 +49,12 @@ export const checkPlanLimits = enforcePlanLimits;
 export { onQuoteAccepted };
 export { onQuoteCreated };
 export { getQuoteExportData };
+export { createQuote };
+export { updateQuote };
+export { sendQuote };
+export { acceptQuote };
+export { rejectQuote };
+export { cancelQuote };
 
 export const onQuoteUpdated = onDocumentUpdated(
   {
@@ -82,6 +101,12 @@ export const onQuoteUpdated = onDocumentUpdated(
 // ==========================================
 // ACCREDITATION MODULE
 // ==========================================
+
+export { createServiceOrder };
+export { updateServiceOrder };
+export { assignCrewMember };
+export { removeCrewMember };
+export { authorizeCrew };
 
 export const onCrewAssigned = onDocumentCreated(
   {
@@ -142,6 +167,8 @@ export {
 // ==========================================
 
 export { onEmployeeHired };
+export { createEmployee };
+export { updateEmployee };
 
 // ==========================================
 // SAFETY MODULE

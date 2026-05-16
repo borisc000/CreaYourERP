@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { doc, getDoc, onSnapshot, collection, query, where, orderBy, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, collection, query, where, orderBy } from "firebase/firestore";
 import { db } from "@/firebase/config";
+import { assignCrewMember, removeCrewMember, authorizeCrew } from "@/services/accreditation";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ServiceOrder, Lead, Customer, Employee, CrewAssignment, AccreditationCheck, AccreditationRequirement } from "@/types";
 import {
@@ -108,42 +109,24 @@ export function ServiceOrderDetail() {
       return;
     }
 
-    await addDoc(collection(db, "companies", companyId, "crewAssignments"), {
-      companyId,
-      serviceOrderId: id,
-      employeeId: selectedEmployee,
-      role: selectedRole,
-      status: "assigned",
-      authorizationStatus: "pending",
-      assignedAt: new Date().toISOString(),
-    });
-
+    await assignCrewMember(id, selectedEmployee, selectedRole);
     setSelectedEmployee("");
     setSelectedRole("worker");
     setShowAddCrew(false);
   };
 
   const handleRemoveCrew = async (assignmentId: string) => {
-    if (!companyId) return;
     if (!confirm("¿Eliminar este miembro de la cuadrilla?")) return;
-    await updateDoc(doc(db, "companies", companyId, "crewAssignments", assignmentId), {
-      status: "removed",
-      removedAt: new Date().toISOString(),
-    });
+    await removeCrewMember(assignmentId);
   };
 
   const handleAuthorize = async () => {
-    if (!companyId) return;
     if (!confirm("¿Autorizar toda la cuadrilla?")) return;
-
-    for (const member of crew) {
-      if (member.status === "assigned" || member.status === "active") {
-        await updateDoc(doc(db, "companies", companyId, "crewAssignments", member.id), {
-          status: "active",
-          authorizationStatus: "authorized",
-          authorizedAt: new Date().toISOString(),
-        });
-      }
+    const pendingIds = crew
+      .filter((c) => c.status === "assigned" || c.status === "active")
+      .map((c) => c.id);
+    if (pendingIds.length > 0) {
+      await authorizeCrew(pendingIds);
     }
   };
 

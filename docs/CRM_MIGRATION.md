@@ -1,139 +1,123 @@
-# Migración del Módulo CRM
+# Migracion del Modulo CRM
 
-## Análisis del ERP Python
+> Ultima actualizacion: 2026-05-15  
+> Fuente legacy: `YOUR_ERP_CORE/modules/crm/module_crm.py`  
+> Fuente Firebase: `functions/src/modules/crm/`, `web/src/modules/crm/`, `web/src/services/crm.ts`
 
-El módulo CRM del ERP Python es el más complejo y central. Gestiona:
+## Alcance real del CRM legacy
 
-- **Stages:** Pipeline de ventas (kanban)
-- **Customers:** Empresas clientes B2B
-- **Mandantes:** Contactos por cliente
-- **Leads:** Oportunidades comerciales
-- **ActivityLog:** Chatter/historial automático
-- **Services:** Registro canónico post-adjudicación
-- **Documents:** Archivos adjuntos polimórficos
+El CRM legacy incluye:
 
-## Traducción de Modelos
+- clientes y mandantes,
+- pipeline de stages,
+- tipos de servicio,
+- leads,
+- activity log,
+- notas,
+- dossier completo del lead,
+- servicio canonico post-adjudicacion,
+- documentos con versionado,
+- mirror de servicio,
+- permisos granulares por accion de servicio.
 
-### Python → TypeScript/Firestore
+## Estado Firebase actual
 
-| Python (`crm.*`) | Firestore Collection | TypeScript Interface |
-|------------------|---------------------|----------------------|
-| `crm.stage` | `stages` | `Stage` |
-| `crm.customer` | `customers` | `Customer` |
-| `crm.mandante` | `mandantes` | `Mandante` |
-| `crm.lead` | `leads` | `Lead` |
-| `crm.activity_log` | `activityLogs` | `ActivityLog` |
-| `crm.service` | `crmServices` | `CRMService` |
-| `crm.document` | `crmDocuments` | `CRMDocument` |
+### Implementado antes
 
-### Campos añadidos en Firebase
+- Customers.
+- Mandantes inline.
+- Leads.
+- Project code `PRJ-XXXX`.
+- ActivityLog basico.
+- Service sync inicial al ganar lead.
 
-- `Lead.projectCode` — auto-generado `PRJ-XXXX`
-- `Lead.isPaid` — tracking financiero
-- `Customer.active` — soft delete
-- `Mandante.isPrimary` — contacto principal
+### Implementado recientemente
 
-### Campos eliminados
+- Capa de callables CRM para operaciones sensibles.
+- Helper RBAC `assertCRMAction`.
+- `allowedModules` en usuario de compania con fallback por rol.
+- Dossier inicial de lead.
+- Notas de lead.
+- Administracion UI de stages y service types.
+- Documentos CRM con metadata/versionado inicial.
+- Mirror autenticado de servicio.
+- Reglas Firestore mas explicitas para colecciones CRM.
 
-- `Lead.reportAreaId`, `reportSectorId` — simplificados por ahora
-- `Service.statusSnapshot`, `contextSnapshot` — no críticos para MVP
+## Decision de mirror
 
-## Cloud Functions
+El legacy tenia mirror publico por token. En esta fase Firebase no expone link anonimo publico. La decision actual es:
 
-### `onLeadCreated`
+- mirror autenticado,
+- usuario con cuenta y permisos,
+- datos filtrados como si fuera publico,
+- sin endpoint anonimo por token.
 
-**Trigger:** `onDocumentCreated` en `companies/{companyId}/leads/{leadId}`
+Si se requiere compatibilidad exacta con legacy, debe agregarse un modo publico separado con token y allowlist estricta.
 
-**Acciones:**
-1. Genera `projectCode` atómicamente usando transacción en `company.currentProjectSeq`
-2. Crea activity log de tipo `created`
+## Dossier de lead
 
-**Código Python equivalente:**
-```python
-seq = company.current_project_seq + 1
-lead.project_code = f"PRJ-{seq:04d}"
-```
+El dossier Firebase debe considerarse version inicial. Ya reemplaza el placeholder y agrega una vista operacional, pero aun falta enriquecerlo hasta el alcance legacy completo:
 
-**Traducción:**
-```typescript
-const newSeq = await db.runTransaction(async (t) => {
-  const doc = await t.get(companyRef);
-  const seq = (doc.data()?.currentProjectSeq || 5000) + 1;
-  t.update(companyRef, { currentProjectSeq: seq });
-  return seq;
-});
-const projectCode = `PRJ-${newSeq.toString().padStart(4, "0")}`;
-```
+- quotes con conteos y resumen,
+- reports con checkpoints,
+- expenses y resumen de margen,
+- rentals y resumen de devoluciones,
+- safety/prevention folder,
+- documentos filtrados/versionados,
+- service statuses calculados,
+- service context completo,
+- integraciones financieras/operativas.
 
-### `onLeadUpdated`
+## Stages y service types
 
-**Trigger:** `onDocumentUpdated` en `companies/{companyId}/leads/{leadId}`
+Ya existe gestion real por compania, pero faltan validaciones/pruebas de paridad:
 
-**Acciones:**
-- Detecta cambios en: `status`, `priority`, `customerId`, `assignedTo`, `expectedRevenue`, `probability`
-- Crea un `ActivityLog` por cada cambio detectado
-- Usa `WriteBatch` para eficiencia
+- auto-seed exacto legacy,
+- reordenamiento robusto,
+- soft delete cuando hay leads usando stage/type,
+- bloqueo o aviso cuando catalogos de quotes usan service types,
+- cobertura de permisos por accion.
 
-### `onLeadWon`
+## Documentos CRM
 
-**Trigger:** `onDocumentUpdated` cuando `status` cambia a `"won"`
+La base de metadata/versionado esta incorporada, pero para paridad completa faltan:
 
-**Acciones:**
-1. Verifica que no exista un `CRMService` para este lead (idempotencia)
-2. Crea `CRMService` con `serviceCode = SRV-{leadId.slice(-6)}`
-3. Crea `ServiceOrder` en el módulo Accreditation
-4. Actualiza lead a `status: "won"`
-5. Crea notificación y activity log
+- upload real de archivo a Storage desde UI,
+- finalizacion con validacion de metadata real,
+- descarga mediante URL autorizada,
+- reemplazo/versionado probado,
+- herencia de firma si reemplaza documento firmado,
+- filtros de visibilidad para mirror,
+- tests de tamano/MIME/permisos.
 
-## Componentes React
+## RBAC
 
-### CustomerList
-- Búsqueda por nombre, RUT, email
-- Grid responsive de tarjetas
-- Navegación a formulario y detalle
+El modelo actual usa `allowedModules` y acciones de servicio. Falta extenderlo y probarlo de forma completa:
 
-### CustomerForm
-- Todos los campos del ERP Python
-- Validación de nombre obligatorio
-- Auto-set de país a "Chile"
+- acciones CRM completas,
+- acciones de Quotes,
+- acciones financieras,
+- documentos,
+- mirror,
+- denegacion cross-company,
+- fallback temporal por rol para usuarios antiguos.
 
-### CustomerDetail
-- Info de contacto (email, teléfono, dirección)
-- Gestión de mandantes (contactos)
-  - Agregar contacto inline
-  - Marcar contacto principal
-  - Eliminar contacto
-- Acciones: Editar, Eliminar cliente
+## Brechas pendientes principales
 
-### LeadList
-- Stats cards: total, abiertas, ganadas, pipeline value
-- Filtros: búsqueda, estado, prioridad
-- Lista con probabilidad, valor esperado, fecha de cierre
+1. Dossier aun no esta al 100% del legacy.
+2. Documentos necesitan upload/download real y pruebas de versionado.
+3. Mirror aun no tiene modo publico anonimo legacy.
+4. Falta Kanban por stages.
+5. Falta dashboard/stats CRM equivalente.
+6. Falta cascade delete completo y probado.
+7. Falta sincronizacion continua del servicio cuando cambian campos relevantes del lead.
+8. Falta cobertura de tests con emuladores.
 
-### LeadForm
-- 3 secciones: Pre-venta, Métricas, Contexto del Proyecto
-- Selector de lead obligatorio
-- Cálculo automático de valor ponderado
+## Secuencia recomendada
 
-### LeadDetail
-- Resumen financiero (ingreso esperado, probabilidad, valor ponderado)
-- Info del cliente (link a CustomerDetail)
-- Equipo y contexto del proyecto
-- Links a integraciones (quotes, accreditation, documents)
-
-## Relaciones con otros módulos
-
-```
-Lead ──→ Customer (N:1)
-Lead ──→ Mandante (1:N, vía customer)
-Lead ──→ Quote (1:N)
-Lead ──→ CRMService (1:1, vía onLeadWon)
-Lead ──→ ServiceOrder (1:1, vía onLeadWon)
-```
-
-## Notas para desarrolladores
-
-- Los leads SIEMPRE deben tener `companyId` (multi-tenant)
-- El `projectCode` es inmutable una vez asignado
-- El `status` de lead tiene transiciones válidas: `open → won`, `open → lost`
-- Cuando un lead pasa a `won`, las Cloud Functions manejan la cascada automáticamente
+1. Completar dossier con agregados reales de quotes/reports/expenses/rentals/safety.
+2. Terminar upload/download/versionado documental.
+3. Agregar Kanban y stats CRM.
+4. Completar sincronizacion continua de `crmServices`.
+5. Decidir si se necesita mirror publico anonimo compatible con legacy.
+6. Cerrar RBAC con tests de permisos por accion.

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { doc, getDoc, collection, query, orderBy, onSnapshot, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
+import { createEmployee, updateEmployee } from "@/services/hr";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Employee, Department, JobProfile } from "@/types";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
@@ -118,18 +119,12 @@ export function EmployeeForm() {
       const payload = {
         ...form,
         fullName: `${form.firstName} ${form.lastName}`,
-        companyId,
-        updatedAt: serverTimestamp(),
       };
 
       if (isEdit && id) {
-        await updateDoc(doc(db, "companies", companyId, "employees", id), payload);
+        await updateEmployee(id, payload);
       } else {
-        await addDoc(collection(db, "companies", companyId, "employees"), {
-          ...payload,
-          createdBy: user.uid,
-          createdAt: serverTimestamp(),
-        });
+        await createEmployee(payload);
       }
       navigate("/hr");
     } catch (err) {

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
+import { sendQuote, acceptQuote, rejectQuote, cancelQuote } from "@/services/quotes";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Quote, Lead, Customer } from "@/types";
 import {
@@ -48,18 +49,25 @@ export function QuoteDetail() {
     return () => unsub();
   }, [id, companyId]);
 
-  const updateStatus = async (status: Quote["status"]) => {
-    if (!companyId || !id) return;
-    const updates: Record<string, any> = { status };
-    if (status === "sent") updates.sentAt = new Date().toISOString();
-    if (status === "accepted") updates.acceptedAt = new Date().toISOString();
-    await updateDoc(doc(db, "companies", companyId, "quotes", id), updates);
+  const handleSend = async () => {
+    if (!id) return;
+    await sendQuote(id);
+  };
+
+  const handleAccept = async () => {
+    if (!id) return;
+    await acceptQuote(id);
+  };
+
+  const handleReject = async () => {
+    if (!id) return;
+    await rejectQuote(id);
   };
 
   const handleDelete = async () => {
-    if (!companyId || !id) return;
+    if (!id) return;
     if (!confirm("¿Eliminar esta cotización?")) return;
-    await updateDoc(doc(db, "companies", companyId, "quotes", id), { status: "cancelled" });
+    await cancelQuote(id);
     navigate("/quotes");
   };
 
@@ -138,7 +146,7 @@ export function QuoteDetail() {
           {quote.status === "draft" && (
             <>
               <button
-                onClick={() => updateStatus("sent")}
+                onClick={handleSend}
                 className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <PaperAirplaneIcon className="w-4 h-4" />
@@ -156,14 +164,14 @@ export function QuoteDetail() {
           {quote.status === "sent" && (
             <>
               <button
-                onClick={() => updateStatus("accepted")}
+                onClick={handleAccept}
                 className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <CheckCircleIcon className="w-4 h-4" />
                 Aceptar
               </button>
               <button
-                onClick={() => updateStatus("rejected")}
+                onClick={handleReject}
                 className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <XCircleIcon className="w-4 h-4" />

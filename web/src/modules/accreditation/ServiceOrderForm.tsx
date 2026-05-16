@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
+import { createServiceOrder, updateServiceOrder } from "@/services/accreditation";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ServiceOrder, Lead, Customer } from "@/types";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
@@ -85,15 +86,11 @@ export function ServiceOrderForm() {
 
     setIsSubmitting(true);
     try {
-      const payload = { ...form, companyId, updatedAt: serverTimestamp() };
+      const payload = { ...form };
       if (isEdit && id) {
-        await updateDoc(doc(db, "companies", companyId, "serviceOrders", id), payload);
+        await updateServiceOrder(id, payload);
       } else {
-        await addDoc(collection(db, "companies", companyId, "serviceOrders"), {
-          ...payload,
-          createdBy: user.uid,
-          createdAt: serverTimestamp(),
-        });
+        await createServiceOrder(payload);
       }
       navigate("/accreditation");
     } catch (err) {

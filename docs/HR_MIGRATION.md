@@ -117,12 +117,21 @@ Employee ──→ CrewAssignment (1:N) [pendiente]
 Employee ──→ EmployeeAccreditation (1:N) [pendiente]
 ```
 
+## Mejoras aplicadas en ronda 2026-05-15
+
+- ✅ `createEmployee` / `updateEmployee` migrados a Callable Functions con validación server-side.
+- ✅ Validación de RUT chileno (módulo 11) en `createEmployee`.
+- ✅ Generación atómica de `employeeCode` (`EMP-{seq}`) en `createEmployee` via transacción.
+- ✅ Recálculo de `fullName` en `updateEmployee` si cambian campos de nombre.
+- ✅ ActivityLog por creación de empleado.
+- ✅ Firestore Rules bloquean escrituras directas a `employees` (`allow create, update, delete: if false`).
+
 ## Próximos pasos (Phase 2)
 
 1. **EmployeeContract CRUD** — Formulario de contratos en EmployeeDetail
 2. **Onboarding workflow** — Cloud Function `onEmployeeHired` completo
 3. **Accreditation matrix** — Nivel A (general) y Nivel B (cliente)
 4. **Crew assignment** — Asignar empleados a órdenes de servicio
-5. **EmployeeCode auto-generation** — `EMP-{seq}` al crear empleado
+5. ~~EmployeeCode auto-generation~~ ✅ Completado
 6. **Leave management** — Licencias, permisos
 7. **Termination workflow** — Desvinculación con documentos

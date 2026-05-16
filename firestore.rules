@@ -60,11 +60,10 @@ service cloud.firestore {
     // SUB-COLECCIONES POR EMPRESA (Reglas explícitas)
     // ==========================================
 
-    // Cotizaciones
+    // Cotizaciones (server-managed: solo via Callable Functions / Admin SDK)
     match /companies/{companyId}/quotes/{quoteId} {
       allow read: if belongsToCompany(companyId);
-      allow create, update: if belongsToCompany(companyId);
-      allow delete: if isCompanyAdmin(companyId);
+      allow create, update, delete: if false;
     }
 
     // Clientes / CRM
@@ -114,11 +113,10 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // Empleados / RRHH
+    // Empleados / RRHH (server-managed)
     match /companies/{companyId}/employees/{employeeId} {
       allow read: if belongsToCompany(companyId);
-      allow create, update: if belongsToCompany(companyId);
-      allow delete: if isCompanyAdmin(companyId);
+      allow create, update, delete: if false;
     }
 
     match /companies/{companyId}/departments/{deptId} {
@@ -138,17 +136,15 @@ service cloud.firestore {
       allow delete: if isCompanyAdmin(companyId);
     }
 
-    // Acreditaciones
+    // Acreditaciones (server-managed)
     match /companies/{companyId}/serviceOrders/{orderId} {
       allow read: if belongsToCompany(companyId);
-      allow create, update: if belongsToCompany(companyId);
-      allow delete: if isCompanyAdmin(companyId);
+      allow create, update, delete: if false;
     }
 
     match /companies/{companyId}/crewAssignments/{assignmentId} {
       allow read: if belongsToCompany(companyId);
-      allow create, update: if belongsToCompany(companyId);
-      allow delete: if isCompanyAdmin(companyId);
+      allow create, update, delete: if false;
     }
 
     match /companies/{companyId}/accreditationChecks/{checkId} {

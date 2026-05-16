@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { doc, getDoc, collection, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
+import { createQuote, updateQuote } from "@/services/quotes";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Quote, QuoteLine, Lead, Customer } from "@/types";
 import {
@@ -161,22 +162,12 @@ export function QuoteForm() {
         ...form,
         ...totals,
         status: statusOverride || form.status || "draft",
-        companyId,
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
       };
 
       if (isEdit && id) {
-        await getDoc(doc(db, "companies", companyId, "quotes", id)); // verify exists
-        // Use updateDoc directly
-        const { updateDoc: firestoreUpdateDoc } = await import("firebase/firestore");
-        await firestoreUpdateDoc(doc(db, "companies", companyId, "quotes", id), {
-          ...payload,
-          updatedAt: serverTimestamp(),
-        });
+        await updateQuote(id, payload);
       } else {
-        const { addDoc } = await import("firebase/firestore");
-        await addDoc(collection(db, "companies", companyId, "quotes"), payload);
+        await createQuote(payload);
       }
       navigate("/quotes");
     } catch (err) {

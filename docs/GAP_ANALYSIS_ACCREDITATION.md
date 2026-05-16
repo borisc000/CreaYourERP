@@ -1,6 +1,7 @@
 # Gap Analysis: Módulo Accreditation (Python ERP → Firebase)
 
 **Fecha:** 2026-05-10  
+**Estado cambio reciente:** CRUD de ServiceOrder y crew operations migrados a Callable Functions (2026-05-15)  
 **Alcance:** Compara la implementación REAL del backend Python (`YOUR_ERP_CORE/modules/accreditation/`) contra la migración Firebase (`your-erp-firebase/`).
 
 ---
@@ -52,22 +53,22 @@ El Python registra 5 listeners en el EventBus. Firebase solo tiene el trigger `o
 
 ### 2.3 HTTPS Callable / Endpoints Faltantes
 
-Los API routes del Python exponen ~15 endpoints. Firebase no expone ninguno propio del módulo accreditation (solo el genérico `getDashboardStats`).
+Los API routes del Python exponen ~15 endpoints. **Los writes criticos ya están en Callables; reads aún directos.**
 
-| Endpoint Python | Método | Uso |
-|-----------------|--------|-----|
+| Endpoint Python | Método | Estado Firebase |
+|-----------------|--------|-----------------|
 | `GET /api/accreditation/service-orders` | Listar órdenes | ✅ Frontend lee Firestore directamente. |
-| `POST /api/accreditation/service-orders` | Crear orden | ✅ Frontend escribe Firestore directamente. |
+| `POST /api/accreditation/service-orders` | Crear orden | ✅ Callable `createServiceOrder` (valida leadId y riskLevel) |
 | `GET /api/accreditation/service-orders/{id}` | Obtener orden + resumen compliance | ⚠️ Frontend arma resumen en cliente (más costoso). |
-| `PUT /api/accreditation/service-orders/{id}` | Actualizar orden | ✅ Frontend escribe directo. |
-| `DELETE /api/accreditation/service-orders/{id}` | Soft-delete | ✅ Frontend hace update de status. |
-| `GET /api/accreditation/service-orders/{id}/requirements` | Requisitos Level A/B | ❌ No existe. Frontend no puede obtener requisitos desglosados por nivel. |
+| `PUT /api/accreditation/service-orders/{id}` | Actualizar orden | ✅ Callable `updateServiceOrder` |
+| `DELETE /api/accreditation/service-orders/{id}` | Soft-delete | ✅ Frontend hace update de status (aún directo, no crítico). |
+| `GET /api/accreditation/service-orders/{id}/requirements` | Requisitos Level A/B | ❌ No existe. |
 | `PUT /api/accreditation/service-orders/{id}/requirements` | Actualizar reqs Level B | ❌ No existe. |
 | `GET /api/accreditation/service-orders/{id}/crew` | Listar crew | ✅ Frontend lee subcolección directamente. |
-| `POST /api/accreditation/service-orders/{id}/crew` | Agregar miembros | ✅ Frontend escribe directo. |
+| `POST /api/accreditation/service-orders/{id}/crew` | Agregar miembros | ✅ Callable `assignCrewMember` (previene duplicados) |
 | `POST /api/accreditation/service-orders/{id}/crew/bulk` | Bulk assign con roles | ❌ No existe. Solo se puede agregar de a 1 en el UI. |
-| `DELETE /api/accreditation/service-orders/{id}/crew/{empId}` | Remover miembro | ✅ Frontend hace update de status. |
-| `POST /api/accreditation/service-orders/{id}/crew/authorize` | Autorizar cuadrilla completa | ⚠️ UI tiene botón pero no marca `authorizedBy` ni `revalidationReason`. |
+| `DELETE /api/accreditation/service-orders/{id}/crew/{empId}` | Remover miembro | ✅ Callable `removeCrewMember` (soft remove + audit) |
+| `POST /api/accreditation/service-orders/{id}/crew/authorize` | Autorizar cuadrilla completa | ✅ Callable `authorizeCrew` (transacción atómica múltiple assignments) |
 | `GET /api/accreditation/service-orders/{id}/checks` | Matriz de acreditación | ⚠️ Frontend la arma con onSnapshot de `accreditationChecks`, pero sin `compute_all_checks` garantizado. |
 | `POST /api/accreditation/service-orders/{id}/checks/recompute` | Forzar recomputo | ❌ No existe. |
 | `POST /api/accreditation/service-orders/{id}/checks/{empId}/generate-missing` | Generar docs faltantes 1 empleado | ❌ No existe. |

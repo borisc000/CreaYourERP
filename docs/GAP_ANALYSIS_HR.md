@@ -1,6 +1,7 @@
 # Gap Analysis: HR Module — Python ERP vs Firebase Migration
 
 > Fecha: 2026-05-10  
+> **Estado cambio reciente:** createEmployee/updateEmployee migrados a Callable Functions (2026-05-15)  
 > Fuente Python: `YOUR_ERP_CORE/modules/hr/module_hr.py`, `models/`, `api/`  
 > Fuente Firebase: `your-erp-firebase/web/src/types/index.ts`, `functions/src/`, `web/src/modules/hr/`
 
@@ -45,8 +46,8 @@
 ### Lógica de negocio principal (módulo `hr`)
 | Funcionalidad Python | Estado Firebase | Notas |
 |----------------------|-----------------|-------|
-| Auto-generación de `employee_code` (`EMP-{company}-{seq}`) | **Falta** | El web app no genera código secuencial |
-| Validación de RUT chileno (`_is_valid_chilean_rut`) | **Falta** | Sin validación server-side de cédula |
+| Auto-generación de `employee_code` (`EMP-{company}-{seq}`) | ✅ Callable `createEmployee` | Genera código secuencial con transacción atómica |
+| Validación de RUT chileno (`_is_valid_chilean_rut`) | ✅ Callable `createEmployee` | Valida dígito verificador server-side |
 | Derivar `zodiac_sign` desde `birth_date` | **Falta** | Feature omitida |
 | Sincronización de estado operacional del empleado (`_sync_employee_operational_status`) | **Falta** | En Python el estado cambia automáticamente según contratos activos y licencias aprobadas. En Firebase el estado es manual/directo desde el cliente. |
 | Crear contrato automáticamente al crear empleado (si vienen datos de contrato) | **Falta** | El formulario React solo crea el documento `employees`; contratos requieren escritura separada manual |

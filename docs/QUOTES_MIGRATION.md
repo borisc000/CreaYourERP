@@ -1,189 +1,182 @@
-# Migración del Módulo Quotes (Cotizaciones)
+# Migracion del Modulo Quotes
 
-## Análisis del ERP Python
+> Ultima actualizacion: 2026-05-15  
+> Fuente legacy: `YOUR_ERP_CORE/modules/quotes/module_quotes.py`, `quote_preview.js`, `quote_form.js`, `quotes.js`  
+> Fuente Firebase: `functions/src/modules/quotes/`, `web/src/modules/quotes/`
 
-El módulo Quotes es la herramienta de cotización comercial. Cada cotización pertenece a un Lead y contiene líneas organizadas en 3 secciones:
+## Alcance real del modulo legacy
 
-- **SERVICIOS:** Servicios profesionales (supervisión, prevención)
-- **PERSONAL:** Horas-hombre de personal
-- **INSUMOS:** Materiales, equipos, suministros
+En el legacy, Quotes no era solo un formulario comercial. Funcionaba como una consola de control comercial, operativo, documental y financiero:
 
-## Traducción de Modelos
+- cotizaciones por lead,
+- lineas por seccion (`SERVICIOS`, `PERSONAL`, `INSUMOS`),
+- catalogos de servicios, cargos/HH e insumos,
+- preview HTML A4 imprimible,
+- envio y aceptacion con cambios de etapa CRM,
+- bridge a servicio CRM y arriendos,
+- panel de control operativo,
+- contexto de facturacion, reportes, documentos y pagos.
 
-### Python → TypeScript/Firestore
+## Estado Firebase actual
 
-| Python Field | TypeScript Field | Notas |
-|--------------|-----------------|-------|
-| `quote_number` | `quoteNumber` | Auto-generado `COT-{proj}-{version}` |
-| `lead_id` | `leadId` | **Obligatorio** |
-| `customer_id` | `customerId` | Heredado del lead si no se especifica |
-| `adm_margin_pct` | `admMarginPct` | Default 5.0% |
-| `profit_margin_pct` | `profitMarginPct` | Default 10.0% |
-| `tax_pct` | `taxPct` | Default 19.0% (IVA Chile) |
-| `subtotal_items` | `subtotalItems` | Σ(qty × unit_price) |
-| `adm_expense_amount` | `admExpenseAmount` | Calculado server-side |
-| `profit_amount` | `profitAmount` | Calculado server-side |
-| `net_total` | `netTotal` | Calculado server-side |
-| `tax_amount` | `taxAmount` | Calculado server-side |
-| `gross_total` | `grossTotal` | Calculado server-side |
-| `control_meta` | `controlMeta` | Metadatos operacionales |
-| `control_snapshot` | `controlSnapshot` | Snapshot al aceptar |
-| `quote_date` | `quoteDate` | Fecha editable para PDF |
+### Implementado
 
-### Fórmula de cálculo (1:1 con Python)
+- `QuoteList`, `QuoteForm`, `QuoteDetail`.
+- Triggers existentes:
+  - `onQuoteCreated`
+  - `onQuoteUpdated`
+  - `onQuoteAccepted`
+- Helper `calculateQuoteTotal`.
+- Callable `getQuoteExportData({ quoteId })`.
+- Ruta `/quotes/:id/preview`.
+- Componente `QuotePreview` con layout A4, `@media print` y boton `window.print()`.
+- Acceso al preview desde detalle y listado.
 
-```python
-# Python original
-subtotal_items = sum(line.quantity * line.unit_price for line in lines)
-adm_expense_amount = round(subtotal_items * adm_margin_pct / 100, 0)
-profit_amount = round(subtotal_items * profit_margin_pct / 100, 0)
-net_total = round(subtotal_items + adm_expense_amount + profit_amount, 0)
-tax_amount = round(net_total * tax_pct / 100, 0)
-gross_total = round(net_total + tax_amount, 0)
-```
+### Paridad alcanzada con legacy
 
-```typescript
-// Traducción
-const subtotalItems = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
-const admExpenseAmount = Math.round(subtotalItems * admMarginPct / 100);
-const profitAmount = Math.round(subtotalItems * profitMarginPct / 100);
-const netTotal = Math.round(subtotalItems + admExpenseAmount + profitAmount);
-const taxAmount = Math.round(netTotal * taxPct / 100);
-const grossTotal = Math.round(netTotal + taxAmount);
-```
+El subflujo de "PDF de cotizacion" ahora replica el enfoque legacy:
 
-**Nota crítica:** El ERP Python usa `round()` sin decimales (redondeo al entero más cercano). Replicamos ese comportamiento con `Math.round()`.
+1. El backend entrega datos enriquecidos.
+2. El frontend renderiza una hoja A4 HTML/CSS.
+3. El usuario usa "Guardar PDF / Imprimir" desde el navegador.
+4. No se genera PDF server-side.
+5. No se guarda archivo PDF en Storage en esta fase.
 
-## Cloud Functions
+## Export data
 
-### `calculateQuoteTotal`
+La callable `getQuoteExportData` valida usuario autenticado y empresa, lee la cotizacion y entrega:
 
-**Ubicación:** `functions/src/modules/quotes/calculateTotal.ts`
+- `quote`: datos completos de la cotizacion.
+- `company`: nombre, razon social, RUT/taxId, email, telefono, logo, banco, tipo/cuenta y terminos.
+- `customer`: nombre, RUT, contacto, telefono, email, direccion.
+- `lead`: titulo, codigo de proyecto, descripcion y tipo de servicio.
+- `creator`: nombre/email.
+- `lines`: lineas normalizadas con `itemCode`.
 
-**Propósito:** Función pura que recalcula totales desde líneas.
+Si existe `catalogItemId`, se intenta buscar codigo de catalogo. Si no hay catalogo o codigo, se usa fallback `#001`, `#002`, etc.
 
-**Cambios realizados:**
-- Reemplazada fórmula anterior (margin simple) por fórmula completa del ERP Python
-- Agregados campos: `admExpenseAmount`, `profitAmount`
-- Eliminado: `marginAmount` (concepto simplificado del scaffold inicial)
+## Preview imprimible
 
-### `onQuoteUpdated`
+La ruta `/quotes/:id/preview` esta protegida por autenticacion y contexto de empresa. Renderiza:
 
-**Trigger:** `onDocumentUpdated` en `companies/{companyId}/quotes/{quoteId}`
+- encabezado empresa/cotizacion,
+- bloque cliente,
+- referencia del servicio,
+- descripcion del servicio,
+- lineas agrupadas por `SERVICIOS`, `PERSONAL`, `INSUMOS`,
+- totales,
+- terminos,
+- datos bancarios,
+- acciones flotantes no imprimibles.
 
-**Lógica:**
-1. Detecta si cambiaron: `lines`, `taxPct`, `admMarginPct`, `profitMarginPct`
-2. Llama a `calculateQuoteTotal` con los nuevos valores
-3. Actualiza el documento con los totales recalculados
+## Lo que todavia falta para paridad completa
 
-**Campos actualizados:** `subtotalItems`, `admExpenseAmount`, `profitAmount`, `netTotal`, `taxAmount`, `grossTotal`
+### P0 - Backend transaccional de Quotes ✅ COMPLETADO (2026-05-15)
 
-### `onQuoteAccepted`
+El legacy no confiaba en escrituras directas del cliente. **Firebase ahora usa Callables para todo CRUD y transiciones:**
 
-**Trigger:** `onDocumentUpdated` cuando `status` cambia a `"accepted"`
+- ✅ `createQuote` — valida auth/company, lineas, recalcula totales, genera `COT-{SHORT}-{SEQ}` atómicamente, crea ActivityLog
+- ✅ `updateQuote` — valida existencia y ownership; bloquea edición si status ∈ {accepted, rejected, cancelled}; recalcula totales si hay líneas
+- ✅ `sendQuote` — solo desde `draft`; registra `sentAt`; crea ActivityLog
+- ✅ `acceptQuote` — solo desde `sent`; registra `acceptedAt`; trigger `onQuoteAccepted` mantiene side effects (CRM sync, ServiceOrder creation)
+- ✅ `rejectQuote` — desde `draft` o `sent`; registra ActivityLog
+- ✅ `cancelQuote` — **bloquea cancelación si status === "accepted"** (protección crítica); registra ActivityLog
 
-**Acciones:**
-1. Crea `ServiceOrder` en `/companies/{id}/serviceOrders`
-2. **NUEVO:** Actualiza el lead vinculado a `status: "won"`
-3. Crea notificación para el creador
-4. Crea tarea de onboarding
+Las reglas de Firestore ahora bloquean escrituras directas a `quotes` (`allow create, update, delete: if false`).
 
-**Código Python equivalente:**
-```python
-lead.status = 'won'
-ensure_service_for_lead(lead)
-# opcional: crear RentalContract si es arriendo
-```
+### P0 - Validaciones de negocio ✅ COMPLETADO
 
-## Componentes React
+Validaciones server-side implementadas en Callables:
 
-### QuoteList
-- Stats: total cotizaciones, pipeline ($), aceptadas ($)
-- Filtros: búsqueda por título/número, filtro por estado
-- Badges de estado con colores
+- ✅ al menos una línea,
+- ✅ `sectionType` validado en `SERVICIOS`, `PERSONAL`, `INSUMOS`,
+- ✅ edición bloqueada si status ∈ {accepted, rejected, cancelled},
+- ✅ envío solo desde `draft`,
+- ✅ aceptación bloqueada si está `rejected` o `cancelled`,
+- ✅ cancelación bloqueada si está `accepted`,
+- ✅ totales recalculados antes de persistir.
 
-### QuoteForm
-**Arquitectura:** Hub-and-spoke (Lead como centro)
+### P0 - Numeracion automatica ✅ COMPLETADO
 
-**Secciones:**
-1. **Información General:** Título, Lead (obligatorio), Cliente, Fechas
-2. **Líneas de Cotización:**
-   - 3 sub-secciones: Servicios, Personal, Insumos
-   - Cada línea: Descripción, Cantidad, Precio unitario
-   - Botón "Agregar" por sección
-   - Botón eliminar por línea
-3. **Configuración de Márgenes:**
-   - Gastos Administrativos (%)
-   - Utilidad (%)
-   - IVA (%)
-   - Notas / Términos
-4. **Resumen (tiempo real):**
-   - Subtotal → Adm → Profit → Neto → IVA → Total
+Legacy genera `COT-{project_code}-{seq}`. Firebase ahora genera `COT-{SHORT}-{SEQ}` atómicamente via transacción en `createQuote`, garantizando secuencialidad sin race conditions.
 
-**Cálculo en tiempo real:** El frontend calcula para UX, pero el backend recalcula al guardar.
+### P1 - Catalogos
 
-### QuoteDetail
-- Header con estado y acciones contextuales
-  - `draft` → Editar, Enviar
-  - `sent` → Aceptar, Rechazar
-  - `accepted/rejected/cancelled` → Solo ver
-- Líneas agrupadas por sección con subtotales
-- Totales completos con desglose
-- Relaciones: Lead (link), Cliente (link)
-- Fechas: creación, envío, aceptación
+Legacy tiene tres catalogos CRUD:
 
-## Workflow de Estados
+- `quote_service_catalog`
+- `quote_worker_catalog`
+- `quote_item_catalog`
 
-```
-draft ──→ sent ──→ accepted
-  │         │          │
-  │         └────→ rejected
-  └──────────────→ cancelled
-```
+Falta:
 
-| Transición | Acción del usuario | Side effects |
-|------------|-------------------|--------------|
-| `draft → sent` | Botón "Enviar" | `sentAt = now` |
-| `sent → accepted` | Botón "Aceptar" | `acceptedAt = now`, Lead.status = "won", ServiceOrder creada |
-| `sent → rejected` | Botón "Rechazar" | — |
-| `any → cancelled` | Botón "Eliminar" | Soft delete (status = cancelled) |
+- API/callables CRUD por catalogo,
+- tipos TS especificos,
+- UI de administracion,
+- selector por seccion en `QuoteForm`,
+- copia de descripcion/precio desde catalogo a la linea.
 
-## Catálogos (Phase 2)
+### P1 - Envio y aceptacion completos
 
-El ERP Python tiene catálogos para autocompletar líneas:
-- `quote_service_catalog` → Servicios
-- `quote_worker_catalog` → Personal / HH
-- `quote_item_catalog` → Insumos
+Legacy al enviar/aceptar:
 
-**Estado actual:** No migrados aún. El formulario permite entrada manual. Los catálogos son Phase 2.
+- cambia estado,
+- registra ActivityLog,
+- avanza stage CRM,
+- sincroniza servicio,
+- guarda `control_snapshot`,
+- puede crear contrato de arriendo,
+- devuelve payload enriquecido.
 
-## Plantillas (Phase 2)
+Firebase tiene side effects parciales. Falta cerrar el flujo completo.
 
-El ERP Python permite guardar plantillas de cotización para reutilizar. **No migrado aún.**
+### P1 - Control operativo
 
-## Generación de PDF
+Legacy tiene `GET/PUT /quotes/{id}/control` con:
 
-El ERP Python NO genera PDFs server-side. Usa:
+- fechas operativas,
+- lugar de trabajo,
+- procedimiento,
+- POP,
+- reporte,
+- HES,
+- factura,
+- pago,
+- documentos/respaldo,
+- permisos condicionales,
+- redireccion al CRM Service si el servicio ya es el owner.
 
-1. Página de preview HTML/CSS optimizado para A4
-2. `window.print()` → browser genera PDF
-3. `@media print` CSS para formato
+Firebase solo tiene `controlMeta` como campo y parte de la estructura de servicio CRM. Falta UI/API completa.
 
-**Mantenemos esta filosofía.** La página de preview será Phase 2.
+### P2 - Plantillas
 
-## Relaciones con otros módulos
+Legacy soporta plantillas de cotizacion. Firebase aun no tiene:
 
-```
-Quote ──→ Lead (N:1, obligatorio)
-Quote ──→ Customer (N:1, heredado del lead)
-Quote ──→ ServiceOrder (1:1, vía onQuoteAccepted)
-Quote ──→ CRMService (1:1, vía Lead.status="won")
-```
+- `QuoteTemplate`,
+- `QuoteTemplateLine`,
+- lista/formulario,
+- crear cotizacion desde plantilla.
 
-## Notas para desarrolladores
+### P2 - Listado enriquecido
 
-- **LeadId es obligatorio.** No se puede crear cotización sin oportunidad.
-- **CustomerId es opcional** pero se auto-setea desde el lead.
-- **Los totales son siempre recalculados server-side.** Nunca confíes en el frontend.
-- **QuoteNumber aún no se genera automáticamente.** Pendiente: Cloud Function para auto-numeración `COT-{proj}-{version}`.
-- **Validación de estados:** Solo `draft` puede editarse. `sent` puede aceptarse/rechazarse. `accepted` es final.
+Legacy `quotes.js` muestra una consola con filtros por estado, tipo de servicio, fechas, cliente, mandante, area, sector, PDF, reporte, factura, pago y control operativo.
+
+Firebase tiene listado basico. Falta enriquecer filas y filtros.
+
+## Riesgos actuales
+
+1. Totales/estados pueden escribirse desde cliente antes del trigger.
+2. Las reglas Firestore no reemplazan validaciones de negocio.
+3. La aceptacion de quote no replica todos los efectos legacy.
+4. Sin catalogos, las lineas siguen siendo mayormente texto libre.
+5. El preview puede estar funcionalmente correcto, pero falta QA visual con datos reales de staging.
+
+## Secuencia recomendada
+
+1. Implementar callables CRUD/transiciones de Quotes.
+2. Bloquear mutaciones directas sensibles en reglas.
+3. Implementar catalogos y picker.
+4. Completar accept/send con stage engine, ActivityLog, servicio y rentals.
+5. Implementar control operativo.
+6. Agregar plantillas.
+7. Agregar tests de emulador y QA visual del preview.
