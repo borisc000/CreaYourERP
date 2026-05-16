@@ -12,6 +12,7 @@ import { sendQuote } from "./modules/quotes/sendQuote";
 import { acceptQuote } from "./modules/quotes/acceptQuote";
 import { rejectQuote } from "./modules/quotes/rejectQuote";
 import { cancelQuote } from "./modules/quotes/cancelQuote";
+import { deleteQuote } from "./modules/quotes/deleteQuote";
 import { checkCrewCompliance } from "./modules/accreditation/checkCrewCompliance";
 import { createServiceOrder } from "./modules/accreditation/createServiceOrder";
 import { updateServiceOrder } from "./modules/accreditation/updateServiceOrder";
@@ -60,6 +61,7 @@ export { sendQuote };
 export { acceptQuote };
 export { rejectQuote };
 export { cancelQuote };
+export { deleteQuote };
 
 export const onQuoteUpdated = onDocumentUpdated(
   {

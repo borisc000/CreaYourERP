@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFirestoreCollection } from "../../hooks/useFirestore";
+import { usePermission } from "../../hooks/usePermission";
 import { Report } from "../../types";
 
 export default function ReportList() {
   const navigate = useNavigate();
+  const { hasPermission } = usePermission();
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
 
@@ -22,7 +24,9 @@ export default function ReportList() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Reportes de Terreno</h1>
-        <button onClick={() => navigate("/reports/new")} className="erp-btn-primary">+ Nuevo Reporte</button>
+        {hasPermission("reports.create_report") && (
+          <button onClick={() => navigate("/reports/new")} className="erp-btn-primary">+ Nuevo Reporte</button>
+        )}
       </div>
 
       <div className="flex gap-4 mb-6">

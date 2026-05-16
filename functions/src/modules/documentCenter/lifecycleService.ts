@@ -8,6 +8,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db, storage } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -32,6 +33,8 @@ export const approveGeneratedDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "document_center.approve_document", { companyId });
 
     const { documentId } = request.data as ApprovePayload;
     if (!documentId) {
@@ -90,6 +93,8 @@ export const closeGeneratedDocument = onCall(
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
 
+    await assertAction(request, "document_center.close_document", { companyId });
+
     const { documentId } = request.data as ClosePayload;
     if (!documentId) {
       throw new HttpsError("invalid-argument", "documentId es requerido");
@@ -146,6 +151,8 @@ export const deleteGeneratedDocument = onCall(
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
 
+    await assertAction(request, "document_center.delete_document", { companyId });
+
     const { documentId } = request.data as DeletePayload;
     if (!documentId) {
       throw new HttpsError("invalid-argument", "documentId es requerido");
@@ -189,6 +196,8 @@ export const getDocumentCenterStats = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "document_center.view_stats", { companyId });
 
     try {
       const cRef = companyRef(companyId);

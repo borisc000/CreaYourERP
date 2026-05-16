@@ -11,6 +11,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -121,6 +122,7 @@ export const getBillingDashboard = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.view_dashboard", { companyId });
 
     try {
       const cref = companyRef(companyId);
@@ -254,6 +256,7 @@ export const createBillingDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.create_document", { companyId });
 
     const payload = request.data as CreateBillingDocumentPayload;
     if (!payload.documentNumber?.trim() || !payload.documentType || !payload.customerName?.trim() || !payload.issueDate || !payload.dueDate) {
@@ -384,6 +387,7 @@ export const updateBillingDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.edit_document", { companyId });
 
     const payload = request.data as UpdateBillingDocumentPayload;
     if (!payload.documentId) {
@@ -498,9 +502,7 @@ export const deleteBillingDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
-    if (request.auth.token.role !== "admin") {
-      throw new HttpsError("permission-denied", "Solo administradores pueden eliminar documentos");
-    }
+    await assertAction(request, "billing.delete_document", { companyId });
 
     const { documentId } = request.data as DeleteBillingDocumentPayload;
     if (!documentId) {
@@ -560,6 +562,7 @@ export const simulateSii = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.simulate_sii", { companyId });
 
     const payload = request.data as SimulateSiiPayload;
     if (!payload.documentId || !payload.profile) {
@@ -666,6 +669,7 @@ export const registerPayment = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.register_payment", { companyId });
 
     const payload = request.data as RegisterPaymentPayload;
     if (!payload.documentId || payload.amount === undefined || payload.amount === null) {
@@ -742,6 +746,7 @@ export const sendDocumentToCustomer = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.send_document", { companyId });
 
     const { documentId } = request.data as SendDocumentPayload;
     if (!documentId) {

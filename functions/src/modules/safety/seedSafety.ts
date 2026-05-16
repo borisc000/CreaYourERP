@@ -5,6 +5,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 const DEFAULT_PPE_CATALOG = [
   { code: "CASCO", name: "Casco de seguridad", category: "cabeza" },
@@ -128,6 +129,8 @@ export const seedSafetyCatalogs = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.seed_catalogs", { companyId });
 
     try {
       const batch = db.batch();

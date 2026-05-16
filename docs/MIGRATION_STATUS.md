@@ -145,31 +145,41 @@ Módulos **Quotes**, **HR** y **Accreditation**: escrituras directas desde clien
 
 ### RBAC Transversal P0.2 (2026-05-15)
 
-Extensión del patrón RBAC existente de CRM a Quotes, HR y Accreditation.
+Extensión del patrón RBAC existente de CRM a **todos los módulos críticos**.
 
 **Backend (`functions/src/shared/rbac.ts`):**
 - `assertAction` genérico reemplaza `assertCRMAction`; mantiene retrocompatibilidad vía re-export en `modules/crm/rbac.ts`.
-- `SERVICE_ACTIONS` ampliado con 22 acciones nuevas:
+- `SERVICE_ACTIONS` ampliado con 55 acciones:
+  - CRM: `service.*`, `crm.*`
   - Quotes: `quote.create`, `quote.edit`, `quote.delete`, `quote.send`, `quote.accept`, `quote.reject`, `quote.cancel`, `quote.view_preview`, `quote.view_export`
   - HR: `hr.create_employee`, `hr.edit_employee`, `hr.delete_employee`, `hr.view_contracts`, `hr.manage_contracts`
   - Accreditation: `accreditation.create_service_order`, `accreditation.edit_service_order`, `accreditation.delete_service_order`, `accreditation.assign_crew`, `accreditation.remove_crew`, `accreditation.authorize_crew`, `accreditation.generate_documents`, `accreditation.recompute_checks`, `accreditation.view_compliance`
+  - Billing: `billing.view_dashboard`, `billing.create_document`, `billing.edit_document`, `billing.delete_document`, `billing.simulate_sii`, `billing.register_payment`, `billing.send_document`
+  - Reports: `reports.view_dashboard`, `reports.create_report`, `reports.edit_report`, `reports.close_report`, `reports.create_checkpoint`, `reports.edit_checkpoint`, `reports.add_photo`
+  - Safety: `safety.save_checklist`, `safety.delete_checklist`, `safety.export_miper`, `safety.generate_risk_matrix`, `safety.generate_irl`, `safety.save_irl`, `safety.delete_irl`, `safety.save_ppe_delivery`, `safety.delete_ppe_delivery`, `safety.save_talk`, `safety.delete_talk`, `safety.seed_catalogs`
+  - Document Center: `document_center.save_template`, `document_center.delete_template`, `document_center.generate_document`, `document_center.approve_document`, `document_center.close_document`, `document_center.delete_document`, `document_center.view_stats`
 - `moduleMap` asocia cada acción a módulos para fallback por `allowedModules`.
 - `actionAllowed`: admin bypass → `serviceActions` explícitos → fallback por rol vía `moduleMap`.
 
-**Callables protegidos (16 total):**
-- Quotes ×6: `createQuote`, `updateQuote`, `sendQuote`, `acceptQuote`, `rejectQuote`, `cancelQuote`
+**Callables protegidos (42 total):**
+- Quotes ×7: `createQuote`, `updateQuote`, `sendQuote`, `acceptQuote`, `rejectQuote`, `cancelQuote`, `deleteQuote`
 - HR ×2: `createEmployee`, `updateEmployee`
 - Accreditation ×8: `createServiceOrder`, `updateServiceOrder`, `assignCrewMember`, `removeCrewMember`, `authorizeCrew`, `bulkAssignCrew`, `recomputeChecks`, `triggerDocumentGeneration`
+- Billing ×7: `getBillingDashboard`, `createBillingDocument`, `updateBillingDocument`, `deleteBillingDocument`, `simulateSii`, `registerPayment`, `sendDocumentToCustomer`
+- Reports ×7: `getReportDashboard`, `createReport`, `updateReport`, `closeReport`, `createCheckpoint`, `updateCheckpoint`, `addReportPhoto`
+- Safety ×12: `saveChecklist`, `deleteChecklist`, `exportMIPER`, `generateRiskMatrix`, `generateIRL`, `saveIRL`, `deleteIRL`, `savePPEDelivery`, `deletePPEDelivery`, `saveTalk`, `deleteTalk`, `seedSafetyCatalogs`
+- Document Center ×7: `saveDocumentTemplate`, `deleteDocumentTemplate`, `generateWorkerDocument`, `approveGeneratedDocument`, `closeGeneratedDocument`, `deleteGeneratedDocument`, `getDocumentCenterStats`
 
 **Frontend (`web/src/hooks/usePermission.ts`):**
 - Hook `usePermission` replica la lógica de `actionAllowed` del backend.
 - Componentes con controles condicionales:
-  - `QuoteList`: oculta "Nueva Cotización" sin `quote.create`
-  - `QuoteDetail`: condiciona Enviar/Editar/Aceptar/Rechazar/Cancelar
-  - `EmployeeList`: oculta "Nuevo Colaborador" sin `hr.create_employee`
-  - `EmployeeDetail`: condiciona Editar
-  - `ServiceOrderList`: oculta "Nueva Orden" sin `accreditation.create_service_order`
-  - `ServiceOrderDetail`: condiciona Editar, Recomputar, Autorizar, Bulk, Agregar crew, Eliminar crew, Generar faltantes
+  - **Quotes**: `QuoteList` (Nueva Cotización), `QuoteDetail` (Enviar/Editar/Aceptar/Rechazar/Eliminar)
+  - **HR**: `EmployeeList` (Nuevo Colaborador), `EmployeeDetail` (Editar)
+  - **Accreditation**: `ServiceOrderList` (Nueva Orden), `ServiceOrderDetail` (Editar, Recomputar, Autorizar, Bulk, Agregar/Eliminar crew, Generar faltantes)
+  - **Billing**: `BillingDocumentList` (Nuevo DTE, Eliminar), `BillingDocumentDetail` (Editar, Enviar Cliente, Simular SII, Registrar Pago)
+  - **Reports**: `ReportList` (Nuevo Reporte), `ReportDetail` (Cerrar, Editar, Agregar checkpoint)
+  - **Safety**: `SafetyFolderList` (Nueva Carpeta), `SafetyFolderDetail` + `RiskMatrixEditor` (Generar/Regenerar matriz, Exportar, Guardar/Eliminar IRL, PPE, Charlas, Checklists)
+  - **Document Center**: `DocumentCenterPage` (Nueva plantilla, Generar documento, Eliminar plantilla, Aprobar/Cerrar/Eliminar documentos generados)
 
 **Build status:**
 - `functions/` y `web/` compilan sin errores (`tsc --noEmit`).
@@ -220,7 +230,7 @@ Cada empresa vive bajo `/companies/{companyId}`. Los modulos usan colecciones hi
 
 1. **CI/lint:** el workflow de CI falla por deuda amplia de ESLint (`any`, imports no usados, warnings de hooks). Hay que decidir si se corrige deuda o se ajusta el gating por fases.
 2. **Deploy:** confirmar que el workflow de staging termina y publica Hosting/Functions con el SHA esperado.
-3. **RBAC:** P0.2 completado para Quotes, HR y Accreditation. Pendiente: Billing, Reports, Safety, Document Center.
+3. **RBAC:** P0.2 completado para **todos los módulos críticos**: Quotes, HR, Accreditation, Billing, Reports, Safety, Document Center.
 4. **Server-side writes:** mover flujos criticos restantes desde escrituras directas Firestore a callables (Quotes, HR, Accreditation, Billing).
 5. **Tests:** faltan tests de emuladores para permisos, multi-company denial, side effects cross-module y documentos.
 6. **Motor de plantillas DOCX:** el legacy usa DOCX+LibreOffice; el staging usa `pdf-lib` manual. Se requiere decision arquitectonica.
@@ -236,7 +246,7 @@ Cada empresa vive bajo `/companies/{companyId}`. Los modulos usan colecciones hi
 2. Cerrar Quotes P0: CRUD server-side, send/accept/delete con validaciones y ActivityLog.
 3. Cerrar HR P0: validacion RUT, auto-codigo `EMP-{seq}`, sincronizacion de estado, contratos, licencias, desvinculaciones.
 4. Cerrar Accreditation P0: `compute_check` real con Level A/B, vencimiento, `DocumentGenerationRequest`, triggers post-firma.
-5. ~~Extender RBAC transversal~~ — **P0.2 completado** para Quotes, HR, Accreditation. Pendiente: Billing, Reports, Safety, Document Center.
+5. ~~Extender RBAC transversal~~ — **P0.2 completado** para Quotes, HR, Accreditation, Billing, Reports, Safety, Document Center.
 
 ### P1 — Alto (funcionalidad core incompleta)
 

@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import type { DocumentTemplate, GeneratedDocument, Employee, Customer } from "@/types";
@@ -29,6 +30,7 @@ import {
 
 export function DocumentCenterPage() {
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocument[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -203,20 +205,24 @@ export function DocumentCenterPage() {
           <p className="text-gray-500 text-sm mt-1">Plantillas, generación masiva y trazabilidad documental</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowGenerateForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium"
-          >
-            <UserIcon className="w-4 h-4" />
-            Generar para trabajador
-          </button>
-          <button
-            onClick={() => { setEditingTemplate(null); setTemplateForm({ status: "draft", sourceFormat: "docx" }); setShowTemplateForm(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
-          >
-            <PlusIcon className="w-4 h-4" />
-            Nueva plantilla
-          </button>
+          {hasPermission("document_center.generate_document") && (
+            <button
+              onClick={() => setShowGenerateForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium"
+            >
+              <UserIcon className="w-4 h-4" />
+              Generar para trabajador
+            </button>
+          )}
+          {hasPermission("document_center.save_template") && (
+            <button
+              onClick={() => { setEditingTemplate(null); setTemplateForm({ status: "draft", sourceFormat: "docx" }); setShowTemplateForm(true); }}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Nueva plantilla
+            </button>
+          )}
         </div>
       </div>
 
@@ -302,9 +308,11 @@ export function DocumentCenterPage() {
                         >
                           <PencilIcon className="w-4 h-4" />
                         </button>
-                        <button onClick={() => deleteTemplate(t.id)} className="text-gray-400 hover:text-red-400">
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
+                        {hasPermission("document_center.delete_template") && (
+                          <button onClick={() => deleteTemplate(t.id)} className="text-gray-400 hover:text-red-400">
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -355,7 +363,7 @@ export function DocumentCenterPage() {
                             <ArrowDownTrayIcon className="w-4 h-4" />
                           </button>
                         )}
-                        {d.status === "generated" && (
+                        {d.status === "generated" && hasPermission("document_center.approve_document") && (
                           <button onClick={() => approveDoc(d.id)} className="text-gray-400 hover:text-blue-400" title="Aprobar">
                             <CheckCircleIcon className="w-4 h-4" />
                           </button>
@@ -365,14 +373,18 @@ export function DocumentCenterPage() {
                             <button onClick={() => sendToSignature(d)} className="text-purple-400 hover:text-purple-300" title="Enviar a firmar">
                               <PencilSquareIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={() => closeDoc(d.id)} className="text-gray-400 hover:text-green-400" title="Cerrar">
-                              <CheckCircleIcon className="w-4 h-4" />
-                            </button>
+                            {hasPermission("document_center.close_document") && (
+                              <button onClick={() => closeDoc(d.id)} className="text-gray-400 hover:text-green-400" title="Cerrar">
+                                <CheckCircleIcon className="w-4 h-4" />
+                              </button>
+                            )}
                           </>
                         )}
-                        <button onClick={() => deleteDocItem(d.id)} className="text-gray-400 hover:text-red-400" title="Eliminar">
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
+                        {hasPermission("document_center.delete_document") && (
+                          <button onClick={() => deleteDocItem(d.id)} className="text-gray-400 hover:text-red-400" title="Eliminar">
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

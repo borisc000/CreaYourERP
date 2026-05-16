@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
-import { sendQuote, acceptQuote, rejectQuote, cancelQuote } from "@/services/quotes";
+import { sendQuote, acceptQuote, rejectQuote, deleteQuote } from "@/services/quotes";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
 import type { Quote, Lead, Customer } from "@/types";
@@ -68,8 +68,8 @@ export function QuoteDetail() {
 
   const handleDelete = async () => {
     if (!id) return;
-    if (!confirm("¿Eliminar esta cotización?")) return;
-    await cancelQuote(id);
+    if (!confirm("¿Eliminar definitivamente esta cotización?")) return;
+    await deleteQuote(id);
     navigate("/quotes");
   };
 
@@ -181,7 +181,7 @@ export function QuoteDetail() {
               Rechazar
             </button>
           )}
-          {hasPermission("quote.cancel") && (
+          {hasPermission("quote.delete") && (
             <button
               onClick={handleDelete}
               className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-red-500/20 hover:text-red-400 text-gray-300 text-sm font-medium rounded-lg transition-colors"

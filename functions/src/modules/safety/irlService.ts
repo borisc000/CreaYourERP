@@ -7,6 +7,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -33,6 +34,8 @@ export const generateIRL = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.generate_irl", { companyId });
 
     const { folderId, employeeId, positionTitle } = request.data as GenerateIRLPayload;
     if (!folderId) {
@@ -202,6 +205,8 @@ export const saveIRL = onCall(
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
 
+    await assertAction(request, "safety.save_irl", { companyId });
+
     const { irlId, ...payload } = request.data as SaveIRLPayload;
     if (!irlId) {
       throw new HttpsError("invalid-argument", "irlId es requerido");
@@ -252,6 +257,8 @@ export const deleteIRL = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.delete_irl", { companyId });
 
     const { irlId } = request.data as DeleteIRLPayload;
     if (!irlId) {

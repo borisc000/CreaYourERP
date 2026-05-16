@@ -4,6 +4,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db, storage } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -48,6 +49,8 @@ export const saveDocumentTemplate = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "document_center.save_template", { companyId });
 
     const payload = request.data as TemplatePayload;
     if (!payload.name?.trim()) {
@@ -139,6 +142,8 @@ export const deleteDocumentTemplate = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "document_center.delete_template", { companyId });
 
     const { id } = request.data as { id: string };
     if (!id) {

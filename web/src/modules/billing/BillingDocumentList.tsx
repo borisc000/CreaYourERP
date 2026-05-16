@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { orderBy } from "firebase/firestore";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
+import { usePermission } from "@/hooks/usePermission";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import type { BillingDocument } from "@/types";
@@ -54,6 +55,7 @@ const typeLabel: Record<string, string> = {
 
 export function BillingDocumentList() {
   const navigate = useNavigate();
+  const { hasPermission } = usePermission();
   const { data: documents, isLoading } = useFirestoreCollection<BillingDocument>("billingDocuments", [
     orderBy("createdAt", "desc"),
   ]);
@@ -122,13 +124,15 @@ export function BillingDocumentList() {
             {documents.length} {documents.length === 1 ? "documento" : "documentos"} registrados
           </p>
         </div>
-        <button
-          onClick={() => navigate("/billing/documents/new")}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <PlusIcon className="w-4 h-4" />
-          Nuevo DTE
-        </button>
+        {hasPermission("billing.create_document") && (
+          <button
+            onClick={() => navigate("/billing/documents/new")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Nuevo DTE
+          </button>
+        )}
       </div>
 
       {/* Quick Stats */}
@@ -258,7 +262,7 @@ export function BillingDocumentList() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {doc.siiStatus !== "accepted" && (
+                  {doc.siiStatus !== "accepted" && hasPermission("billing.delete_document") && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

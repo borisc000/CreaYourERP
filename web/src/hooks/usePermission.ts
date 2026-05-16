@@ -41,7 +41,44 @@ type ServiceAction =
   | "accreditation.authorize_crew"
   | "accreditation.generate_documents"
   | "accreditation.recompute_checks"
-  | "accreditation.view_compliance";
+  | "accreditation.view_compliance"
+  // Billing
+  | "billing.view_dashboard"
+  | "billing.create_document"
+  | "billing.edit_document"
+  | "billing.delete_document"
+  | "billing.simulate_sii"
+  | "billing.register_payment"
+  | "billing.send_document"
+  // Reports
+  | "reports.view_dashboard"
+  | "reports.create_report"
+  | "reports.edit_report"
+  | "reports.close_report"
+  | "reports.create_checkpoint"
+  | "reports.edit_checkpoint"
+  | "reports.add_photo"
+  // Safety
+  | "safety.save_checklist"
+  | "safety.delete_checklist"
+  | "safety.export_miper"
+  | "safety.generate_risk_matrix"
+  | "safety.generate_irl"
+  | "safety.save_irl"
+  | "safety.delete_irl"
+  | "safety.save_ppe_delivery"
+  | "safety.delete_ppe_delivery"
+  | "safety.save_talk"
+  | "safety.delete_talk"
+  | "safety.seed_catalogs"
+  // Document Center
+  | "document_center.save_template"
+  | "document_center.delete_template"
+  | "document_center.generate_document"
+  | "document_center.approve_document"
+  | "document_center.close_document"
+  | "document_center.delete_document"
+  | "document_center.view_stats";
 
 const moduleMap: Record<ServiceAction, string[]> = {
   "service.view_internal": ["crm", "reports", "finance", "expenses", "safety", "accreditation", "document_center"],
@@ -82,6 +119,43 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "accreditation.generate_documents": ["accreditation"],
   "accreditation.recompute_checks": ["accreditation"],
   "accreditation.view_compliance": ["accreditation"],
+  // Billing
+  "billing.view_dashboard": ["finance"],
+  "billing.create_document": ["finance"],
+  "billing.edit_document": ["finance"],
+  "billing.delete_document": ["finance"],
+  "billing.simulate_sii": ["finance"],
+  "billing.register_payment": ["finance"],
+  "billing.send_document": ["finance"],
+  // Reports
+  "reports.view_dashboard": ["reports"],
+  "reports.create_report": ["reports"],
+  "reports.edit_report": ["reports"],
+  "reports.close_report": ["reports"],
+  "reports.create_checkpoint": ["reports"],
+  "reports.edit_checkpoint": ["reports"],
+  "reports.add_photo": ["reports"],
+  // Safety
+  "safety.save_checklist": ["safety"],
+  "safety.delete_checklist": ["safety"],
+  "safety.export_miper": ["safety"],
+  "safety.generate_risk_matrix": ["safety"],
+  "safety.generate_irl": ["safety"],
+  "safety.save_irl": ["safety"],
+  "safety.delete_irl": ["safety"],
+  "safety.save_ppe_delivery": ["safety"],
+  "safety.delete_ppe_delivery": ["safety"],
+  "safety.save_talk": ["safety"],
+  "safety.delete_talk": ["safety"],
+  "safety.seed_catalogs": ["safety"],
+  // Document Center
+  "document_center.save_template": ["document_center"],
+  "document_center.delete_template": ["document_center"],
+  "document_center.generate_document": ["document_center"],
+  "document_center.approve_document": ["document_center"],
+  "document_center.close_document": ["document_center"],
+  "document_center.delete_document": ["document_center"],
+  "document_center.view_stats": ["document_center"],
 };
 
 function fallbackModulesForRole(role: string | null): string[] {

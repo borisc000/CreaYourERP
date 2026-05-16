@@ -5,6 +5,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -34,6 +35,8 @@ export const saveTalk = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.save_talk", { companyId });
 
     const { id, folderId, talkDate, topic, speakerUserId, attendeeIds, notes } =
       request.data as TalkPayload;
@@ -93,6 +96,8 @@ export const deleteTalk = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.delete_talk", { companyId });
 
     const { id } = request.data as { id: string };
     if (!id) {

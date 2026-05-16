@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import type { SafetyFolder, Lead } from "@/types";
 import { ShieldCheckIcon, PlusIcon, MagnifyingGlassIcon, FunnelIcon } from "@heroicons/react/24/outline";
 
@@ -21,6 +22,7 @@ const statusLabels: Record<string, string> = {
 export function SafetyFolderList() {
   const navigate = useNavigate();
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const { data: folders, isLoading } = useFirestoreCollection<SafetyFolder>("safetyFolders");
   const { data: leads } = useFirestoreCollection<Lead>("leads");
 
@@ -48,13 +50,15 @@ export function SafetyFolderList() {
           </h1>
           <p className="text-gray-400 text-sm mt-1">Gestión de prevención de riesgos por faena</p>
         </div>
-        <button
-          onClick={() => navigate("/safety/new")}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <PlusIcon className="w-4 h-4" />
-          Nueva Carpeta
-        </button>
+        {hasPermission("safety.save_checklist") && (
+          <button
+            onClick={() => navigate("/safety/new")}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Nueva Carpeta
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -102,12 +106,14 @@ export function SafetyFolderList() {
           <div className="text-center py-12">
             <ShieldCheckIcon className="w-12 h-12 text-gray-700 mx-auto mb-3" />
             <p className="text-gray-500 text-sm">No hay carpetas de seguridad</p>
-            <button
-              onClick={() => navigate("/safety/new")}
-              className="text-emerald-400 text-sm mt-2 hover:text-emerald-300"
-            >
-              Crear la primera →
-            </button>
+            {hasPermission("safety.save_checklist") && (
+              <button
+                onClick={() => navigate("/safety/new")}
+                className="text-emerald-400 text-sm mt-2 hover:text-emerald-300"
+              >
+                Crear la primera →
+              </button>
+            )}
           </div>
         ) : (
           <table className="w-full text-sm">

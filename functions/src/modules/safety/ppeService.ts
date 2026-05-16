@@ -5,6 +5,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -35,6 +36,8 @@ export const savePPEDelivery = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.save_ppe_delivery", { companyId });
 
     const { id, folderId, employeeId, deliveryDate, status, items, notes, documentTemplateId } =
       request.data as PPEDeliveryPayload;
@@ -106,6 +109,8 @@ export const deletePPEDelivery = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.delete_ppe_delivery", { companyId });
 
     const { id } = request.data as { id: string };
     if (!id) {

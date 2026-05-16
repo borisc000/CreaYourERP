@@ -11,6 +11,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 interface GenerateMatrixPayload {
   folderId: string;
@@ -178,6 +179,8 @@ export const generateRiskMatrix = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.generate_risk_matrix", { companyId });
 
     const { folderId } = request.data as GenerateMatrixPayload;
     if (!folderId) {

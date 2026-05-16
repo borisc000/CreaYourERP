@@ -5,6 +5,7 @@ import { db } from "@/firebase/config";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import type { BillingDocument, BillingLine, BillingEvent } from "@/types";
 import {
   ArrowLeftIcon,
@@ -76,6 +77,7 @@ export function BillingDocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const [docData, setDocData] = useState<BillingDocument | null>(null);
   const [lines, setLines] = useState<BillingLine[]>([]);
   const [events, setEvents] = useState<BillingEvent[]>([]);
@@ -227,7 +229,7 @@ export function BillingDocumentDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {editable && (
+          {editable && hasPermission("billing.edit_document") && (
             <button
               onClick={() => navigate(`/billing/documents/${id}/edit`)}
               className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
@@ -236,14 +238,16 @@ export function BillingDocumentDetail() {
               Editar
             </button>
           )}
-          <button
-            onClick={handleSendToCustomer}
-            disabled={actionLoading === "send" || !!docData.sentToCustomerAt}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <PaperAirplaneIcon className="w-4 h-4" />
-            {docData.sentToCustomerAt ? "Enviado" : "Enviar Cliente"}
-          </button>
+          {hasPermission("billing.send_document") && (
+            <button
+              onClick={handleSendToCustomer}
+              disabled={actionLoading === "send" || !!docData.sentToCustomerAt}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <PaperAirplaneIcon className="w-4 h-4" />
+              {docData.sentToCustomerAt ? "Enviado" : "Enviar Cliente"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -402,7 +406,7 @@ export function BillingDocumentDetail() {
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-3">
             <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-2">Acciones</h2>
 
-            {docData.siiStatus !== "accepted" && (
+            {docData.siiStatus !== "accepted" && hasPermission("billing.simulate_sii") && (
               <div className="space-y-2">
                 <p className="text-xs text-gray-500 uppercase tracking-wider">Simular SII</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -438,7 +442,7 @@ export function BillingDocumentDetail() {
               </div>
             )}
 
-            {docData.totalAmount > 0 && docData.paymentStatus !== "paid" && (
+            {docData.totalAmount > 0 && docData.paymentStatus !== "paid" && hasPermission("billing.register_payment") && (
               <div className="pt-3 border-t border-gray-800">
                 <button
                   onClick={() => setShowPaymentForm((s) => !s)}

@@ -67,3 +67,9 @@ export async function cancelQuote(quoteId: string): Promise<{ id: string; status
   const result = await fn({ quoteId });
   return result.data as { id: string; status: string };
 }
+
+export async function deleteQuote(quoteId: string): Promise<{ id: string; deleted: boolean }> {
+  const fn = httpsCallable(functions, "deleteQuote");
+  const result = await fn({ quoteId });
+  return result.data as { id: string; deleted: boolean };
+}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { usePermission } from "../../hooks/usePermission";
 import { useFirestoreDocument, useFirestoreCollection } from "../../hooks/useFirestore";
 import { Report, ReportCheckpoint, ReportPhoto } from "../../types";
 import { httpsCallable } from "firebase/functions";
@@ -8,6 +9,7 @@ import { functions } from "../../firebase/config";
 
 export default function ReportDetail() {
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const { id } = useParams();
   const navigate = useNavigate();
   const { data: report } = useFirestoreDocument<Report>(
@@ -54,10 +56,12 @@ export default function ReportDetail() {
           <p className="text-gray-500 mt-1">{report.servicio} | {report.empresa} | {report.area}/{report.sector}</p>
         </div>
         <div className="flex gap-3">
-          {report.status !== "cerrado" && (
+          {report.status !== "cerrado" && hasPermission("reports.close_report") && (
             <button onClick={handleClose} className="erp-btn-primary">Cerrar reporte</button>
           )}
-          <button onClick={() => navigate(`/reports/${id}/edit`)} className="erp-btn-secondary">Editar</button>
+          {hasPermission("reports.edit_report") && (
+            <button onClick={() => navigate(`/reports/${id}/edit`)} className="erp-btn-secondary">Editar</button>
+          )}
         </div>
       </div>
 
@@ -69,7 +73,9 @@ export default function ReportDetail() {
 
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-bold">Checkpoints ({checkpoints.length})</h2>
-        <button onClick={() => setShowCheckpointForm(true)} className="erp-btn-primary">+ Agregar checkpoint</button>
+        {hasPermission("reports.create_checkpoint") && (
+          <button onClick={() => setShowCheckpointForm(true)} className="erp-btn-primary">+ Agregar checkpoint</button>
+        )}
       </div>
 
       {showCheckpointForm && (

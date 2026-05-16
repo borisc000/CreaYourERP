@@ -7,6 +7,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db, storage } from "../../config";
 import { buildWorkerPDF } from "../../shared/pdfGenerator";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -44,6 +45,8 @@ export const generateWorkerDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "document_center.generate_document", { companyId });
 
     const payload = request.data as WorkerGeneratePayload;
     if (!payload.templateId || !payload.employeeId) {

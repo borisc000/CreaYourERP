@@ -5,6 +5,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -36,6 +37,8 @@ export const saveChecklist = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.save_checklist", { companyId });
 
     const { id, folderId, checklistName, checklistType, executedAt, result, items, findings, requiresAction } =
       request.data as ChecklistPayload;
@@ -97,6 +100,8 @@ export const deleteChecklist = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.delete_checklist", { companyId });
 
     const { id } = request.data as { id: string };
     if (!id) {

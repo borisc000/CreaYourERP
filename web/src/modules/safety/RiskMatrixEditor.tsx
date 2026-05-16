@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import type { SafetyRiskMatrix, SafetyRiskMatrixRow } from "@/types";
 import { TableCellsIcon, TrashIcon, PlusIcon, CalculatorIcon } from "@heroicons/react/24/outline";
 
@@ -20,6 +21,7 @@ const severityColors: Record<string, string> = {
 
 export function RiskMatrixEditor({ folderId, onGenerate, isGenerating }: RiskMatrixEditorProps) {
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const [matrix, setMatrix] = useState<SafetyRiskMatrix | null>(null);
   const [rows, setRows] = useState<SafetyRiskMatrixRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,13 +136,15 @@ export function RiskMatrixEditor({ folderId, onGenerate, isGenerating }: RiskMat
       <div className="text-center py-12">
         <TableCellsIcon className="w-12 h-12 text-gray-700 mx-auto mb-3" />
         <p className="text-gray-500 text-sm mb-4">No hay matriz MIPER generada</p>
-        <button
-          onClick={onGenerate}
-          disabled={isGenerating}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          {isGenerating ? "Generando..." : "Generar Matriz MIPER"}
-        </button>
+        {hasPermission("safety.generate_risk_matrix") && (
+          <button
+            onClick={onGenerate}
+            disabled={isGenerating}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            {isGenerating ? "Generando..." : "Generar Matriz MIPER"}
+          </button>
+        )}
       </div>
     );
   }
@@ -167,14 +171,16 @@ export function RiskMatrixEditor({ folderId, onGenerate, isGenerating }: RiskMat
               {importantCount} importantes
             </span>
           )}
-          <button
-            onClick={onGenerate}
-            disabled={isGenerating}
-            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
-          >
-            <CalculatorIcon className="w-3.5 h-3.5" />
-            {isGenerating ? "Generando..." : "Regenerar"}
-          </button>
+          {hasPermission("safety.generate_risk_matrix") && (
+            <button
+              onClick={onGenerate}
+              disabled={isGenerating}
+              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
+            >
+              <CalculatorIcon className="w-3.5 h-3.5" />
+              {isGenerating ? "Generando..." : "Regenerar"}
+            </button>
+          )}
         </div>
       </div>
 
