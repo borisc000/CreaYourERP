@@ -58,3 +58,27 @@ export async function triggerDocumentGeneration(accreditationCheckId: string): P
   const result = await fn({ accreditationCheckId });
   return result.data as { generated: number; skipped: number; requests: Array<{ id: string; status: string; error?: string }> };
 }
+
+export async function bulkAssignCrew(serviceOrderId: string, assignments: Array<{ employeeId: string; role: string }>): Promise<{ serviceOrderId: string; results: Array<{ id: string; employeeId: string; status: string }>; assignedCount: number; skippedCount: number }> {
+  const fn = httpsCallable(functions, "bulkAssignCrew");
+  const result = await fn({ serviceOrderId, assignments });
+  return result.data as { serviceOrderId: string; results: Array<{ id: string; employeeId: string; status: string }>; assignedCount: number; skippedCount: number };
+}
+
+export interface ExpiringDocument {
+  accreditationId: string;
+  employeeId: string;
+  employeeName?: string;
+  requirementId: string;
+  requirementName?: string;
+  documentUrl?: string;
+  validUntil: string;
+  daysRemaining: number;
+  serviceOrderIds: string[];
+}
+
+export async function checkExpiringDocuments(daysAhead?: number): Promise<{ expiring: ExpiringDocument[]; total: number; daysAhead: number }> {
+  const fn = httpsCallable(functions, "checkExpiringDocuments");
+  const result = await fn({ daysAhead });
+  return result.data as { expiring: ExpiringDocument[]; total: number; daysAhead: number };
+}

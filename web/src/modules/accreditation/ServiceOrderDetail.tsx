@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { doc, getDoc, onSnapshot, collection, query, where, orderBy } from "firebase/firestore";
 import { db } from "@/firebase/config";
-import { assignCrewMember, removeCrewMember, authorizeCrew, recomputeChecks, triggerDocumentGeneration } from "@/services/accreditation";
+import { assignCrewMember, removeCrewMember, authorizeCrew, recomputeChecks, triggerDocumentGeneration, bulkAssignCrew, checkExpiringDocuments } from "@/services/accreditation";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ServiceOrder, Lead, Customer, Employee, CrewAssignment, AccreditationCheck, AccreditationRequirement } from "@/types";
 import {
@@ -45,10 +45,27 @@ export function ServiceOrderDetail() {
   const [selectedRole, setSelectedRole] = useState("worker");
   const [recomputing, setRecomputing] = useState(false);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [selectedBulkEmployees, setSelectedBulkEmployees] = useState<string[]>([]);
+  const [bulkRole, setBulkRole] = useState("worker");
+  const [expiringAlerts, setExpiringAlerts] = useState<Array<{ employeeName?: string; requirementName?: string; daysRemaining: number }>>([]);
+  const [checkingExpiring, setCheckingExpiring] = useState(false);
 
   useEffect(() => {
     if (!id || !companyId) return;
     setLoading(true);
+
+    // Verificar documentos por vencer para esta orden
+    setCheckingExpiring(true);
+    checkExpiringDocuments(30).then((result) => {
+      const crewEmployeeIds = new Set(crew.map((c) => c.employeeId));
+      const relevant = result.expiring.filter((e) => crewEmployeeIds.has(e.employeeId) && e.serviceOrderIds.includes(id));
+      setExpiringAlerts(relevant.map((e) => ({
+        employeeName: e.employeeName,
+        requirementName: e.requirementName,
+        daysRemaining: e.daysRemaining,
+      })));
+    }).catch(console.error).finally(() => setCheckingExpiring(false));
 
     const unsubOrder = onSnapshot(doc(db, "companies", companyId, "serviceOrders", id), async (snap) => {
       if (snap.exists()) {
@@ -151,12 +168,30 @@ export function ServiceOrderDetail() {
     setGeneratingFor(checkId);
     try {
       const result = await triggerDocumentGeneration(checkId);
-      const msg = result.requests.map((r) => `${r.status}`).join(", ");
       alert(`Generación completada: ${result.generated} generados, ${result.skipped} sin template`);
     } catch (err: any) {
       alert("Error al generar documentos: " + (err.message || "desconocido"));
     } finally {
       setGeneratingFor(null);
+    }
+  };
+
+  const handleBulkAssign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !companyId || selectedBulkEmployees.length === 0) return;
+
+    const assignments = selectedBulkEmployees.map((empId) => ({
+      employeeId: empId,
+      role: bulkRole,
+    }));
+
+    try {
+      const result = await bulkAssignCrew(id, assignments);
+      alert(`Asignación masiva completada: ${result.assignedCount} asignados, ${result.skippedCount} omitidos`);
+      setSelectedBulkEmployees([]);
+      setShowBulkAssign(false);
+    } catch (err: any) {
+      alert("Error en asignación masiva: " + (err.message || "desconocido"));
     }
   };
 
@@ -288,6 +323,23 @@ export function ServiceOrderDetail() {
 
         {/* Right column - Crew & Accreditation */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Alertas de vencimiento */}
+          {expiringAlerts.length > 0 && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <ExclamationTriangleIcon className="w-4 h-4 text-yellow-400" />
+                <h3 className="text-sm font-semibold text-yellow-400">Documentos por vencer</h3>
+              </div>
+              <div className="space-y-1">
+                {expiringAlerts.map((alert, idx) => (
+                  <p key={idx} className="text-xs text-yellow-300/80">
+                    {alert.employeeName} — {alert.requirementName} ({alert.daysRemaining} días)
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Crew */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
@@ -315,6 +367,13 @@ export function ServiceOrderDetail() {
                     Autorizar
                   </button>
                 )}
+                <button
+                  onClick={() => setShowBulkAssign(!showBulkAssign)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 text-xs font-medium rounded-lg transition-colors"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  Bulk
+                </button>
                 <button
                   onClick={() => setShowAddCrew(!showAddCrew)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-xs font-medium rounded-lg transition-colors"
@@ -357,6 +416,56 @@ export function ServiceOrderDetail() {
                   <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
                     Asignar
                   </button>
+                </div>
+              </form>
+            )}
+
+            {showBulkAssign && (
+              <form onSubmit={handleBulkAssign} className="mb-4 p-4 bg-purple-500/5 border border-purple-500/20 rounded-lg space-y-3">
+                <p className="text-sm text-purple-300 font-medium">Asignación masiva de cuadrilla</p>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {employees
+                    .filter((e) => !crew.some((c) => c.employeeId === e.id))
+                    .map((e) => (
+                      <label key={e.id} className="flex items-center gap-2 p-2 bg-gray-900 rounded cursor-pointer hover:bg-gray-800 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={selectedBulkEmployees.includes(e.id)}
+                          onChange={(ev) => {
+                            if (ev.target.checked) {
+                              setSelectedBulkEmployees((prev) => [...prev, e.id]);
+                            } else {
+                              setSelectedBulkEmployees((prev) => prev.filter((id) => id !== e.id));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-gray-600 text-purple-500 focus:ring-purple-500/50"
+                        />
+                        <span className="text-sm text-white">{e.firstName} {e.lastName}</span>
+                      </label>
+                    ))}
+                </div>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={bulkRole}
+                    onChange={(e) => setBulkRole(e.target.value)}
+                    className="w-40 px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-purple-500"
+                  >
+                    {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                  <div className="flex-1 flex justify-end gap-2">
+                    <button type="button" onClick={() => setShowBulkAssign(false)} className="px-3 py-2 text-xs text-gray-400 hover:text-white transition-colors">
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={selectedBulkEmployees.length === 0}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      Asignar {selectedBulkEmployees.length > 0 ? `(${selectedBulkEmployees.length})` : ""}
+                    </button>
+                  </div>
                 </div>
               </form>
             )}

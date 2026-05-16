@@ -21,6 +21,8 @@ import { authorizeCrew } from "./modules/accreditation/authorizeCrew";
 import { recomputeChecks } from "./modules/accreditation/recomputeChecks";
 import { detectGaps } from "./modules/accreditation/detectGaps";
 import { triggerDocumentGeneration } from "./modules/accreditation/triggerDocumentGeneration";
+import { bulkAssignCrew } from "./modules/accreditation/bulkAssignCrew";
+import { checkExpiringDocuments } from "./modules/accreditation/checkExpiringDocuments";
 import { onEmployeeHired } from "./modules/hr/onEmployeeHired";
 import { createEmployee } from "./modules/hr/createEmployee";
 import { updateEmployee } from "./modules/hr/updateEmployee";
@@ -113,6 +115,8 @@ export { authorizeCrew };
 export { recomputeChecks };
 export { detectGaps };
 export { triggerDocumentGeneration };
+export { bulkAssignCrew };
+export { checkExpiringDocuments };
 
 export const onCrewAssigned = onDocumentCreated(
   {
@@ -128,6 +132,49 @@ export const onCrewAssigned = onDocumentCreated(
       await checkCrewCompliance(companyId, assignmentId, data as any);
     } catch (error) {
       console.error("Error verificando acreditación:", error);
+    }
+  }
+);
+
+export const onAccreditationUpdated = onDocumentUpdated(
+  {
+    document: "companies/{companyId}/employees/{employeeId}/accreditations/{accreditationId}",
+    region: "southamerica-west1",
+  },
+  async (event) => {
+    const { companyId, employeeId } = event.params;
+    const after = event.data?.after.data();
+    const before = event.data?.before.data();
+    if (!after) return;
+
+    // Solo recompute si el status cambió a "valid"
+    const becameValid = after.status === "valid" && before?.status !== "valid";
+    if (!becameValid) return;
+
+    try {
+      // Buscar asignaciones activas de este empleado
+      const assignmentsSnap = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("crewAssignments")
+        .where("employeeId", "==", employeeId)
+        .where("status", "in", ["assigned", "active"])
+        .get();
+
+      for (const doc of assignmentsSnap.docs) {
+        const data = doc.data();
+        try {
+          await checkCrewCompliance(companyId, doc.id, {
+            serviceOrderId: data.serviceOrderId,
+            employeeId: data.employeeId,
+            role: data.role || "worker",
+          });
+        } catch (err) {
+          console.error(`[onAccreditationUpdated] Recompute falló para assignment ${doc.id}:`, err);
+        }
+      }
+    } catch (error) {
+      console.error("[onAccreditationUpdated] Error:", error);
     }
   }
 );
