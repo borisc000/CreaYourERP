@@ -365,6 +365,23 @@ export interface QuoteTemplate {
   createdAt: string;
 }
 
+export type CatalogType = "service" | "worker" | "item";
+
+export interface CatalogItem {
+  id: string;
+  companyId: string;
+  catalogType: CatalogType;
+  code: string;
+  name: string;
+  description?: string;
+  unitPrice: number;
+  unit?: string;
+  category?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface QuoteLine {
   id: string;
   sectionType: "SERVICIOS" | "PERSONAL" | "INSUMOS";

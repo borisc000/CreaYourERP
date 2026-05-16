@@ -10,6 +10,7 @@ import { QuoteList } from "./modules/quotes/QuoteList";
 import { QuoteForm } from "./modules/quotes/QuoteForm";
 import { QuoteDetail } from "./modules/quotes/QuoteDetail";
 import { QuotePreview } from "./modules/quotes/QuotePreview";
+import { CatalogManager } from "./modules/quotes/CatalogManager";
 import { CustomerList } from "./modules/crm/CustomerList";
 import { CustomerForm } from "./modules/crm/CustomerForm";
 import { CustomerDetail } from "./modules/crm/CustomerDetail";
@@ -157,6 +158,7 @@ function App() {
                 <Route path="/quotes/new" element={<QuoteForm />} />
                 <Route path="/quotes/:id" element={<QuoteDetail />} />
                 <Route path="/quotes/:id/edit" element={<QuoteForm />} />
+                <Route path="/quotes/catalog/:type" element={<CatalogManager />} />
 
                 {/* CRM */}
                 <Route path="/crm/customers" element={<CustomerList />} />

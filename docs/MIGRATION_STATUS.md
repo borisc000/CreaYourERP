@@ -25,7 +25,7 @@
 |--------|-------------|----------|---------------------|------------------|--------------|
 | Auth / Base | Parcial avanzado | Login, registro, onboarding, roles | `onUserCreate`, onboarding, claims | Permisos granulares por accion aun no son transversales | STAGING_VS_LEGACY_COMPLETE_ANALYSIS.md |
 | CRM | Parcial avanzado | Customers, Leads, Lead dossier inicial, settings CRM, mirror autenticado | CRM callables, RBAC base, service sync, documents metadata/versionado inicial | Dossier aun no cubre todos los agregados legacy; falta hardening completo de documentos, stats y kanban | [GAP_ANALYSIS_CRM.md](./GAP_ANALYSIS_CRM.md) |
-| Quotes | Parcial avanzado | List, Form, Detail, preview A4 imprimible | `calculateQuoteTotal`, triggers, `getQuoteExportData`, **Callables CRUD + transiciones** | Falta catalogos, plantillas, control operativo completo | [GAP_ANALYSIS_QUOTES.md](./GAP_ANALYSIS_QUOTES.md) |
+| Quotes | Parcial avanzado | List, Form, Detail, preview A4 imprimible, **catalogos CRUD + picker en líneas** | `calculateQuoteTotal`, triggers, `getQuoteExportData`, **Callables CRUD + transiciones + saveCatalogItem + deleteCatalogItem** | Falta control operativo completo, bridge automático a Rentals | [GAP_ANALYSIS_QUOTES.md](./GAP_ANALYSIS_QUOTES.md) |
 | HR | Parcial avanzado | Employees, departments, job profiles, **contracts CRUD + modal**, employment status events | `onEmployeeHired`, **Callables create/update/delete employee + create/update/delete contract**, `onContractUpdated` trigger | Falta licencias, desvinculaciones formales, matriz de acreditacion HR completa | [GAP_ANALYSIS_HR.md](./GAP_ANALYSIS_HR.md) |
 | Accreditation | Parcial avanzado | Service orders, crew, compliance matrix, gaps, document generation, bulk assign, requisitos UI (checkboxes Level A/B), alertas vencimiento | `checkCrewCompliance`, assignment triggers, **Callables CRUD SO + crew assign/remove/authorize/bulk + computeCheck/detectGaps/triggerDocumentGeneration/recomputeChecks/checkExpiringDocuments**, `onAccreditationUpdated/Deleted` triggers | Falta Cloud Scheduler para alertas automáticas, invalidación requires_revalidation al modificar cuadrilla | [GAP_ANALYSIS_ACCREDITATION.md](./GAP_ANALYSIS_ACCREDITATION.md) |
 | Safety | Parcial avanzado | Safety folders, MIPER, IRL, PPE, talks, checklists | Safety callables y export | Falta motor BOT/procedimientos, validacion server-side certificada de matrices, exportacion XLSX/PDF | [GAP_ANALYSIS_SAFETY.md](./GAP_ANALYSIS_SAFETY.md) |
@@ -252,7 +252,7 @@ Cada empresa vive bajo `/companies/{companyId}`. Los modulos usan colecciones hi
 
 6. Cerrar CRM P1: dossier enriquecido con quotes/reports/expenses/rentals/safety reales.
 7. Cerrar documentos CRM: upload real a Storage, descarga autorizada, reemplazo y versionado probado.
-8. Implementar catalogos de Quotes: `ServiceCatalog`, `WorkerCatalog`, `ItemCatalog`.
+8. ~~Implementar catalogos de Quotes~~ — **Completado**: `serviceCatalog`, `workerCatalog`, `itemCatalog` con CRUD, picker en `QuoteForm`, y acción RBAC `quotes.manage_catalogs`.
 9. Decidir estrategia de motor de plantillas (DOCX vs `pdf-lib` puro).
 10. Implementar batch generation en Document Center.
 11. Implementar exportacion XLSX/PDF en Safety.

@@ -63,15 +63,23 @@ export function QuoteList() {
             {quotes.length} {quotes.length === 1 ? "cotización" : "cotizaciones"} registradas
           </p>
         </div>
-        {hasPermission("quote.create") && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate("/quotes/new")}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+            onClick={() => navigate("/quotes/catalog/service")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
           >
-            <PlusIcon className="w-4 h-4" />
-            Nueva Cotización
+            Catálogos
           </button>
-        )}
+          {hasPermission("quote.create") && (
+            <button
+              onClick={() => navigate("/quotes/new")}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Nueva Cotización
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
