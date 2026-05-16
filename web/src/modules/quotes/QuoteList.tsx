@@ -10,6 +10,7 @@ import {
   MagnifyingGlassIcon,
   ChevronRightIcon,
   PrinterIcon,
+  TruckIcon,
 } from "@heroicons/react/24/outline";
 
 export function QuoteList() {
@@ -161,6 +162,12 @@ export function QuoteList() {
                     {quote.quoteNumber && (
                       <span className="px-1.5 py-0.5 bg-gray-800 text-gray-400 text-xs rounded shrink-0">
                         {quote.quoteNumber}
+                      </span>
+                    )}
+                    {quote.rentalContractId && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-900/30 text-amber-400 text-xs rounded shrink-0">
+                        <TruckIcon className="w-3 h-3" />
+                        Arriendo
                       </span>
                     )}
                   </div>

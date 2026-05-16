@@ -419,6 +419,7 @@ export interface Quote {
   acceptedAt?: string;
   controlMeta?: Record<string, unknown>;
   controlSnapshot?: Record<string, unknown>;
+  rentalContractId?: string;
   createdBy: string;
   createdAt: string;
   updatedAt?: string;

@@ -15,6 +15,7 @@ import {
   TrashIcon,
   DocumentTextIcon,
   PrinterIcon,
+  TruckIcon,
 } from "@heroicons/react/24/outline";
 
 export function QuoteDetail() {
@@ -58,7 +59,10 @@ export function QuoteDetail() {
 
   const handleAccept = async () => {
     if (!id) return;
-    await acceptQuote(id);
+    const result = await acceptQuote(id);
+    if (result.rentalContract) {
+      navigate(`/rentals/contracts/${result.rentalContract.id}`);
+    }
   };
 
   const handleReject = async () => {
@@ -246,6 +250,17 @@ export function QuoteDetail() {
                 <div className="flex justify-between">
                   <span className="text-gray-500">Aceptada</span>
                   <span className="text-green-400">{new Date(quote.acceptedAt).toLocaleDateString("es-CL")}</span>
+                </div>
+              )}
+              {quote.rentalContractId && (
+                <div className="pt-2 mt-2 border-t border-gray-800">
+                  <button
+                    onClick={() => navigate(`/rentals/contracts/${quote.rentalContractId}`)}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-amber-900/30 hover:bg-amber-900/50 text-amber-300 text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <TruckIcon className="w-4 h-4" />
+                    Ver contrato de arriendo
+                  </button>
                 </div>
               )}
             </div>

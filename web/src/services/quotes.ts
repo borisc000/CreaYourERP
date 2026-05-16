@@ -50,10 +50,27 @@ export async function sendQuote(quoteId: string): Promise<{ id: string; status: 
   return result.data as { id: string; status: string };
 }
 
-export async function acceptQuote(quoteId: string): Promise<{ id: string; status: string }> {
+export interface AcceptQuoteResult {
+  id: string;
+  status: string;
+  wasAlreadyAccepted: boolean;
+  requiresRental: boolean;
+  rentalContract: {
+    id: string;
+    sourceQuoteId: string;
+    sourceQuoteNumber: string;
+    leadId: string;
+    customerId: string;
+    status: string;
+    title: string;
+    contractValue: number;
+  } | null;
+}
+
+export async function acceptQuote(quoteId: string): Promise<AcceptQuoteResult> {
   const fn = httpsCallable(functions, "acceptQuote");
   const result = await fn({ quoteId });
-  return result.data as { id: string; status: string };
+  return result.data as AcceptQuoteResult;
 }
 
 export async function rejectQuote(quoteId: string): Promise<{ id: string; status: string }> {
