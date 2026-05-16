@@ -382,6 +382,31 @@ export interface CatalogItem {
   updatedAt?: string;
 }
 
+export interface QuoteTemplateLine {
+  id: string;
+  sectionType: "SERVICIOS" | "PERSONAL" | "INSUMOS";
+  catalogItemId?: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discountPercent?: number;
+}
+
+export interface QuoteTemplate {
+  id: string;
+  companyId: string;
+  name: string;
+  description?: string;
+  lines: QuoteTemplateLine[];
+  taxPct: number;
+  admMarginPct: number;
+  profitMarginPct: number;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface QuoteLine {
   id: string;
   sectionType: "SERVICIOS" | "PERSONAL" | "INSUMOS";

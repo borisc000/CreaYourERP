@@ -29,6 +29,7 @@ type ServiceAction =
   | "quote.view_preview"
   | "quote.view_export"
   | "quotes.manage_catalogs"
+  | "quote.manage_templates"
   | "hr.create_employee"
   | "hr.edit_employee"
   | "hr.delete_employee"
@@ -107,6 +108,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "quote.view_preview": ["quotes"],
   "quote.view_export": ["quotes"],
   "quotes.manage_catalogs": ["quotes"],
+  "quote.manage_templates": ["quotes"],
   "hr.create_employee": ["hr"],
   "hr.edit_employee": ["hr"],
   "hr.delete_employee": ["hr"],

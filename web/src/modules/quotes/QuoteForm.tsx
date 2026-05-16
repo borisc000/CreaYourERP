@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { doc, getDoc, collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { createQuote, updateQuote } from "@/services/quotes";
@@ -43,6 +43,7 @@ function emptyLine(sectionType: QuoteLine["sectionType"]): QuoteLine {
 export function QuoteForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
   const { companyId, user } = useAuth();
   const isEdit = Boolean(id);
 
@@ -120,6 +121,35 @@ export function QuoteForm() {
       }
     });
   }, [id, companyId]);
+
+  // Load from template when creating new
+  useEffect(() => {
+    if (isEdit || !location.state?.template) return;
+    const t = location.state.template as any;
+    setForm({
+      title: t.name || "",
+      description: t.description || "",
+      leadId: "",
+      customerId: "",
+      status: "draft",
+      lines: (t.lines || []).map((l: any) => ({
+        id: crypto.randomUUID(),
+        sectionType: l.sectionType || "SERVICIOS",
+        catalogItemId: l.catalogItemId || undefined,
+        description: l.description || "",
+        quantity: l.quantity || 1,
+        unitPrice: l.unitPrice || 0,
+        subtotalLine: (l.quantity || 1) * (l.unitPrice || 0),
+      })),
+      taxPct: t.taxPct ?? 19,
+      admMarginPct: t.admMarginPct ?? 5,
+      profitMarginPct: t.profitMarginPct ?? 10,
+      notes: t.notes || "",
+      quoteDate: new Date().toISOString().split("T")[0],
+    });
+    // Clear state so reload doesn't reapply
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [isEdit, location.state, location.pathname, navigate]);
 
   // Auto-set customer when lead changes
   useEffect(() => {

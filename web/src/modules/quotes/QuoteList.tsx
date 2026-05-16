@@ -71,6 +71,12 @@ export function QuoteList() {
           >
             Catálogos
           </button>
+          <button
+            onClick={() => navigate("/quotes/templates")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            Plantillas
+          </button>
           {hasPermission("quote.create") && (
             <button
               onClick={() => navigate("/quotes/new")}

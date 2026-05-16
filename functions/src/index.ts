@@ -15,6 +15,9 @@ import { cancelQuote } from "./modules/quotes/cancelQuote";
 import { deleteQuote } from "./modules/quotes/deleteQuote";
 import { saveCatalogItem } from "./modules/quotes/saveCatalogItem";
 import { deleteCatalogItem } from "./modules/quotes/deleteCatalogItem";
+import { saveQuoteTemplate } from "./modules/quotes/saveQuoteTemplate";
+import { deleteQuoteTemplate } from "./modules/quotes/deleteQuoteTemplate";
+import { listQuoteTemplates } from "./modules/quotes/listQuoteTemplates";
 import { checkCrewCompliance } from "./modules/accreditation/checkCrewCompliance";
 import { createServiceOrder } from "./modules/accreditation/createServiceOrder";
 import { updateServiceOrder } from "./modules/accreditation/updateServiceOrder";
@@ -70,6 +73,9 @@ export { cancelQuote };
 export { deleteQuote };
 export { saveCatalogItem };
 export { deleteCatalogItem };
+export { saveQuoteTemplate };
+export { deleteQuoteTemplate };
+export { listQuoteTemplates };
 
 export const onQuoteUpdated = onDocumentUpdated(
   {
