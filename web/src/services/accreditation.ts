@@ -31,3 +31,9 @@ export async function authorizeCrew(assignmentIds: string[]): Promise<{ results:
   const result = await fn({ assignmentIds });
   return result.data as { results: Array<{ id: string; status: string }>; authorizedAt: string };
 }
+
+export async function recomputeChecks(serviceOrderId: string): Promise<{ serviceOrderId: string; checksComputed: number; totalAssignments: number; errors?: string[] }> {
+  const fn = httpsCallable(functions, "recomputeChecks");
+  const result = await fn({ serviceOrderId });
+  return result.data as { serviceOrderId: string; checksComputed: number; totalAssignments: number; errors?: string[] };
+}

@@ -18,6 +18,7 @@ import { updateServiceOrder } from "./modules/accreditation/updateServiceOrder";
 import { assignCrewMember } from "./modules/accreditation/assignCrewMember";
 import { removeCrewMember } from "./modules/accreditation/removeCrewMember";
 import { authorizeCrew } from "./modules/accreditation/authorizeCrew";
+import { recomputeChecks } from "./modules/accreditation/recomputeChecks";
 import { onEmployeeHired } from "./modules/hr/onEmployeeHired";
 import { createEmployee } from "./modules/hr/createEmployee";
 import { updateEmployee } from "./modules/hr/updateEmployee";
@@ -107,6 +108,7 @@ export { updateServiceOrder };
 export { assignCrewMember };
 export { removeCrewMember };
 export { authorizeCrew };
+export { recomputeChecks };
 
 export const onCrewAssigned = onDocumentCreated(
   {

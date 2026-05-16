@@ -149,8 +149,17 @@ service cloud.firestore {
 
     match /companies/{companyId}/accreditationChecks/{checkId} {
       allow read: if belongsToCompany(companyId);
-      allow create, update: if belongsToCompany(companyId);
-      allow delete: if isCompanyAdmin(companyId);
+      allow create, update, delete: if false;
+    }
+
+    match /companies/{companyId}/documentGenerationRequests/{reqId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update, delete: if false;
+    }
+
+    match /companies/{companyId}/employees/{employeeId}/accreditations/{accId} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update, delete: if false;
     }
 
     match /companies/{companyId}/accreditationRequirements/{reqId} {

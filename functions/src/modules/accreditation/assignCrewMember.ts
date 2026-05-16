@@ -6,6 +6,7 @@ import {
   companyRef,
   getServiceOrder,
 } from "./accreditationService";
+import { checkCrewCompliance } from "./checkCrewCompliance";
 
 export const assignCrewMember = onCall(
   { region: "us-central1", cors },
@@ -74,6 +75,18 @@ export const assignCrewMember = onCall(
         createdAt: now,
       });
     });
+
+    // Verificar compliance post-asignación (fuera de transacción para evitar lecturas adicionales en tx)
+    try {
+      await checkCrewCompliance(companyId, assignmentRef.id, {
+        serviceOrderId,
+        employeeId,
+        role,
+      });
+    } catch (err: any) {
+      console.error("[assignCrewMember] Error en checkCrewCompliance:", err);
+      // No fallamos la asignación si el compliance check falla; se puede recompute manualmente
+    }
 
     return { id: assignmentRef.id, ...assignmentData };
   }

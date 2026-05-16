@@ -555,13 +555,17 @@ export interface CrewAssignment {
 export interface DocumentGenerationRequest {
   id: string;
   companyId: string;
+  accreditationCheckId: string;
   serviceOrderId: string;
   employeeId: string;
   requirementId: string;
-  status: "pending" | "generating" | "completed" | "failed";
   templateId?: string;
-  generatedDocumentUrl?: string;
+  generatedDocumentId?: string;
+  signatureRequestId?: string;
+  accreditationDocumentId?: string;
+  status: "pending" | "template_found" | "generating" | "generated" | "signature_pending" | "signed" | "failed" | "skipped";
   errorMessage?: string;
+  personalizationData?: Record<string, any>;
   createdAt: string;
   completedAt?: string;
 }
@@ -599,6 +603,7 @@ export interface AccreditationCheck {
   levelBValid: number;
   levelBMissingIds: string[];
   overallStatus: "compliant" | "attention" | "non_compliant";
+  pendingGenerationIds?: string[];
   lastCheckedAt?: string;
 }
 
@@ -706,8 +711,18 @@ export interface EmployeeAccreditation {
   referenceId: string; // requirementId or courseId
   status: "pending" | "valid" | "expired" | "rejected";
   documentUrl?: string;
+  documentOrigin?: string;
+  templateId?: string;
+  generatedDocumentId?: string;
+  verificationStatus?: "pending_review" | "approved" | "rejected";
+  signatureStatus?: "not_required" | "pending" | "signed";
+  signedDocumentUrl?: string;
+  sourceModule?: string;
+  issuedOn?: string;
+  expiresOn?: string;
   validFrom?: string;
   validUntil?: string;
+  notes?: string;
   createdAt: string;
 }
 
