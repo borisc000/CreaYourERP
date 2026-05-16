@@ -18,6 +18,8 @@ import { deleteCatalogItem } from "./modules/quotes/deleteCatalogItem";
 import { saveQuoteTemplate } from "./modules/quotes/saveQuoteTemplate";
 import { deleteQuoteTemplate } from "./modules/quotes/deleteQuoteTemplate";
 import { createBillingDocumentFromQuote } from "./modules/billing/createFromQuote";
+import { exportSafetyMatrixPdf } from "./modules/safety/exportMatrixPdf";
+import { exportSafetyMatrixXlsx } from "./modules/safety/exportMatrixXlsx";
 import { listQuoteTemplates } from "./modules/quotes/listQuoteTemplates";
 import { checkCrewCompliance } from "./modules/accreditation/checkCrewCompliance";
 import { createServiceOrder } from "./modules/accreditation/createServiceOrder";
@@ -78,6 +80,8 @@ export { saveQuoteTemplate };
 export { deleteQuoteTemplate };
 export { listQuoteTemplates };
 export { createBillingDocumentFromQuote };
+export { exportSafetyMatrixPdf };
+export { exportSafetyMatrixXlsx };
 
 export const onQuoteUpdated = onDocumentUpdated(
   {

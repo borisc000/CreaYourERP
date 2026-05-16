@@ -4,7 +4,8 @@ import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
 import type { SafetyRiskMatrix, SafetyRiskMatrixRow } from "@/types";
-import { TableCellsIcon, TrashIcon, PlusIcon, CalculatorIcon } from "@heroicons/react/24/outline";
+import { TableCellsIcon, TrashIcon, PlusIcon, CalculatorIcon, DocumentArrowDownIcon } from "@heroicons/react/24/outline";
+import { exportSafetyMatrixPdf, exportSafetyMatrixXlsx } from "@/services/safetyExport";
 
 interface RiskMatrixEditorProps {
   folderId: string;
@@ -170,6 +171,24 @@ export function RiskMatrixEditor({ folderId, onGenerate, isGenerating }: RiskMat
             <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">
               {importantCount} importantes
             </span>
+          )}
+          {hasPermission("safety.export_miper") && (
+            <>
+              <button
+                onClick={() => matrix && exportSafetyMatrixPdf(matrix.id)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium rounded-lg transition-colors"
+              >
+                <DocumentArrowDownIcon className="w-3.5 h-3.5" />
+                PDF
+              </button>
+              <button
+                onClick={() => matrix && exportSafetyMatrixXlsx(matrix.id)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium rounded-lg transition-colors"
+              >
+                <DocumentArrowDownIcon className="w-3.5 h-3.5" />
+                Excel
+              </button>
+            </>
           )}
           {hasPermission("safety.generate_risk_matrix") && (
             <button
