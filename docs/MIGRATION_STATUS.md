@@ -2,7 +2,7 @@
 
 > **Ultima actualizacion:** 2026-05-15  
 > **Rama revisada:** `staging`  
-> **Ultimo commit funcional documentado:** `8590b0e` (`feat(accreditation): Fase 6 — UI consolidada para pipeline documental`)
+> **Ultimo commit funcional documentado:** `cdab176` (`feat(accreditation): Brechas remanentes post-P0.1`)
 
 ## Resumen General (Legacy vs Staging)
 
@@ -27,7 +27,7 @@
 | CRM | Parcial avanzado | Customers, Leads, Lead dossier inicial, settings CRM, mirror autenticado | CRM callables, RBAC base, service sync, documents metadata/versionado inicial | Dossier aun no cubre todos los agregados legacy; falta hardening completo de documentos, stats y kanban | [GAP_ANALYSIS_CRM.md](./GAP_ANALYSIS_CRM.md) |
 | Quotes | Parcial avanzado | List, Form, Detail, preview A4 imprimible | `calculateQuoteTotal`, triggers, `getQuoteExportData`, **Callables CRUD + transiciones** | Falta catalogos, plantillas, control operativo completo | [GAP_ANALYSIS_QUOTES.md](./GAP_ANALYSIS_QUOTES.md) |
 | HR | Parcial avanzado | Employees, departments, job profiles | `onEmployeeHired`, **Callables create/update con validación RUT y auto-código** | Falta contratos, licencias, desvinculaciones, matriz de acreditacion | [GAP_ANALYSIS_HR.md](./GAP_ANALYSIS_HR.md) |
-| Accreditation | Parcial avanzado | Service orders, crew, compliance matrix, gaps, document generation | `checkCrewCompliance`, assignment triggers, **Callables CRUD SO + crew assign/remove/authorize + computeCheck/detectGaps/triggerDocumentGeneration/recomputeChecks** | Falta bulk assign, requisitos por orden UI, alertas de vencimiento | [GAP_ANALYSIS_ACCREDITATION.md](./GAP_ANALYSIS_ACCREDITATION.md) |
+| Accreditation | Parcial avanzado | Service orders, crew, compliance matrix, gaps, document generation, bulk assign, requisitos UI, alertas vencimiento | `checkCrewCompliance`, assignment triggers, **Callables CRUD SO + crew assign/remove/authorize/bulk + computeCheck/detectGaps/triggerDocumentGeneration/recomputeChecks/checkExpiringDocuments** | Falta Cloud Scheduler para alertas automáticas, invalidación requires_revalidation al modificar cuadrilla | [GAP_ANALYSIS_ACCREDITATION.md](./GAP_ANALYSIS_ACCREDITATION.md) |
 | Safety | Parcial avanzado | Safety folders, MIPER, IRL, PPE, talks, checklists | Safety callables y export | Falta motor BOT/procedimientos, validacion server-side certificada de matrices, exportacion XLSX/PDF | [GAP_ANALYSIS_SAFETY.md](./GAP_ANALYSIS_SAFETY.md) |
 | Document Center | Parcial avanzado | Templates + generated docs | Generation/lifecycle services | Falta motor DOCX real, batch generation, firma integrada con layouts | [GAP_ANALYSIS_DOCUMENT_CENTER.md](./GAP_ANALYSIS_DOCUMENT_CENTER.md) |
 | Signature | Parcial | Signature center | Signature service inicial | Falta layout designer, flujo publico robusto, sellado criptografico | [GAP_ANALYSIS_SIGNATURE.md](./GAP_ANALYSIS_SIGNATURE.md) |

@@ -66,7 +66,7 @@ Los API routes del Python exponen ~15 endpoints. **Los writes criticos ya están
 | `PUT /api/accreditation/service-orders/{id}/requirements` | Actualizar reqs Level B | ⚠️ Parcial (ServiceOrderForm aún sin selector multi-req). |
 | `GET /api/accreditation/service-orders/{id}/crew` | Listar crew | ✅ Frontend lee subcolección directamente. |
 | `POST /api/accreditation/service-orders/{id}/crew` | Agregar miembros | ✅ Callable `assignCrewMember` (previene duplicados + compliance check) |
-| `POST /api/accreditation/service-orders/{id}/crew/bulk` | Bulk assign con roles | ❌ No existe. Solo se puede agregar de a 1 en el UI. |
+| `POST /api/accreditation/service-orders/{id}/crew/bulk` | Bulk assign con roles | ✅ Callable `bulkAssignCrew` (asignación masiva + compliance check) |
 | `DELETE /api/accreditation/service-orders/{id}/crew/{empId}` | Remover miembro | ✅ Callable `removeCrewMember` (soft remove + audit) |
 | `POST /api/accreditation/service-orders/{id}/crew/authorize` | Autorizar cuadrilla completa | ✅ Callable `authorizeCrew` (bloquea si requires_revalidation) |
 | `POST /checks/{empId}/generate-missing` | Generar docs faltantes | ✅ Callable `triggerDocumentGeneration` (PDF + Storage + GeneratedDocument + EmployeeAccreditation) |
@@ -130,9 +130,14 @@ Crew Assigned → Compute Check (Level A/B + vencimiento) → Detect Gaps → Ma
 - **Python**: `_find_valid_doc` filtra por `verification_status=approved` **y** `expires_on >= today`.
 - **Firebase**: solo filtra `status == "valid"`. No considera fechas de vencimiento.
 
-### 4.4 Eventos y Recomputo en Cascada
+### 4.4 Eventos y Recomputo en Cascada ✅ PARCIAL
 - **Python**: al modificar crew autorizada, se invalida (`requires_revalidation`) toda la cuadrilla. Al completar firma, se recomputea el check automáticamente.
-- **Firebase**: no hay invalidación automática ni recomputo post-firma.
+- **Firebase**:
+  - `assignCrewMember` y `authorizeCrew` recomputean automáticamente
+  - `triggerDocumentGeneration` recomputea post-registro de documento
+  - `signDocument` recomputea post-firma
+  - `onAccreditationUpdated` trigger recomputea cuando un empleado sube un documento manualmente
+  - Falta invalidación automática de crew autorizada cuando se modifica la cuadrilla (`requires_revalidation`)
 
 ---
 
@@ -157,8 +162,8 @@ Crew Assigned → Compute Check (Level A/B + vencimiento) → Detect Gaps → Ma
 12. **Mostrar acreditaciones en `EmployeeDetail`**.
 
 ### Prioridad 4 — Baja (Optimizaciones)
-13. **Listener `signature.completed`** para cerrar el loop documento-firma-acreditación.
-14. **Alertas de documentos por vencer** (cron o scheduled function).
+13. ✅ **Listener `signature.completed`** implementado en `signDocument`.
+14. ⚠️ **Alertas de documentos por vencer**: callable `checkExpiringDocuments` implementado (escaneo bajo demanda). Falta Cloud Scheduler para ejecución automática diaria.
 
 ---
 
