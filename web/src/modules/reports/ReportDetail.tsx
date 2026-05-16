@@ -6,6 +6,7 @@ import { useFirestoreDocument, useFirestoreCollection } from "../../hooks/useFir
 import { Report, ReportCheckpoint, ReportPhoto } from "../../types";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase/config";
+import { publishReportMirror } from "../../services/reports";
 
 export default function ReportDetail() {
   const { companyId } = useAuth();
@@ -61,6 +62,22 @@ export default function ReportDetail() {
           )}
           {hasPermission("reports.edit_report") && (
             <button onClick={() => navigate(`/reports/${id}/edit`)} className="erp-btn-secondary">Editar</button>
+          )}
+          {id && hasPermission("reports.edit_report") && (
+            <button
+              onClick={async () => {
+                try {
+                  const result = await publishReportMirror(id);
+                  await navigator.clipboard.writeText(result.mirrorUrl);
+                  alert("Enlace de espejo público copiado al portapapeles");
+                } catch (e: any) {
+                  alert(e.message || "Error publicando espejo");
+                }
+              }}
+              className="erp-btn-secondary"
+            >
+              Copiar enlace público
+            </button>
           )}
         </div>
       </div>

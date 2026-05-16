@@ -573,6 +573,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Espejos públicos (reportes, etc.)
+    match /publicMirrors/{token} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ==========================================
     // CATCH-ALL (último recurso)
     // ==========================================

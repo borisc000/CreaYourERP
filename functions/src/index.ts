@@ -19,6 +19,7 @@ import { saveQuoteTemplate } from "./modules/quotes/saveQuoteTemplate";
 import { deleteQuoteTemplate } from "./modules/quotes/deleteQuoteTemplate";
 import { createBillingDocumentFromQuote } from "./modules/billing/createFromQuote";
 import { exportSafetyMatrixPdf } from "./modules/safety/exportMatrixPdf";
+import { publishReportMirror } from "./modules/reports/publishMirror";
 import { exportSafetyMatrixXlsx } from "./modules/safety/exportMatrixXlsx";
 import { listQuoteTemplates } from "./modules/quotes/listQuoteTemplates";
 import { checkCrewCompliance } from "./modules/accreditation/checkCrewCompliance";
@@ -81,6 +82,7 @@ export { deleteQuoteTemplate };
 export { listQuoteTemplates };
 export { createBillingDocumentFromQuote };
 export { exportSafetyMatrixPdf };
+export { publishReportMirror };
 export { exportSafetyMatrixXlsx };
 
 export const onQuoteUpdated = onDocumentUpdated(

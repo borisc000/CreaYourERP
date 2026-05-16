@@ -138,6 +138,7 @@ import { PdfWorkspacePage } from "./modules/pdfWorkspace";
 // Cross Correspondence
 import { CrossCorrespondenceList } from "./modules/crossCorrespondence";
 import { CrossCorrespondenceForm } from "./modules/crossCorrespondence";
+import { ReportMirror } from "./modules/reports/ReportMirror";
 
 function App() {
   return (
@@ -148,6 +149,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<LoginPage mode="register" />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/mirror/report/:token" element={<ReportMirror />} />
 
           {/* Protegidas */}
           <Route element={<ProtectedRoute />}>
