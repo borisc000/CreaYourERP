@@ -6,7 +6,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db, storage } from "../../config";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { buildWorkerPDF } from "../../shared/pdfGenerator";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -27,114 +27,7 @@ interface WorkerGeneratePayload {
   notes?: string;
 }
 
-async function buildWorkerPDF(
-  company: any,
-  template: any,
-  employee: any,
-  customer?: any,
-  serviceOrder?: any,
-  extraData?: any
-): Promise<Buffer> {
-  const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage();
-  const { width, height } = page.getSize();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  let y = height - 40;
-
-  // Header
-  page.drawText(company.name || "Empresa", { x: 40, y, size: 10, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
-  y -= 16;
-  page.drawText(`Documento: ${template.name}`, { x: 40, y, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
-  y -= 24;
-  page.drawText(`Generado: ${new Date().toLocaleDateString("es-CL")}`, { x: 40, y, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
-  y -= 30;
-
-  // Divider
-  page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
-  y -= 20;
-
-  // Worker section
-  page.drawText("TRABAJADOR", { x: 40, y, size: 10, font: boldFont, color: rgb(0.3, 0.3, 0.3) });
-  y -= 16;
-  const workerName = employee?.fullName || `${employee?.firstName || ""} ${employee?.lastName || ""}`.trim() || "N/A";
-  page.drawText(`Nombre: ${workerName}`, { x: 40, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
-  y -= 14;
-  page.drawText(`RUT: ${employee?.cedula || "N/A"}`, { x: 40, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
-  y -= 14;
-  page.drawText(`Cargo: ${employee?.positionTitle || "N/A"}`, { x: 40, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
-  y -= 14;
-  page.drawText(`Email: ${employee?.email || "N/A"}`, { x: 40, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
-  y -= 24;
-
-  // Context section
-  if (customer || serviceOrder || extraData) {
-    page.drawText("CONTEXTO", { x: 40, y, size: 10, font: boldFont, color: rgb(0.3, 0.3, 0.3) });
-    y -= 16;
-    if (customer) {
-      page.drawText(`Cliente: ${customer.name || "N/A"}`, { x: 40, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
-      y -= 14;
-    }
-    if (serviceOrder) {
-      page.drawText(`Orden de servicio: ${serviceOrder.title || "N/A"}`, { x: 40, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
-      y -= 14;
-    }
-    if (extraData?.documentDate) {
-      page.drawText(`Fecha documento: ${extraData.documentDate}`, { x: 40, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
-      y -= 14;
-    }
-    if (extraData?.effectiveDate) {
-      page.drawText(`Fecha efectiva: ${extraData.effectiveDate}`, { x: 40, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
-      y -= 14;
-    }
-    y -= 10;
-  }
-
-  // Detail items
-  if (extraData?.detailItems?.length) {
-    page.drawText("DETALLE", { x: 40, y, size: 10, font: boldFont, color: rgb(0.3, 0.3, 0.3) });
-    y -= 16;
-    for (const item of extraData.detailItems) {
-      page.drawText(`• ${item.label}: ${item.value}`, { x: 40, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
-      y -= 14;
-      if (y < 60) {
-        // New page
-        const newPage = pdfDoc.addPage();
-        y = newPage.getSize().height - 40;
-      }
-    }
-    y -= 10;
-  }
-
-  // Notes
-  if (extraData?.notes) {
-    page.drawText("NOTAS", { x: 40, y, size: 10, font: boldFont, color: rgb(0.3, 0.3, 0.3) });
-    y -= 16;
-    const lines = extraData.notes.split("\n");
-    for (const line of lines) {
-      page.drawText(line.slice(0, 100), { x: 40, y, size: 10, font, color: rgb(0.1, 0.1, 0.1) });
-      y -= 14;
-      if (y < 60) {
-        const newPage = pdfDoc.addPage();
-        y = newPage.getSize().height - 40;
-      }
-    }
-  }
-
-  // Footer
-  for (const p of pdfDoc.getPages()) {
-    p.drawText("Documento generado desde YourERP - No tiene validez legal sin firma", {
-      x: 40,
-      y: 30,
-      size: 8,
-      font,
-      color: rgb(0.5, 0.5, 0.5),
-    });
-  }
-
-  return Buffer.from(await pdfDoc.save());
-}
 
 export const generateWorkerDocument = onCall(
   {

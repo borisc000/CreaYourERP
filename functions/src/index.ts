@@ -20,6 +20,7 @@ import { removeCrewMember } from "./modules/accreditation/removeCrewMember";
 import { authorizeCrew } from "./modules/accreditation/authorizeCrew";
 import { recomputeChecks } from "./modules/accreditation/recomputeChecks";
 import { detectGaps } from "./modules/accreditation/detectGaps";
+import { triggerDocumentGeneration } from "./modules/accreditation/triggerDocumentGeneration";
 import { onEmployeeHired } from "./modules/hr/onEmployeeHired";
 import { createEmployee } from "./modules/hr/createEmployee";
 import { updateEmployee } from "./modules/hr/updateEmployee";
@@ -111,6 +112,7 @@ export { removeCrewMember };
 export { authorizeCrew };
 export { recomputeChecks };
 export { detectGaps };
+export { triggerDocumentGeneration };
 
 export const onCrewAssigned = onDocumentCreated(
   {

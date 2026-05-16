@@ -52,3 +52,9 @@ export async function detectGaps(accreditationCheckId: string): Promise<{ gaps: 
   const result = await fn({ accreditationCheckId });
   return result.data as { gaps: GapResult[]; fullyCompliant: boolean; serviceOrderId: string; employeeId: string };
 }
+
+export async function triggerDocumentGeneration(accreditationCheckId: string): Promise<{ generated: number; skipped: number; requests: Array<{ id: string; status: string; error?: string }> }> {
+  const fn = httpsCallable(functions, "triggerDocumentGeneration");
+  const result = await fn({ accreditationCheckId });
+  return result.data as { generated: number; skipped: number; requests: Array<{ id: string; status: string; error?: string }> };
+}
