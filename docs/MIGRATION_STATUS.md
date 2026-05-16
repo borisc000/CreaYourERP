@@ -26,7 +26,7 @@
 | Auth / Base | Parcial avanzado | Login, registro, onboarding, roles | `onUserCreate`, onboarding, claims | Permisos granulares por accion aun no son transversales | STAGING_VS_LEGACY_COMPLETE_ANALYSIS.md |
 | CRM | Parcial avanzado | Customers, Leads, Lead dossier inicial, settings CRM, mirror autenticado | CRM callables, RBAC base, service sync, documents metadata/versionado inicial | Dossier aun no cubre todos los agregados legacy; falta hardening completo de documentos, stats y kanban | [GAP_ANALYSIS_CRM.md](./GAP_ANALYSIS_CRM.md) |
 | Quotes | Parcial avanzado | List, Form, Detail, preview A4 imprimible | `calculateQuoteTotal`, triggers, `getQuoteExportData`, **Callables CRUD + transiciones** | Falta catalogos, plantillas, control operativo completo | [GAP_ANALYSIS_QUOTES.md](./GAP_ANALYSIS_QUOTES.md) |
-| HR | Parcial avanzado | Employees, departments, job profiles | `onEmployeeHired`, **Callables create/update con validación RUT y auto-código** | Falta contratos, licencias, desvinculaciones, matriz de acreditacion | [GAP_ANALYSIS_HR.md](./GAP_ANALYSIS_HR.md) |
+| HR | Parcial avanzado | Employees, departments, job profiles, **contracts CRUD + modal**, employment status events | `onEmployeeHired`, **Callables create/update/delete employee + create/update/delete contract**, `onContractUpdated` trigger | Falta licencias, desvinculaciones formales, matriz de acreditacion HR completa | [GAP_ANALYSIS_HR.md](./GAP_ANALYSIS_HR.md) |
 | Accreditation | Parcial avanzado | Service orders, crew, compliance matrix, gaps, document generation, bulk assign, requisitos UI (checkboxes Level A/B), alertas vencimiento | `checkCrewCompliance`, assignment triggers, **Callables CRUD SO + crew assign/remove/authorize/bulk + computeCheck/detectGaps/triggerDocumentGeneration/recomputeChecks/checkExpiringDocuments**, `onAccreditationUpdated/Deleted` triggers | Falta Cloud Scheduler para alertas automáticas, invalidación requires_revalidation al modificar cuadrilla | [GAP_ANALYSIS_ACCREDITATION.md](./GAP_ANALYSIS_ACCREDITATION.md) |
 | Safety | Parcial avanzado | Safety folders, MIPER, IRL, PPE, talks, checklists | Safety callables y export | Falta motor BOT/procedimientos, validacion server-side certificada de matrices, exportacion XLSX/PDF | [GAP_ANALYSIS_SAFETY.md](./GAP_ANALYSIS_SAFETY.md) |
 | Document Center | Parcial avanzado | Templates + generated docs | Generation/lifecycle services | Falta motor DOCX real, batch generation, firma integrada con layouts | [GAP_ANALYSIS_DOCUMENT_CENTER.md](./GAP_ANALYSIS_DOCUMENT_CENTER.md) |
@@ -244,7 +244,7 @@ Cada empresa vive bajo `/companies/{companyId}`. Los modulos usan colecciones hi
 
 1. Corregir o aislar CI/lint para que `staging` tenga senal confiable.
 2. Cerrar Quotes P0: CRUD server-side, send/accept/delete con validaciones y ActivityLog.
-3. Cerrar HR P0: validacion RUT, auto-codigo `EMP-{seq}`, sincronizacion de estado, contratos, licencias, desvinculaciones.
+3. Cerrar HR P0: validacion RUT, auto-codigo `EMP-{seq}`, sincronizacion de estado, **contratos CRUD + triggers**, licencias, desvinculaciones.
 4. ~~Cerrar Accreditation P0~~ — **P0.1+P0.2 completados**: `compute_check` real con Level A/B, vencimiento, `DocumentGenerationRequest`, triggers post-firma, selector de requisitos UI, recompute automático post-cambio/eliminación de documento.
 5. ~~Extender RBAC transversal~~ — **P0.2 completado** para Quotes, HR, Accreditation, Billing, Reports, Safety, Document Center.
 

@@ -27,6 +27,9 @@ import { checkExpiringDocuments } from "./modules/accreditation/checkExpiringDoc
 import { onEmployeeHired } from "./modules/hr/onEmployeeHired";
 import { createEmployee } from "./modules/hr/createEmployee";
 import { updateEmployee } from "./modules/hr/updateEmployee";
+import { createContract } from "./modules/hr/createContract";
+import { updateContract } from "./modules/hr/updateContract";
+import { deleteContract } from "./modules/hr/deleteContract";
 import { onLeadCreated } from "./modules/crm/generateProjectCode";
 import { onLeadUpdated } from "./modules/crm/activityLog";
 import { onLeadWon, ensureServiceSync } from "./modules/crm/ensureService";
@@ -35,6 +38,7 @@ import { seedSafetyCatalogs } from "./modules/safety/seedSafety";
 import { generateRiskMatrix } from "./modules/safety/generateRiskMatrix";
 import { refreshFolderMetrics } from "./modules/safety/refreshFolderMetrics";
 import { db } from "./config";
+import { cleanString } from "./modules/hr/hrService";
 
 // ==========================================
 // AUTH TRIGGERS
@@ -227,6 +231,87 @@ export const onAccreditationDeleted = onDocumentDeleted(
 );
 
 // ==========================================
+// HR TRIGGERS
+// ==========================================
+
+export const onContractUpdated = onDocumentUpdated(
+  {
+    document: "companies/{companyId}/contracts/{contractId}",
+    region: "southamerica-west1",
+  },
+  async (event) => {
+    const { companyId, contractId } = event.params;
+    const after = event.data?.after.data();
+    const before = event.data?.before.data();
+    if (!after) return;
+
+    const oldStatus = cleanString(before?.status);
+    const newStatus = cleanString(after.status);
+    if (oldStatus === newStatus) return;
+
+    const employeeId = cleanString(after.employeeId);
+    if (!employeeId) return;
+
+    const now = new Date().toISOString();
+
+    try {
+      const employeeRef = db.collection("companies").doc(companyId).collection("employees").doc(employeeId);
+
+      if (newStatus === "active") {
+        await employeeRef.update({
+          hireDate: after.startDate || null,
+          status: "active",
+          baseSalary: after.salaryAmount || null,
+          updatedAt: now,
+        });
+        await db.collection("companies").doc(companyId).collection("employmentStatusEvents").add({
+          companyId,
+          employeeId,
+          eventType: "hired",
+          previousStatus: oldStatus,
+          newStatus: "active",
+          reason: `Contrato ${contractId} activado vía trigger`,
+          effectiveDate: after.startDate || now,
+          processedBy: "system",
+          createdAt: now,
+        });
+      } else if (newStatus === "terminated") {
+        const otherActiveSnap = await db
+          .collection("companies")
+          .doc(companyId)
+          .collection("contracts")
+          .where("employeeId", "==", employeeId)
+          .where("status", "==", "active")
+          .where("__name__", "!=", contractId)
+          .limit(1)
+          .get();
+
+        if (otherActiveSnap.empty) {
+          await employeeRef.update({
+            status: "inactive",
+            terminationDate: now,
+            updatedAt: now,
+          });
+        }
+        await db.collection("companies").doc(companyId).collection("employmentStatusEvents").add({
+          companyId,
+          employeeId,
+          eventType: "terminated",
+          previousStatus: oldStatus,
+          newStatus: "terminated",
+          reason: `Contrato ${contractId} terminado vía trigger`,
+          effectiveDate: now,
+          processedBy: "system",
+          createdAt: now,
+        });
+      }
+    } catch (error) {
+      console.error("[onContractUpdated] Error:", error);
+    }
+  }
+);
+
+// ==========================================
 // CRM MODULE
 // ==========================================
 
@@ -269,6 +354,9 @@ export {
 export { onEmployeeHired };
 export { createEmployee };
 export { updateEmployee };
+export { createContract };
+export { updateContract };
+export { deleteContract };
 
 // ==========================================
 // SAFETY MODULE
