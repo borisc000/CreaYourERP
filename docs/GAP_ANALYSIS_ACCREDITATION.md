@@ -62,13 +62,15 @@ Los API routes del Python exponen ~15 endpoints. **Los writes criticos ya están
 | `GET /api/accreditation/service-orders/{id}` | Obtener orden + resumen compliance | ⚠️ Frontend arma resumen en cliente (más costoso). |
 | `PUT /api/accreditation/service-orders/{id}` | Actualizar orden | ✅ Callable `updateServiceOrder` |
 | `DELETE /api/accreditation/service-orders/{id}` | Soft-delete | ✅ Frontend hace update de status (aún directo, no crítico). |
-| `GET /api/accreditation/service-orders/{id}/requirements` | Requisitos Level A/B | ❌ No existe. |
-| `PUT /api/accreditation/service-orders/{id}/requirements` | Actualizar reqs Level B | ❌ No existe. |
+| `GET /api/accreditation/service-orders/{id}/requirements` | Requisitos Level A/B | ✅ Callable `detectGaps` + computeCheck real. |
+| `PUT /api/accreditation/service-orders/{id}/requirements` | Actualizar reqs Level B | ⚠️ Parcial (ServiceOrderForm aún sin selector multi-req). |
 | `GET /api/accreditation/service-orders/{id}/crew` | Listar crew | ✅ Frontend lee subcolección directamente. |
-| `POST /api/accreditation/service-orders/{id}/crew` | Agregar miembros | ✅ Callable `assignCrewMember` (previene duplicados) |
+| `POST /api/accreditation/service-orders/{id}/crew` | Agregar miembros | ✅ Callable `assignCrewMember` (previene duplicados + compliance check) |
 | `POST /api/accreditation/service-orders/{id}/crew/bulk` | Bulk assign con roles | ❌ No existe. Solo se puede agregar de a 1 en el UI. |
 | `DELETE /api/accreditation/service-orders/{id}/crew/{empId}` | Remover miembro | ✅ Callable `removeCrewMember` (soft remove + audit) |
-| `POST /api/accreditation/service-orders/{id}/crew/authorize` | Autorizar cuadrilla completa | ✅ Callable `authorizeCrew` (transacción atómica múltiple assignments) |
+| `POST /api/accreditation/service-orders/{id}/crew/authorize` | Autorizar cuadrilla completa | ✅ Callable `authorizeCrew` (bloquea si requires_revalidation) |
+| `POST /checks/{empId}/generate-missing` | Generar docs faltantes | ✅ Callable `triggerDocumentGeneration` (PDF + Storage + GeneratedDocument + EmployeeAccreditation) |
+| `POST /checks/recompute` | Forzar recomputo | ✅ Callable `recomputeChecks` |
 | `GET /api/accreditation/service-orders/{id}/checks` | Matriz de acreditación | ⚠️ Frontend la arma con onSnapshot de `accreditationChecks`, pero sin `compute_all_checks` garantizado. |
 | `POST /api/accreditation/service-orders/{id}/checks/recompute` | Forzar recomputo | ❌ No existe. |
 | `POST /api/accreditation/service-orders/{id}/checks/{empId}/generate-missing` | Generar docs faltantes 1 empleado | ❌ No existe. |
@@ -102,15 +104,23 @@ Los API routes del Python exponen ~15 endpoints. **Los writes criticos ya están
 
 ## 4. Endpoints / Lógica de Negocio Faltante (Resumen Ejecutivo)
 
-### 4.1 Pipeline de Documentos Automáticos (mayor gap)
+### 4.1 Pipeline de Documentos Automáticos ✅ IMPLEMENTADO (2026-05-15)
 El Python tiene un flujo end-to-end:
 ```
 Crew Assigned → Compute Check → Detect Gaps → Match Template → Generate DOCX/PDF → Signature (if needed) → Register in HR → Recompute Check
 ```
-En Firebase este pipeline **no existe**. Solo hay:
+En Firebase ahora existe el pipeline completo usando PDF (pdf-lib) en lugar de DOCX:
 ```
-Crew Assigned → Basic Compliance Check (requirements vs accreditations)
+Crew Assigned → Compute Check (Level A/B + vencimiento) → Detect Gaps → Match Template → Generate PDF → Signature (if needed) → Register EmployeeAccreditation → Recompute Check
 ```
+
+**Callables implementados:**
+- `computeCheck` / `checkCrewCompliance`: discriminación Level A/B + evaluación de vencimiento
+- `detectGaps`: template matching con preferencia customer-specific > general
+- `triggerDocumentGeneration`: genera PDF, guarda en Storage, crea GeneratedDocument, registra EmployeeAccreditation
+- `recomputeChecks`: recomputo masivo por orden de servicio
+
+**Integración con Signature:** Al completar firma (`signDocument`), se cierra el loop actualizando DGR, registrando EmployeeAccreditation como approved, y recomputando el check.
 
 ### 4.2 Nivel A vs Nivel B
 - **Python**: discrimina `AccreditationRequirement` sin `customer_id` (Level A) vs con `customer_id` (Level B) + `required_requirement_ids` explícitos.
