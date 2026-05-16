@@ -37,3 +37,18 @@ export async function recomputeChecks(serviceOrderId: string): Promise<{ service
   const result = await fn({ serviceOrderId });
   return result.data as { serviceOrderId: string; checksComputed: number; totalAssignments: number; errors?: string[] };
 }
+
+export interface GapResult {
+  requirementId: string;
+  requirementName: string;
+  level: "A" | "B";
+  templateId?: string;
+  templateName?: string;
+  requiresSignature?: boolean;
+}
+
+export async function detectGaps(accreditationCheckId: string): Promise<{ gaps: GapResult[]; fullyCompliant: boolean; serviceOrderId: string; employeeId: string }> {
+  const fn = httpsCallable(functions, "detectGaps");
+  const result = await fn({ accreditationCheckId });
+  return result.data as { gaps: GapResult[]; fullyCompliant: boolean; serviceOrderId: string; employeeId: string };
+}
