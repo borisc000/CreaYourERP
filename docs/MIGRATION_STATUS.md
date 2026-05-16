@@ -2,7 +2,7 @@
 
 > **Ultima actualizacion:** 2026-05-15  
 > **Rama revisada:** `staging`  
-> **Ultimo commit funcional documentado:** `a3484ed` → *pendiente commit de migración server-side validation (Quotes/HR/Accreditation)*
+> **Ultimo commit funcional documentado:** `905733b` (`feat: migrate critical writes to Callable Functions for Quotes, HR, Accreditation`)
 
 ## Resumen General (Legacy vs Staging)
 
