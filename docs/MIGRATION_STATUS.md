@@ -25,15 +25,15 @@
 |--------|-------------|----------|---------------------|------------------|--------------|
 | Auth / Base | Parcial avanzado | Login, registro, onboarding, roles | `onUserCreate`, onboarding, claims | Permisos granulares por accion aun no son transversales | STAGING_VS_LEGACY_COMPLETE_ANALYSIS.md |
 | CRM | Parcial avanzado | Customers, Leads, Lead dossier inicial, settings CRM, mirror autenticado | CRM callables, RBAC base, service sync, documents metadata/versionado inicial | Dossier aun no cubre todos los agregados legacy; falta hardening completo de documentos, stats y kanban | [GAP_ANALYSIS_CRM.md](./GAP_ANALYSIS_CRM.md) |
-| Quotes | Parcial avanzado | List, Form, Detail, preview A4 imprimible, **catalogos CRUD + picker en líneas** | `calculateQuoteTotal`, triggers, `getQuoteExportData`, **Callables CRUD + transiciones + saveCatalogItem + deleteCatalogItem** | Falta control operativo completo, bridge automático a Rentals | [GAP_ANALYSIS_QUOTES.md](./GAP_ANALYSIS_QUOTES.md) |
+| Quotes | Parcial avanzado | List, Form, Detail, preview A4, **catálogos + plantillas + picker**, **bridge Rentals** | `calculateQuoteTotal`, triggers, CRUD callables + transiciones + catálogos + plantillas + bridge | Falta control operativo completo | [GAP_ANALYSIS_QUOTES.md](./GAP_ANALYSIS_QUOTES.md) |
 | HR | Parcial avanzado | Employees, departments, job profiles, **contracts CRUD + modal**, employment status events | `onEmployeeHired`, **Callables create/update/delete employee + create/update/delete contract**, `onContractUpdated` trigger | Falta licencias, desvinculaciones formales, matriz de acreditacion HR completa | [GAP_ANALYSIS_HR.md](./GAP_ANALYSIS_HR.md) |
 | Accreditation | Parcial avanzado | Service orders, crew, compliance matrix, gaps, document generation, bulk assign, requisitos UI (checkboxes Level A/B), alertas vencimiento | `checkCrewCompliance`, assignment triggers, **Callables CRUD SO + crew assign/remove/authorize/bulk + computeCheck/detectGaps/triggerDocumentGeneration/recomputeChecks/checkExpiringDocuments**, `onAccreditationUpdated/Deleted` triggers | Falta Cloud Scheduler para alertas automáticas, invalidación requires_revalidation al modificar cuadrilla | [GAP_ANALYSIS_ACCREDITATION.md](./GAP_ANALYSIS_ACCREDITATION.md) |
-| Safety | Parcial avanzado | Safety folders, MIPER, IRL, PPE, talks, checklists | Safety callables y export | Falta motor BOT/procedimientos, validacion server-side certificada de matrices, exportacion XLSX/PDF | [GAP_ANALYSIS_SAFETY.md](./GAP_ANALYSIS_SAFETY.md) |
+| Safety | Parcial avanzado | Safety folders, MIPER, IRL, PPE, talks, checklists, **export PDF/XLSX** | Safety callables y export, **exportSafetyMatrixPdf + exportSafetyMatrixXlsx** | Falta motor BOT/procedimientos, validacion server-side certificada de matrices | [GAP_ANALYSIS_SAFETY.md](./GAP_ANALYSIS_SAFETY.md) |
 | Document Center | Parcial avanzado | Templates + generated docs | Generation/lifecycle services | Falta motor DOCX real, batch generation, firma integrada con layouts | [GAP_ANALYSIS_DOCUMENT_CENTER.md](./GAP_ANALYSIS_DOCUMENT_CENTER.md) |
 | Signature | Parcial | Signature center | Signature service inicial | Falta layout designer, flujo publico robusto, sellado criptografico | [GAP_ANALYSIS_SIGNATURE.md](./GAP_ANALYSIS_SIGNATURE.md) |
-| Billing | Parcial | Billing documents, dashboard | Billing service, plan limits | Falta integracion SII real (ambos simuladores), atomicidad completa, bridge con quotes | [GAP_ANALYSIS_BILLING.md](./GAP_ANALYSIS_BILLING.md) |
+| Billing | Parcial avanzado | Billing documents, dashboard, **bridge quote→billing** | Billing service, plan limits, **createBillingDocumentFromQuote**, SII simulator hardening | Falta integracion SII real (ambos simuladores), atomicidad completa | [GAP_ANALYSIS_BILLING.md](./GAP_ANALYSIS_BILLING.md) |
 | Rentals | Parcial | Rentals UI | Rental service | Falta bridge automatico desde quote aceptada, matriz de transiciones, workflow aprobatorio | [GAP_ANALYSIS_RENTALS.md](./GAP_ANALYSIS_RENTALS.md) |
-| Reports | Parcial avanzado | Reportes, checkpoints, fotos | CRUD + Storage | Falta espejo publico, exportacion PDF nativa, listener post-firma robusto | [GAP_ANALYSIS_REPORTS.md](./GAP_ANALYSIS_REPORTS.md) |
+| Reports | Parcial avanzado | Reportes, checkpoints, fotos, **espejo público** | CRUD + Storage, **publishReportMirror** | Falta exportacion PDF nativa, listener post-firma robusto | [GAP_ANALYSIS_REPORTS.md](./GAP_ANALYSIS_REPORTS.md) |
 | Expenses | Parcial avanzado | Gastos, dashboard, respaldos | CRUD + normalizacion | Falta workflow aprobacion formal, audit log, precision monetaria (float) | [GAP_ANALYSIS_EXPENSES.md](./GAP_ANALYSIS_EXPENSES.md) |
 | Payroll | Parcial avanzado | Planillas, liquidaciones, perfiles | Calculos chilenos completos | Falta workflow cierre/aprobacion, validacion legal 2026, firma liquidaciones | [GAP_ANALYSIS_PAYROLL.md](./GAP_ANALYSIS_PAYROLL.md) |
 | Inventory | Parcial avanzado | Items, movimientos, dashboard | CRUD + batched writes | Falta bodegas/ubicaciones, cierre por periodo, conciliacion fisica | [GAP_ANALYSIS_INVENTORY.md](./GAP_ANALYSIS_INVENTORY.md) |
@@ -255,9 +255,9 @@ Cada empresa vive bajo `/companies/{companyId}`. Los modulos usan colecciones hi
 8. ~~Implementar catalogos de Quotes~~ — **Completado**: `serviceCatalog`, `workerCatalog`, `itemCatalog` con CRUD, picker en `QuoteForm`, y acción RBAC `quotes.manage_catalogs`.
 9. Decidir estrategia de motor de plantillas (DOCX vs `pdf-lib` puro).
 10. Implementar batch generation en Document Center.
-11. Implementar exportacion XLSX/PDF en Safety.
-12. Implementar espejo publico en Reports.
-13. Implementar bridge Quotes → Rentals automatico.
+11. ~~Implementar exportacion XLSX/PDF en Safety~~ — **Completado**: `exportSafetyMatrixPdf` (pdf-lib) y `exportSafetyMatrixXlsx` (xlsx) con hoja Matriz + Información.
+12. ~~Implementar espejo publico en Reports~~ — **Completado**: `publishReportMirror` callable, colección `publicMirrors` con lectura pública, página `ReportMirror` sin auth.
+13. ~~Implementar bridge Quotes → Rentals automatico~~ — **Completado**: `acceptQuote` detecta keywords arriendo, crea `RentalContract` vinculado, retorna `rentalContract`.
 
 ### P2 — Medio (UX, completitud, integraciones)
 
