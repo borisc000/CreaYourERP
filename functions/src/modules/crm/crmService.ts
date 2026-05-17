@@ -402,6 +402,7 @@ export const crmGetLeadDossier = onCall({ region, cors: crmCors }, async (reques
   const reports = await getCollectionByLead(ctx.companyId, "reports", leadId);
   const expenses = await getCollectionByLead(ctx.companyId, "expenses", leadId);
   const rentals = await getCollectionByLead(ctx.companyId, "rentalContracts", leadId);
+  const safetyFolders = await getCollectionByLead(ctx.companyId, "safetyFolders", leadId);
   const activity = await getCollectionByLead(ctx.companyId, "activityLogs", leadId, 100);
   const notes = await getCollectionByLead(ctx.companyId, "leadNotes", leadId, 100);
   const customer = await getOptionalDoc(ctx.companyId, "customers", lead.customerId);
@@ -409,6 +410,14 @@ export const crmGetLeadDossier = onCall({ region, cors: crmCors }, async (reques
   const stage = await getOptionalDoc(ctx.companyId, "stages", lead.stageId);
   const serviceType = await getOptionalDoc(ctx.companyId, "serviceTypes", lead.serviceTypeId);
   const assignedUser = await getOptionalDoc(ctx.companyId, "users", lead.assignedTo);
+
+  const acceptedQuotes = quotes.filter((q: any) => q.status === "accepted");
+  const openReports = reports.filter((r: any) => r.status !== "cerrado");
+  const activeRentals = rentals.filter((r: any) => r.status === "active" || r.status === "dispatched");
+  const expenseTotal = expenses.reduce((sum: number, e: any) => sum + (Number(e.totalAmount) || 0), 0);
+  const worstTrafficLight = safetyFolders.length > 0
+    ? (safetyFolders.some((s: any) => s.trafficLight === "red") ? "red" : safetyFolders.some((s: any) => s.trafficLight === "yellow") ? "yellow" : "green")
+    : null;
 
   return {
     lead,
@@ -422,6 +431,7 @@ export const crmGetLeadDossier = onCall({ region, cors: crmCors }, async (reques
     reports,
     expenses,
     rentals,
+    safetyFolders,
     documents,
     activity,
     notes,
@@ -429,7 +439,16 @@ export const crmGetLeadDossier = onCall({ region, cors: crmCors }, async (reques
       expectedRevenue: Number(lead.expectedRevenue || 0),
       weightedRevenue: Math.round((Number(lead.expectedRevenue || 0) * Number(lead.probability || 0)) / 100),
       quotesCount: quotes.length,
+      acceptedQuotesCount: acceptedQuotes.length,
+      acceptedQuotesTotal: acceptedQuotes.reduce((sum: number, q: any) => sum + (Number(q.grossTotal) || 0), 0),
       reportsCount: reports.length,
+      openReportsCount: openReports.length,
+      expensesCount: expenses.length,
+      expensesTotal: expenseTotal,
+      rentalsCount: rentals.length,
+      activeRentalsCount: activeRentals.length,
+      safetyFoldersCount: safetyFolders.length,
+      safetyTrafficLight: worstTrafficLight,
       documentsCount: documents.length,
       currentDocumentsCount: documents.filter((doc) => doc.isCurrent !== false).length,
       notesCount: notes.length,

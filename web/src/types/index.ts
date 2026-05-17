@@ -282,8 +282,9 @@ export interface LeadDossier {
   service?: CRMService | null;
   quotes: Quote[];
   reports: Report[];
-  expenses: any[];
-  rentals: any[];
+  expenses: ExpenseRecord[];
+  rentals: RentalContract[];
+  safetyFolders: SafetyFolder[];
   documents: CRMDocument[];
   activity: ActivityLog[];
   notes: LeadNote[];
@@ -291,7 +292,16 @@ export interface LeadDossier {
     expectedRevenue: number;
     weightedRevenue: number;
     quotesCount: number;
+    acceptedQuotesCount: number;
+    acceptedQuotesTotal: number;
     reportsCount: number;
+    openReportsCount: number;
+    expensesCount: number;
+    expensesTotal: number;
+    rentalsCount: number;
+    activeRentalsCount: number;
+    safetyFoldersCount: number;
+    safetyTrafficLight: "red" | "yellow" | "green" | null;
     documentsCount: number;
     currentDocumentsCount: number;
     notesCount: number;

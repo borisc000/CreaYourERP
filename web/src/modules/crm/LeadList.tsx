@@ -11,6 +11,7 @@ import {
   ChartBarIcon,
   UsersIcon,
   ChevronRightIcon,
+  ViewColumnsIcon,
 } from "@heroicons/react/24/outline";
 
 const statusLabels: Record<LeadStatus, string> = {
@@ -72,13 +73,22 @@ export function LeadList() {
           <h1 className="text-2xl font-bold text-white">Oportunidades</h1>
           <p className="text-gray-400 text-sm mt-1">Pipeline de ventas y seguimiento comercial</p>
         </div>
-        <button
-          onClick={() => navigate("/crm/leads/new")}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <PlusIcon className="w-4 h-4" />
-          Nueva Oportunidad
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/crm/leads/kanban")}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            <ViewColumnsIcon className="w-4 h-4" />
+            Kanban
+          </button>
+          <button
+            onClick={() => navigate("/crm/leads/new")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Nueva Oportunidad
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

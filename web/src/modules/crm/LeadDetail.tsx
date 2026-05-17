@@ -21,12 +21,22 @@ import {
   PencilIcon,
   PlusIcon,
   TrashIcon,
+  BanknotesIcon,
+  TruckIcon,
+  ShieldCheckIcon,
+  ClipboardDocumentListIcon,
+  CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
 
-type TabId = "overview" | "activity" | "documents" | "service" | "financial";
+type TabId = "overview" | "activity" | "documents" | "service" | "financial" | "quotes" | "reports" | "expenses" | "rentals" | "safety";
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: "overview", label: "Resumen" },
+  { id: "quotes", label: "Cotizaciones" },
+  { id: "reports", label: "Reportes" },
+  { id: "expenses", label: "Gastos" },
+  { id: "rentals", label: "Arriendos" },
+  { id: "safety", label: "Seguridad" },
   { id: "activity", label: "Actividad" },
   { id: "documents", label: "Documentos" },
   { id: "service", label: "Servicio" },
@@ -242,7 +252,7 @@ export function LeadDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
           <p className="text-xs text-gray-500 uppercase tracking-wider">Esperado</p>
           <p className="text-xl font-semibold text-white mt-1">{money(summary.expectedRevenue)}</p>
@@ -252,12 +262,23 @@ export function LeadDetail() {
           <p className="text-xl font-semibold text-blue-300 mt-1">{money(summary.weightedRevenue)}</p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Cotiz. aceptadas</p>
+          <p className="text-xl font-semibold text-green-300 mt-1">{money(summary.acceptedQuotesTotal)}</p>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Gastos</p>
+          <p className="text-xl font-semibold text-red-300 mt-1">{money(summary.expensesTotal)}</p>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
           <p className="text-xs text-gray-500 uppercase tracking-wider">Documentos</p>
           <p className="text-xl font-semibold text-white mt-1">{summary.currentDocumentsCount}</p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-          <p className="text-xs text-gray-500 uppercase tracking-wider">Servicio</p>
-          <p className="text-xl font-semibold text-white mt-1">{service?.serviceCode || "-"}</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Seguridad</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`w-3 h-3 rounded-full ${summary.safetyTrafficLight === "red" ? "bg-red-500" : summary.safetyTrafficLight === "yellow" ? "bg-yellow-500" : summary.safetyTrafficLight === "green" ? "bg-green-500" : "bg-gray-600"}`} />
+            <span className="text-sm text-gray-300">{summary.safetyFoldersCount}</span>
+          </div>
         </div>
       </div>
 
@@ -447,6 +468,133 @@ export function LeadDetail() {
             <Field label="Cotizaciones" value={summary.quotesCount} />
             <Field label="Reportes" value={summary.reportsCount} />
             <Field label="Ingreso esperado" value={money(lead.expectedRevenue)} />
+          </div>
+        </section>
+      )}
+
+      {activeTab === "quotes" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Cotizaciones</h2>
+            <span className="text-xs text-gray-500">{dossier.quotes.length} total · {summary.acceptedQuotesCount} aceptadas</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {dossier.quotes.map((q) => (
+              <div key={q.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/quotes/${q.id}`)}>
+                <div>
+                  <p className="text-sm font-medium text-white">{q.title || q.quoteNumber || "Sin título"}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{q.lines?.length || 0} líneas · {dateLabel(q.quoteDate)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-white">{money(q.grossTotal)}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${q.status === "accepted" ? "bg-green-500/10 text-green-400" : q.status === "sent" ? "bg-blue-500/10 text-blue-400" : "bg-gray-500/10 text-gray-400"}`}>
+                    {q.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {dossier.quotes.length === 0 && <p className="p-6 text-sm text-gray-500">Sin cotizaciones.</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "reports" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Reportes de terreno</h2>
+            <span className="text-xs text-gray-500">{dossier.reports.length} total · {summary.openReportsCount} abiertos</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {dossier.reports.map((r) => (
+              <div key={r.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/reports/${r.id}`)}>
+                <div>
+                  <p className="text-sm font-medium text-white">{r.servicio || "Reporte sin nombre"}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{r.empresa} · {r.area}/{r.sector}</p>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${r.status === "cerrado" ? "bg-green-500/10 text-green-400" : "bg-blue-500/10 text-blue-400"}`}>
+                  {r.status}
+                </span>
+              </div>
+            ))}
+            {dossier.reports.length === 0 && <p className="p-6 text-sm text-gray-500">Sin reportes.</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "expenses" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Gastos</h2>
+            <span className="text-xs text-gray-500">{dossier.expenses.length} registros · {money(summary.expensesTotal)} total</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {dossier.expenses.map((e) => (
+              <div key={e.id} className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-white">{e.description || e.category || "Gasto"}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{e.scope} · {dateLabel(e.createdAt)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-white">{money(e.totalAmount)}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${e.status === "reconciled" ? "bg-green-500/10 text-green-400" : e.status === "observed" ? "bg-red-500/10 text-red-400" : "bg-yellow-500/10 text-yellow-400"}`}>
+                    {e.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {dossier.expenses.length === 0 && <p className="p-6 text-sm text-gray-500">Sin gastos registrados.</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "rentals" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Arriendos</h2>
+            <span className="text-xs text-gray-500">{dossier.rentals.length} contratos · {summary.activeRentalsCount} activos</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {dossier.rentals.map((r) => (
+              <div key={r.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/rentals/contracts/${r.id}`)}>
+                <div>
+                  <p className="text-sm font-medium text-white">{r.title || r.rentalNumber || "Contrato"}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{dateLabel(r.startDate)} - {dateLabel(r.endDate || r.returnDueDate)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-white">{money(r.contractValue)}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${r.status === "dispatched" ? "bg-amber-500/10 text-amber-400" : r.status === "closed" ? "bg-green-500/10 text-green-400" : "bg-gray-500/10 text-gray-400"}`}>
+                    {r.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {dossier.rentals.length === 0 && <p className="p-6 text-sm text-gray-500">Sin contratos de arriendo.</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "safety" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Seguridad</h2>
+            <span className="text-xs text-gray-500">{dossier.safetyFolders.length} carpetas</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {dossier.safetyFolders.map((s) => (
+              <div key={s.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/safety/folders/${s.id}`)}>
+                <div>
+                  <p className="text-sm font-medium text-white">Carpeta {s.id.slice(-6)}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{s.readinessPct || 0}% listo · {s.status}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${s.trafficLight === "red" ? "bg-red-500" : s.trafficLight === "yellow" ? "bg-yellow-500" : "bg-green-500"}`} />
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === "closed" ? "bg-green-500/10 text-green-400" : s.status === "in_progress" ? "bg-blue-500/10 text-blue-400" : "bg-gray-500/10 text-gray-400"}`}>
+                    {s.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {dossier.safetyFolders.length === 0 && <p className="p-6 text-sm text-gray-500">Sin carpetas de seguridad.</p>}
           </div>
         </section>
       )}

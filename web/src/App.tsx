@@ -139,6 +139,7 @@ import { PdfWorkspacePage } from "./modules/pdfWorkspace";
 import { CrossCorrespondenceList } from "./modules/crossCorrespondence";
 import { CrossCorrespondenceForm } from "./modules/crossCorrespondence";
 import { ReportMirror } from "./modules/reports/ReportMirror";
+import { LeadKanban } from "./modules/crm/LeadKanban";
 
 function App() {
   return (
@@ -170,6 +171,7 @@ function App() {
                 <Route path="/crm/customers/:id" element={<CustomerDetail />} />
                 <Route path="/crm/customers/:id/edit" element={<CustomerForm />} />
                 <Route path="/crm/leads" element={<LeadList />} />
+                <Route path="/crm/leads/kanban" element={<LeadKanban />} />
                 <Route path="/crm/leads/new" element={<LeadForm />} />
                 <Route path="/crm/leads/:id" element={<LeadDetail />} />
                 <Route path="/crm/leads/:id/edit" element={<LeadForm />} />
