@@ -999,6 +999,9 @@ export interface SafetyRiskMatrixRow {
   sourceLabels?: string[];
   sourceGroup?: string;
   sourceTitle?: string;
+  source?: string;
+  sourceId?: string;
+  jobProfileName?: string;
   severityColor?: string;
   approvalBlocked?: boolean;
   mitigationRequired?: boolean;

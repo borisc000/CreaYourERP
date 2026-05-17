@@ -393,6 +393,7 @@ export { deleteJobProfile } from "./modules/hr/deleteJobProfile";
 
 export { seedSafetyCatalogs };
 export { generateRiskMatrix };
+export { generateJobProfileMatrix } from "./modules/safety/generateJobProfileMatrix";
 export { refreshFolderMetrics };
 export { generateIRL, saveIRL, deleteIRL } from "./modules/safety/irlService";
 export { savePPEDelivery, deletePPEDelivery } from "./modules/safety/ppeService";
