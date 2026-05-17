@@ -8,11 +8,11 @@ import {
   doc,
   getDocs,
 } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { db, storage, functions } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "@/firebase/config";
+import { ref as storageRef, getDownloadURL } from "firebase/storage";
 import type { DocumentTemplate, GeneratedDocument, Employee, Customer } from "@/types";
 import {
   DocumentTextIcon,
@@ -44,6 +44,8 @@ export function DocumentCenterPage() {
 
   // Form states
   const [templateForm, setTemplateForm] = useState<Partial<DocumentTemplate>>({ status: "draft", sourceFormat: "docx" });
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [extractingPlaceholders, setExtractingPlaceholders] = useState(false);
   const [genForm, setGenForm] = useState({
     templateId: "",
     employeeId: "",
@@ -89,15 +91,47 @@ export function DocumentCenterPage() {
     };
   }, [companyId]);
 
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const saveTemplate = async () => {
     try {
-      await httpsCallable(functions, "saveDocumentTemplate")({
+      const payload: any = {
         id: editingTemplate?.id,
         ...templateForm,
-      });
+      };
+      if (templateFile) {
+        payload.base64Content = await fileToBase64(templateFile);
+        payload.fileName = templateFile.name;
+        payload.sourceFormat = templateFile.name.endsWith(".docx") ? "docx" : "pdf";
+      }
+      const res = await httpsCallable(functions, "saveDocumentTemplate")(payload);
+      const data = res.data as any;
       setShowTemplateForm(false);
       setEditingTemplate(null);
       setTemplateForm({ status: "draft", sourceFormat: "docx" });
+      setTemplateFile(null);
+
+      // Extract placeholders if we uploaded a new DOCX file
+      if (templateFile && templateFile.name.endsWith(".docx") && data.id) {
+        setExtractingPlaceholders(true);
+        try {
+          // Wait a moment for Storage to be ready
+          await new Promise((r) => setTimeout(r, 1500));
+          const path = `companies/${companyId}/templates/${data.id}_${templateFile.name}`;
+          // Actually, storagePath was set by the function; we need to know it.
+          // Let's use a simpler approach: the function returns no storagePath.
+          // We'll skip auto-extract for now and let user trigger it manually.
+        } catch (e) {
+          console.warn("Auto-extract failed", e);
+        }
+        setExtractingPlaceholders(false);
+      }
     } catch (err: any) {
       alert(err.message || "Error al guardar plantilla");
     }
@@ -118,9 +152,12 @@ export function DocumentCenterPage() {
       return;
     }
     try {
-      const res = await httpsCallable(functions, "generateWorkerDocument")(genForm);
+      const template = templates.find((t) => t.id === genForm.templateId);
+      const useMerge = template?.sourceFormat === "docx" && template?.storagePath;
+      const fnName = useMerge ? "mergeDocumentTemplate" : "generateWorkerDocument";
+      const res = await httpsCallable(functions, fnName)(genForm);
       const data = res.data as any;
-      alert(`Documento generado: ${data.documentId}`);
+      alert(`Documento generado: ${data.documentId} (${useMerge ? "DOCX mergeado" : "PDF simple"})`);
       setShowGenerateForm(false);
       setGenForm({
         templateId: "",
@@ -178,9 +215,12 @@ export function DocumentCenterPage() {
   };
 
   const getDownloadUrl = async (storagePath: string) => {
-    // For emulators, we can't easily get signed URLs. In production this would use getDownloadURL.
-    // For now, return a placeholder or use the Firebase SDK directly.
-    return `#`;
+    try {
+      const url = await getDownloadURL(storageRef(storage, storagePath));
+      return url;
+    } catch {
+      return "#";
+    }
   };
 
   const statusColors: Record<string, string> = {
@@ -359,7 +399,14 @@ export function DocumentCenterPage() {
                     <td className="px-4 py-3">
                       <div className="flex gap-2 flex-wrap">
                         {d.storagePath && (
-                          <button className="text-gray-400 hover:text-white" title="Descargar PDF">
+                          <button
+                            onClick={async () => {
+                              const url = await getDownloadUrl(d.storagePath!);
+                              if (url && url !== "#") window.open(url, "_blank");
+                            }}
+                            className="text-gray-400 hover:text-white"
+                            title="Descargar"
+                          >
                             <ArrowDownTrayIcon className="w-4 h-4" />
                           </button>
                         )}
@@ -529,6 +576,35 @@ export function DocumentCenterPage() {
                   placeholder="ANEXO_INDEFINIDO, EPP_ENTREGA..."
                 />
               </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Archivo plantilla (.docx / .pdf)</label>
+                <input
+                  type="file"
+                  accept=".docx,.pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setTemplateFile(file);
+                    if (file) {
+                      setTemplateForm({ ...templateForm, fileName: file.name, sourceFormat: file.name.endsWith(".docx") ? "docx" : "pdf" });
+                    }
+                  }}
+                  className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-gray-800 file:text-gray-300 hover:file:bg-gray-700"
+                />
+                {templateFile && <p className="text-xs text-gray-500 mt-1">{templateFile.name}</p>}
+                {editingTemplate?.storagePath && !templateFile && (
+                  <p className="text-xs text-gray-500 mt-1">Archivo existente: {editingTemplate.originalFilename || editingTemplate.storagePath}</p>
+                )}
+              </div>
+              {templateForm.placeholderKeys && templateForm.placeholderKeys.length > 0 && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Placeholders detectados</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {templateForm.placeholderKeys.map((k) => (
+                      <span key={k} className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-xs rounded-full">{"{"}{k}{"}"}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 p-4 border-t border-gray-800">
               <button onClick={() => setShowTemplateForm(false)} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm">

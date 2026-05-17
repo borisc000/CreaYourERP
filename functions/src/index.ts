@@ -404,6 +404,8 @@ export { exportMIPER } from "./modules/safety/exportService";
 export { saveDocumentTemplate, deleteDocumentTemplate } from "./modules/documentCenter/templateService";
 export { generateWorkerDocument } from "./modules/documentCenter/generationService";
 export { approveGeneratedDocument, closeGeneratedDocument, deleteGeneratedDocument, getDocumentCenterStats } from "./modules/documentCenter/lifecycleService";
+export { mergeDocumentTemplate } from "./modules/documentCenter/mergeTemplate";
+export { extractTemplatePlaceholders } from "./modules/documentCenter/extractPlaceholders";
 
 // ==========================================
 // SIGNATURE MODULE

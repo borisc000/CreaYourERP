@@ -1251,6 +1251,8 @@ export interface DocumentTemplate {
   templateMime?: string;
   sourceFormat?: "docx" | "doc" | "pdf";
   storagePath?: string; // Firebase Storage path
+  base64Content?: string; // for upload
+  fileName?: string; // original filename for upload
   availableFormats?: string[];
   placeholderKeys?: string[];
   placeholderValidationStatus?: "pending" | "valid" | "invalid";
@@ -1281,6 +1283,7 @@ export interface GeneratedDocument {
   sourceLabel?: string;
   mergePayload?: Record<string, any>;
   storagePath?: string; // generated file in Storage
+  outputFormat?: "docx" | "pdf";
   availableFormats?: string[];
   status: "generated" | "ready_for_review" | "approved" | "signature_pending" | "signed" | "closed" | "error";
   requiresSignature: boolean;
