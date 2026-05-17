@@ -10,7 +10,7 @@ import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
-import type { SignatureRequest, GeneratedDocument } from "@/types";
+import type { SignatureRequest, SignatureSigner, GeneratedDocument } from "@/types";
 import {
   PencilSquareIcon,
   PlusIcon,
@@ -28,7 +28,9 @@ export function SignatureCenter() {
   const [requests, setRequests] = useState<SignatureRequest[]>([]);
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocument[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [isMultiSigner, setIsMultiSigner] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [signersByRequest, setSignersByRequest] = useState<Record<string, SignatureSigner[]>>({});
 
   // Form state
   const [form, setForm] = useState({
@@ -39,6 +41,9 @@ export function SignatureCenter() {
     generatedDocumentId: "",
     expiresAt: "",
   });
+  const [multiSigners, setMultiSigners] = useState<{ name: string; email: string }[]>([
+    { name: "", email: "" },
+  ]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -60,7 +65,22 @@ export function SignatureCenter() {
       setGeneratedDocs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as GeneratedDocument)))
     );
 
-    return () => { unsub(); unsubDocs(); };
+    // Listen to signers for all requests
+    const qSigners = query(
+      collection(db, "companies", companyId, "signatureSigners"),
+      orderBy("order")
+    );
+    const unsubSigners = onSnapshot(qSigners, (snap) => {
+      const map: Record<string, SignatureSigner[]> = {};
+      snap.docs.forEach((d) => {
+        const s = { id: d.id, ...d.data() } as SignatureSigner;
+        if (!map[s.signatureRequestId]) map[s.signatureRequestId] = [];
+        map[s.signatureRequestId].push(s);
+      });
+      setSignersByRequest(map);
+    });
+
+    return () => { unsub(); unsubDocs(); unsubSigners(); };
   }, [companyId]);
 
   const createRequest = async () => {
@@ -79,6 +99,40 @@ export function SignatureCenter() {
     }
   };
 
+  const createMultiRequest = async () => {
+    if (!form.name.trim() || multiSigners.length === 0 || multiSigners.some((s) => !s.email.trim())) {
+      alert("Nombre y al menos un firmante con email son requeridos");
+      return;
+    }
+    try {
+      const res = await httpsCallable(functions, "createMultiSignerRequest")({
+        name: form.name,
+        description: form.description,
+        signers: multiSigners,
+        generatedDocumentId: form.generatedDocumentId || null,
+        expiresAt: form.expiresAt || null,
+      });
+      const data = res.data as any;
+      alert(`Solicitud multi-firmante creada: ${data.id}`);
+      setShowForm(false);
+      setForm({ name: "", description: "", requestToEmail: "", requestToName: "", generatedDocumentId: "", expiresAt: "" });
+      setMultiSigners([{ name: "", email: "" }]);
+      setIsMultiSigner(false);
+    } catch (err: any) {
+      alert(err.message || "Error al crear solicitud");
+    }
+  };
+
+  const sendNext = async (requestId: string) => {
+    try {
+      const res = await httpsCallable(functions, "sendNextSignatureInvitation")({ requestId });
+      const data = res.data as any;
+      alert(`Invitación enviada a ${data.email}`);
+    } catch (err: any) {
+      alert(err.message || "Error al enviar invitación");
+    }
+  };
+
   const sendRequest = async (id: string) => {
     try {
       await httpsCallable(functions, "sendSignatureRequest")({ id });
@@ -86,6 +140,16 @@ export function SignatureCenter() {
     } catch (err: any) {
       alert(err.message || "Error al enviar");
     }
+  };
+
+  const downloadEvidence = (evidence: any) => {
+    const blob = new Blob([JSON.stringify(evidence, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "evidencia-firma.json";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const signHere = async (req: SignatureRequest) => {
@@ -191,69 +255,101 @@ export function SignatureCenter() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((req) => (
-                <tr key={req.id} className="border-b border-gray-800/50">
-                  <td className="px-4 py-3">
-                    <div className="text-white font-medium">{req.name}</div>
-                    <div className="text-gray-400 text-xs">{req.description || "Sin descripción"}</div>
-                    {req.generatedDocumentId && (
-                      <div className="text-blue-400 text-xs mt-0.5 flex items-center gap-1">
-                        <DocumentTextIcon className="w-3 h-3" />
-                        Vinculado a documento generado
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-300">
-                    <div>{req.requestToName || req.requestToEmail}</div>
-                    <div className="text-gray-500 text-xs">{req.requestToEmail}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs ${statusColors[req.status] || statusColors.draft}`}>
-                      {statusLabels[req.status] || req.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 text-xs">
-                    <div className="flex items-center gap-1">
-                      <ClockIcon className="w-3 h-3" />
-                      {new Date(req.createdAt).toLocaleDateString("es-CL")}
-                    </div>
-                    {req.expiresAt && (
-                      <div className="text-yellow-500 mt-0.5">
-                        Vence: {new Date(req.expiresAt).toLocaleDateString("es-CL")}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      {req.status === "draft" && (
-                        <button
-                          onClick={() => sendRequest(req.id)}
-                          className="text-blue-400 hover:text-blue-300"
-                          title="Enviar"
-                        >
-                          <PaperAirplaneIcon className="w-4 h-4" />
-                        </button>
+              {filtered.map((req) => {
+                const signers = signersByRequest[req.id] || [];
+                const isMulti = req.signerMode === "ordered";
+                return (
+                  <tr key={req.id} className="border-b border-gray-800/50">
+                    <td className="px-4 py-3">
+                      <div className="text-white font-medium">{req.name}</div>
+                      <div className="text-gray-400 text-xs">{req.description || "Sin descripción"}</div>
+                      {req.generatedDocumentId && (
+                        <div className="text-blue-400 text-xs mt-0.5 flex items-center gap-1">
+                          <DocumentTextIcon className="w-3 h-3" />
+                          Vinculado a documento generado
+                        </div>
                       )}
-                      {(req.status === "sent" || req.status === "viewed") && (
-                        <button
-                          onClick={() => signHere(req)}
-                          className="text-green-400 hover:text-green-300"
-                          title="Firmar"
-                        >
-                          <CheckCircleIcon className="w-4 h-4" />
-                        </button>
+                      {isMulti && (
+                        <div className="mt-2 space-y-1">
+                          {signers.map((s) => (
+                            <div key={s.id} className="flex items-center gap-2 text-xs">
+                              <span className={`w-2 h-2 rounded-full ${
+                                s.status === "signed" ? "bg-green-400" : s.status === "sent" ? "bg-blue-400" : "bg-gray-500"
+                              }`} />
+                              <span className="text-gray-300">{s.order}. {s.name || s.email}</span>
+                              <span className="text-gray-500">({s.status})</span>
+                              {s.evidenceJson && (
+                                <button onClick={() => downloadEvidence(s.evidenceJson)} className="text-blue-400 hover:underline">
+                                  evidencia
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       )}
-                      <button
-                        onClick={() => deleteReq(req.id)}
-                        className="text-gray-400 hover:text-red-400"
-                        title="Eliminar"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3 text-gray-300">
+                      <div>{req.requestToName || req.requestToEmail}</div>
+                      <div className="text-gray-500 text-xs">{req.requestToEmail}</div>
+                      {isMulti && <div className="text-purple-400 text-xs mt-0.5">Multi-firmante</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${statusColors[req.status] || statusColors.draft}`}>
+                        {statusLabels[req.status] || req.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">
+                      <div className="flex items-center gap-1">
+                        <ClockIcon className="w-3 h-3" />
+                        {new Date(req.createdAt).toLocaleDateString("es-CL")}
+                      </div>
+                      {req.expiresAt && (
+                        <div className="text-yellow-500 mt-0.5">
+                          Vence: {new Date(req.expiresAt).toLocaleDateString("es-CL")}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        {req.status === "draft" && !isMulti && (
+                          <button
+                            onClick={() => sendRequest(req.id)}
+                            className="text-blue-400 hover:text-blue-300"
+                            title="Enviar"
+                          >
+                            <PaperAirplaneIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                        {isMulti && req.status !== "signed" && req.status !== "expired" && (
+                          <button
+                            onClick={() => sendNext(req.id)}
+                            className="text-blue-400 hover:text-blue-300"
+                            title="Enviar siguiente invitación"
+                          >
+                            <PaperAirplaneIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                        {(req.status === "sent" || req.status === "viewed") && !isMulti && (
+                          <button
+                            onClick={() => signHere(req)}
+                            className="text-green-400 hover:text-green-300"
+                            title="Firmar"
+                          >
+                            <CheckCircleIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteReq(req.id)}
+                          className="text-gray-400 hover:text-red-400"
+                          title="Eliminar"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -288,25 +384,72 @@ export function SignatureCenter() {
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Email del firmante *</label>
-                  <input
-                    type="email"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
-                    value={form.requestToEmail}
-                    onChange={(e) => setForm({ ...form, requestToEmail: e.target.value })}
-                  />
+              <label className="flex items-center gap-2 text-gray-300 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isMultiSigner}
+                  onChange={(e) => setIsMultiSigner(e.target.checked)}
+                  className="rounded border-gray-600 bg-gray-800"
+                />
+                Multi-firmante ordenado
+              </label>
+              {!isMultiSigner ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Email del firmante *</label>
+                    <input
+                      type="email"
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
+                      value={form.requestToEmail}
+                      onChange={(e) => setForm({ ...form, requestToEmail: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Nombre del firmante</label>
+                    <input
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
+                      value={form.requestToName}
+                      onChange={(e) => setForm({ ...form, requestToName: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Nombre del firmante</label>
-                  <input
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
-                    value={form.requestToName}
-                    onChange={(e) => setForm({ ...form, requestToName: e.target.value })}
-                  />
+              ) : (
+                <div className="space-y-2">
+                  <label className="block text-xs text-gray-500">Firmantes (en orden)</label>
+                  {multiSigners.map((s, idx) => (
+                    <div key={idx} className="grid grid-cols-2 gap-2">
+                      <input
+                        placeholder="Nombre"
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
+                        value={s.name}
+                        onChange={(e) => {
+                          const next = [...multiSigners];
+                          next[idx].name = e.target.value;
+                          setMultiSigners(next);
+                        }}
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email *"
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
+                        value={s.email}
+                        onChange={(e) => {
+                          const next = [...multiSigners];
+                          next[idx].email = e.target.value;
+                          setMultiSigners(next);
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setMultiSigners([...multiSigners, { name: "", email: "" }])}
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    + Agregar firmante
+                  </button>
                 </div>
-              </div>
+              )}
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Documento generado (opcional)</label>
                 <select
@@ -334,8 +477,11 @@ export function SignatureCenter() {
               <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm">
                 Cancelar
               </button>
-              <button onClick={createRequest} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium">
-                Crear solicitud
+              <button
+                onClick={isMultiSigner ? createMultiRequest : createRequest}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
+              >
+                {isMultiSigner ? "Crear multi-firmante" : "Crear solicitud"}
               </button>
             </div>
           </div>

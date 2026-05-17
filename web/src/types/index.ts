@@ -693,6 +693,22 @@ export interface AccreditationCheck {
 // SIGNATURE
 // ==========================================
 
+export interface SignatureSigner {
+  id: string;
+  signatureRequestId: string;
+  companyId: string;
+  order: number;
+  name: string;
+  email: string;
+  status: "pending" | "sent" | "signed" | "rejected";
+  sentAt?: string;
+  signedAt?: string;
+  signedStoragePath?: string;
+  evidenceJson?: Record<string, any>;
+  accessToken?: string;
+  createdAt: string;
+}
+
 export interface SignatureRequest {
   id: string;
   companyId: string;
@@ -715,6 +731,9 @@ export interface SignatureRequest {
     label?: string;
   }>;
   status: "draft" | "sent" | "viewed" | "signed" | "declined" | "expired";
+  signerMode?: "single" | "ordered";
+  currentSignerOrder?: number;
+  originalHash?: string; // SHA-256 before signing
   signedAt?: string;
   signedByEmail?: string;
   signedByName?: string;

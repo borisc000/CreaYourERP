@@ -97,6 +97,9 @@ export const SERVICE_ACTIONS = [
   "document_center.close_document",
   "document_center.delete_document",
   "document_center.view_stats",
+  // Signature
+  "signature.create_request",
+  "signature.send_request",
 ] as const;
 
 export type ServiceAction = (typeof SERVICE_ACTIONS)[number];
@@ -197,6 +200,9 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "document_center.close_document": ["document_center"],
   "document_center.delete_document": ["document_center"],
   "document_center.view_stats": ["document_center"],
+  // Signature
+  "signature.create_request": ["signature"],
+  "signature.send_request": ["signature"],
 };
 
 // ==========================================

@@ -412,6 +412,7 @@ export { extractTemplatePlaceholders } from "./modules/documentCenter/extractPla
 // ==========================================
 
 export { createSignatureRequest, sendSignatureRequest, signDocument, deleteSignatureRequest } from "./modules/signature/signatureService";
+export { createMultiSignerRequest, sendNextSignatureInvitation } from "./modules/signature/multiSignerService";
 
 // ==========================================
 // INVENTORY MODULE

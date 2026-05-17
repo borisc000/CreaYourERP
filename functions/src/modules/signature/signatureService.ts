@@ -9,8 +9,10 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db, storage } from "../../config";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import * as crypto from "crypto";
 import { checkCrewCompliance } from "../accreditation/checkCrewCompliance";
 import { registerAccreditationDocument } from "../accreditation/registerAccreditationDocument";
+import { checkRateLimit } from "./rateLimit";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -172,6 +174,10 @@ interface SignPayload {
   notes?: string;
 }
 
+function sha256(buffer: Buffer): string {
+  return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
 export const signDocument = onCall(
   {
     region: "us-central1",
@@ -179,7 +185,6 @@ export const signDocument = onCall(
     memory: "512MiB",
   },
   async (request) => {
-    // Allow both authenticated and token-based signing
     const companyId = request.auth?.token?.companyId;
     if (!companyId && !request.data.token) {
       throw new HttpsError("unauthenticated", "Debes iniciar sesión o proporcionar un token válido");
@@ -191,57 +196,105 @@ export const signDocument = onCall(
     }
 
     try {
-      // Find request by id and verify company
       let resolvedCompanyId = companyId;
+      let signerDocId = id; // For multi-signer, 'id' is the signer doc id
+      let signerRef: FirebaseFirestore.DocumentReference | null = null;
+      let signerData: any = null;
+      let requestRef: FirebaseFirestore.DocumentReference | null = null;
+      let requestData: any = null;
+
+      // If token provided, try to resolve signer first (multi-signer mode)
       if (!resolvedCompanyId && request.data.token) {
-        // Token-based lookup (public signing)
-        const q = await db.collectionGroup("signatureRequests")
+        // Try signer token first
+        const signerQ = await db.collectionGroup("signatureSigners")
           .where("accessToken", "==", request.data.token)
           .where("__name__", "==", id)
           .limit(1)
           .get();
-        if (q.empty) {
-          throw new HttpsError("not-found", "Solicitud no encontrada");
+
+        if (!signerQ.empty) {
+          signerRef = signerQ.docs[0].ref;
+          signerData = signerQ.docs[0].data();
+          signerDocId = signerQ.docs[0].id;
+          resolvedCompanyId = signerData.companyId;
+          requestRef = companyRef(resolvedCompanyId).collection("signatureRequests").doc(signerData.signatureRequestId);
+        } else {
+          // Fallback: legacy request token
+          const reqQ = await db.collectionGroup("signatureRequests")
+            .where("accessToken", "==", request.data.token)
+            .where("__name__", "==", id)
+            .limit(1)
+            .get();
+          if (reqQ.empty) {
+            throw new HttpsError("not-found", "Solicitud no encontrada");
+          }
+          requestRef = reqQ.docs[0].ref;
+          resolvedCompanyId = reqQ.docs[0].ref.path.match(/companies\/([^/]+)/)?.[1] || "";
         }
-        const path = q.docs[0].ref.path;
-        const match = path.match(/companies\/([^/]+)/);
-        if (match) resolvedCompanyId = match[1];
       }
 
       if (!resolvedCompanyId) {
         throw new HttpsError("failed-precondition", "No se pudo determinar la empresa");
       }
 
-      const ref = companyRef(resolvedCompanyId).collection("signatureRequests").doc(id);
-      const snap = await ref.get();
-      if (!snap.exists) {
+      // Resolve request if not done yet
+      if (!requestRef) {
+        requestRef = companyRef(resolvedCompanyId).collection("signatureRequests").doc(id);
+      }
+      const reqSnap = await requestRef.get();
+      if (!reqSnap.exists) {
         throw new HttpsError("not-found", "Solicitud no encontrada");
       }
+      requestData = reqSnap.data() || {};
 
-      const sigData = snap.data() || {};
-      if (sigData.status === "signed" || sigData.status === "closed") {
+      // Rate limiting
+      const rateCheck = await checkRateLimit(resolvedCompanyId, request.data.token || request.auth?.uid || "anon");
+      if (!rateCheck.allowed) {
+        throw new HttpsError("resource-exhausted", "Demasiados intentos. Intenta más tarde.");
+      }
+
+      if (requestData.status === "signed" || requestData.status === "closed") {
         throw new HttpsError("failed-precondition", "Documento ya firmado o cerrado");
       }
-      if (sigData.expiresAt && new Date(sigData.expiresAt) < new Date()) {
-        await ref.update({ status: "expired", updatedAt: new Date().toISOString() });
+      if (requestData.expiresAt && new Date(requestData.expiresAt) < new Date()) {
+        await requestRef.update({ status: "expired", updatedAt: new Date().toISOString() });
         throw new HttpsError("failed-precondition", "La solicitud ha expirado");
       }
 
+      // Multi-signer validation
+      if (requestData.signerMode === "ordered" && signerRef) {
+        if (signerData.status !== "sent" && signerData.status !== "pending") {
+          throw new HttpsError("failed-precondition", "Este firmante ya ha respondido");
+        }
+        // Ensure this is the current signer
+        const pendingSigners = await companyRef(resolvedCompanyId)
+          .collection("signatureSigners")
+          .where("signatureRequestId", "==", requestRef.id)
+          .where("status", "in", ["pending", "sent"])
+          .orderBy("order")
+          .limit(1)
+          .get();
+        if (!pendingSigners.empty && pendingSigners.docs[0].id !== signerDocId) {
+          throw new HttpsError("failed-precondition", "No es tu turno para firmar");
+        }
+      }
+
       // Load source PDF from Storage
+      let sourceBuffer: Buffer | null = null;
       let signedPdfBuffer: Buffer;
-      if (sigData.storagePath) {
-        const bucket = storage.bucket();
-        const [buffer] = await bucket.file(sigData.storagePath).download();
-        const pdfDoc = await PDFDocument.load(buffer);
+      const bucket = storage.bucket();
+
+      if (requestData.storagePath) {
+        const [buffer] = await bucket.file(requestData.storagePath).download();
+        sourceBuffer = buffer;
+        const pdfDoc = await PDFDocument.load(sourceBuffer);
         const pages = pdfDoc.getPages();
 
-        // Embed signature annotation on each position
-        for (const pos of sigData.signaturePositions || []) {
+        for (const pos of requestData.signaturePositions || []) {
           const pageIdx = Math.min(Math.max(pos.page - 1, 0), pages.length - 1);
           const page = pages[pageIdx];
           const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-          // Draw border
           page.drawRectangle({
             x: pos.x,
             y: pos.y,
@@ -251,7 +304,6 @@ export const signDocument = onCall(
             borderWidth: 1,
           });
 
-          // Draw label
           page.drawText(pos.label || "Firma", {
             x: pos.x + 4,
             y: pos.y + pos.height - 14,
@@ -260,7 +312,6 @@ export const signDocument = onCall(
             color: rgb(0.4, 0.4, 0.4),
           });
 
-          // Draw signer name
           page.drawText(signerName, {
             x: pos.x + 4,
             y: pos.y + pos.height / 2 - 4,
@@ -269,7 +320,6 @@ export const signDocument = onCall(
             color: rgb(0.1, 0.1, 0.1),
           });
 
-          // Draw date
           page.drawText(new Date().toLocaleDateString("es-CL"), {
             x: pos.x + 4,
             y: pos.y + 4,
@@ -281,48 +331,83 @@ export const signDocument = onCall(
 
         signedPdfBuffer = Buffer.from(await pdfDoc.save());
       } else {
-        // No source PDF, create a simple one
         const pdfDoc = await PDFDocument.create();
         const page = pdfDoc.addPage();
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         page.drawText(`DOCUMENTO FIRMADO DIGITALMENTE`, { x: 50, y: 700, size: 16, font, color: rgb(0.1, 0.1, 0.1) });
-        page.drawText(`Documento: ${sigData.name}`, { x: 50, y: 660, size: 12, font });
+        page.drawText(`Documento: ${requestData.name}`, { x: 50, y: 660, size: 12, font });
         page.drawText(`Firmado por: ${signerName} (${signerEmail})`, { x: 50, y: 640, size: 12, font });
         page.drawText(`Fecha: ${new Date().toLocaleDateString("es-CL")}`, { x: 50, y: 620, size: 12, font });
         signedPdfBuffer = Buffer.from(await pdfDoc.save());
       }
 
-      // Save signed PDF to Storage
-      const bucket = storage.bucket();
-      const signedFileName = `signed_${Date.now()}_${sigData.name?.replace(/\s+/g, "_") || "doc"}.pdf`;
+      const signedHash = sha256(signedPdfBuffer);
+      const signedFileName = `signed_${Date.now()}_${requestData.name?.replace(/\s+/g, "_") || "doc"}.pdf`;
       const signedPath = `companies/${resolvedCompanyId}/signed/${signedFileName}`;
       await bucket.file(signedPath).save(signedPdfBuffer, { metadata: { contentType: "application/pdf" } });
 
       const now = new Date().toISOString();
-      await ref.update({
-        status: "signed",
+      const evidenceJson = {
+        signerName,
+        signerEmail,
         signedAt: now,
-        signedByEmail: signerEmail,
-        signedByName: signerName,
-        signedStoragePath: signedPath,
+        originalHash: sourceBuffer ? sha256(sourceBuffer) : null,
+        signedHash,
+        ipAddress: request.rawRequest?.ip || null,
+        userAgent: request.rawRequest?.headers?.["user-agent"] || null,
+      };
+
+      // Update signer
+      if (signerRef && signerData) {
+        await signerRef.update({
+          status: "signed",
+          signedAt: now,
+          signedStoragePath: signedPath,
+          evidenceJson,
+          updatedAt: now,
+        });
+      }
+
+      // Check if there are more pending signers
+      let finalStatus = "signed";
+      if (requestData.signerMode === "ordered") {
+        const remaining = await companyRef(resolvedCompanyId)
+          .collection("signatureSigners")
+          .where("signatureRequestId", "==", requestRef.id)
+          .where("status", "in", ["pending", "sent"])
+          .count()
+          .get();
+        // We haven't updated the current signer yet in the query, but we will now.
+        // Actually, remaining includes the current one if we query before update.
+        // Let's query after update or subtract 1.
+        const totalPending = remaining.data().count;
+        finalStatus = totalPending > 1 ? "sent" : "signed";
+      }
+
+      await requestRef.update({
+        status: finalStatus,
+        signedAt: finalStatus === "signed" ? now : requestData.signedAt || null,
+        signedByEmail: finalStatus === "signed" ? signerEmail : requestData.signedByEmail || null,
+        signedByName: finalStatus === "signed" ? signerName : requestData.signedByName || null,
+        signedStoragePath: finalStatus === "signed" ? signedPath : requestData.signedStoragePath || null,
+        originalHash: requestData.originalHash || evidenceJson.originalHash,
         updatedAt: now,
       });
 
-      // Update linked generated document
-      if (sigData.generatedDocumentId) {
+      // Update linked generated document only when fully signed
+      if (finalStatus === "signed" && requestData.generatedDocumentId) {
         await companyRef(resolvedCompanyId)
           .collection("generatedDocuments")
-          .doc(sigData.generatedDocumentId)
+          .doc(requestData.generatedDocumentId)
           .update({ status: "signed", signedAt: now, updatedAt: now });
       }
 
-      // Cierre de loop para documentos de acreditación
-      if (sigData.sourceModule === "accreditation") {
+      // Accreditation loop
+      if (requestData.sourceModule === "accreditation" && finalStatus === "signed") {
         try {
-          // Buscar DocumentGenerationRequest vinculado
           const dgrSnap = await companyRef(resolvedCompanyId)
             .collection("documentGenerationRequests")
-            .where("signatureRequestId", "==", id)
+            .where("signatureRequestId", "==", requestRef.id)
             .limit(1)
             .get();
 
@@ -330,8 +415,6 @@ export const signDocument = onCall(
             const dgrDoc = dgrSnap.docs[0];
             const dgrData = dgrDoc.data();
             await dgrDoc.ref.update({ status: "signed", completedAt: now });
-
-            // Registrar acreditación como aprobada
             await registerAccreditationDocument({
               companyId: resolvedCompanyId,
               employeeId: dgrData.employeeId,
@@ -343,8 +426,6 @@ export const signDocument = onCall(
               signedDocumentUrl: signedPath,
               validUntil: dgrData.validUntil || null,
             });
-
-            // Recompute check
             const assignmentSnap = await companyRef(resolvedCompanyId)
               .collection("crewAssignments")
               .where("serviceOrderId", "==", dgrData.serviceOrderId)
@@ -352,7 +433,6 @@ export const signDocument = onCall(
               .where("status", "in", ["assigned", "active"])
               .limit(1)
               .get();
-
             if (!assignmentSnap.empty) {
               const assignmentDoc = assignmentSnap.docs[0];
               await checkCrewCompliance(resolvedCompanyId, assignmentDoc.id, {
@@ -364,23 +444,24 @@ export const signDocument = onCall(
           }
         } catch (loopErr: any) {
           console.error("[signDocument] Error cerrando loop de acreditación:", loopErr);
-          // No fallamos la firma si el loop falla
         }
       }
 
       await companyRef(resolvedCompanyId).collection("signatureLogs").add({
         companyId: resolvedCompanyId,
-        signatureRequestId: id,
+        signatureRequestId: requestRef.id,
+        signerId: signerRef?.id || null,
         event: "signed",
         userEmail: signerEmail,
         notes: notes || "",
-        metadata: { signerName, signedPath },
+        metadata: { signerName, signedPath, evidenceJson },
         createdAt: now,
       });
 
-      return { success: true, signedPath };
+      return { success: true, signedPath, status: finalStatus };
     } catch (error: any) {
       console.error("[signDocument] Error:", error);
+      if (error instanceof HttpsError) throw error;
       throw new HttpsError("internal", error.message || "Error al firmar documento");
     }
   }
