@@ -115,6 +115,79 @@ export const SERVICE_ACTIONS = [
   "expenses.edit_expense",
   "expenses.delete_expense",
   "expenses.create_backup",
+  // AI
+  "ai.view",
+  "ai.create",
+  "ai.edit",
+  // Assets
+  "assets.view",
+  "assets.create",
+  "assets.edit",
+  "assets.delete",
+  // Cross Correspondence
+  "cross_correspondence.view",
+  "cross_correspondence.create",
+  "cross_correspondence.edit",
+  // Gantt
+  "gantt.view",
+  "gantt.create",
+  "gantt.edit",
+  // Google Workspace
+  "google_workspace.view",
+  "google_workspace.create",
+  "google_workspace.edit",
+  // Inventory
+  "inventory.view",
+  "inventory.create",
+  "inventory.edit",
+  "inventory.delete",
+  // Mail
+  "mail.view",
+  "mail.create",
+  "mail.edit",
+  // Payroll
+  "payroll.view",
+  "payroll.create",
+  "payroll.edit",
+  // PDF Workspace
+  "pdf_workspace.view",
+  "pdf_workspace.edit",
+  // Planning
+  "planning.view",
+  "planning.create",
+  "planning.edit",
+  "planning.delete",
+  // Recruitment
+  "recruitment.view",
+  "recruitment.create",
+  "recruitment.edit",
+  // Rentals
+  "rentals.view",
+  "rentals.create",
+  "rentals.edit",
+  "rentals.delete",
+  // Riohs
+  "riohs.view",
+  "riohs.create",
+  "riohs.edit",
+  // Safety Activities
+  "safety_activities.view",
+  "safety_activities.create",
+  "safety_activities.edit",
+  // Safety Procedures
+  "safety_procedures.view",
+  "safety_procedures.create",
+  "safety_procedures.edit",
+  // Suppliers
+  "suppliers.view",
+  "suppliers.create",
+  "suppliers.edit",
+  "suppliers.delete",
+  // Tasks
+  "tasks.view",
+  "tasks.create",
+  "tasks.edit",
+  "tasks.delete",
 ] as const;
 
 export type ServiceAction = (typeof SERVICE_ACTIONS)[number];
@@ -233,6 +306,79 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "expenses.edit_expense": ["finance", "expenses"],
   "expenses.delete_expense": ["finance", "expenses"],
   "expenses.create_backup": ["finance", "expenses"],
+  // AI
+  "ai.view": ["ai"],
+  "ai.create": ["ai"],
+  "ai.edit": ["ai"],
+  // Assets
+  "assets.view": ["assets"],
+  "assets.create": ["assets"],
+  "assets.edit": ["assets"],
+  "assets.delete": ["assets"],
+  // Cross Correspondence
+  "cross_correspondence.view": ["document_center"],
+  "cross_correspondence.create": ["document_center"],
+  "cross_correspondence.edit": ["document_center"],
+  // Gantt
+  "gantt.view": ["planning"],
+  "gantt.create": ["planning"],
+  "gantt.edit": ["planning"],
+  // Google Workspace
+  "google_workspace.view": ["google_workspace"],
+  "google_workspace.create": ["google_workspace"],
+  "google_workspace.edit": ["google_workspace"],
+  // Inventory
+  "inventory.view": ["inventory"],
+  "inventory.create": ["inventory"],
+  "inventory.edit": ["inventory"],
+  "inventory.delete": ["inventory"],
+  // Mail
+  "mail.view": ["mail"],
+  "mail.create": ["mail"],
+  "mail.edit": ["mail"],
+  // Payroll
+  "payroll.view": ["payroll"],
+  "payroll.create": ["payroll"],
+  "payroll.edit": ["payroll"],
+  // PDF Workspace
+  "pdf_workspace.view": ["document_center"],
+  "pdf_workspace.edit": ["document_center"],
+  // Planning
+  "planning.view": ["planning"],
+  "planning.create": ["planning"],
+  "planning.edit": ["planning"],
+  "planning.delete": ["planning"],
+  // Recruitment
+  "recruitment.view": ["hr"],
+  "recruitment.create": ["hr"],
+  "recruitment.edit": ["hr"],
+  // Rentals
+  "rentals.view": ["rentals"],
+  "rentals.create": ["rentals"],
+  "rentals.edit": ["rentals"],
+  "rentals.delete": ["rentals"],
+  // Riohs
+  "riohs.view": ["safety"],
+  "riohs.create": ["safety"],
+  "riohs.edit": ["safety"],
+  // Safety Activities
+  "safety_activities.view": ["safety"],
+  "safety_activities.create": ["safety"],
+  "safety_activities.edit": ["safety"],
+  // Safety Procedures
+  "safety_procedures.view": ["safety"],
+  "safety_procedures.create": ["safety"],
+  "safety_procedures.edit": ["safety"],
+  // Suppliers
+  "suppliers.view": ["suppliers"],
+  "suppliers.create": ["suppliers"],
+  "suppliers.edit": ["suppliers"],
+  "suppliers.delete": ["suppliers"],
+  // Tasks
+  "tasks.view": ["tasks"],
+  "tasks.create": ["tasks"],
+  "tasks.edit": ["tasks"],
+  "tasks.delete": ["tasks"],
 };
 
 // ==========================================

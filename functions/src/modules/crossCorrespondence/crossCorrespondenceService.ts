@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
@@ -13,6 +14,7 @@ export const getCorrespondenceDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "cross_correspondence.view", { companyId });
     const snap = await companyRef(companyId).collection("crossCorrespondences").orderBy("createdAt", "desc").get();
     const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     return {
@@ -38,6 +40,7 @@ export const createCorrespondence = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "cross_correspondence.create", { companyId });
     const { companyId: _c, ...data } = request.data;
     if (!data.contractId || !data.subject) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("crossCorrespondences").add({
@@ -59,6 +62,7 @@ export const updateCorrespondence = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "cross_correspondence.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("crossCorrespondences").doc(id).update({ ...data, updatedAt: nowIso() });
@@ -74,6 +78,7 @@ export const approveCorrespondence = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "cross_correspondence.edit", { companyId });
     const { id } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const corr = await companyRef(companyId).collection("crossCorrespondences").doc(id).get();
@@ -104,6 +109,7 @@ export const sendCorrespondenceForSignature = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "cross_correspondence.create", { companyId });
     const { id } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const corr = await companyRef(companyId).collection("crossCorrespondences").doc(id).get();

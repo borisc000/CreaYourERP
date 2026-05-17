@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
@@ -13,6 +14,7 @@ export const getAIDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "ai.view", { companyId });
     const [providers, prompts, agents, executions] = await Promise.all([
       companyRef(companyId).collection("aiProviders").get(),
       companyRef(companyId).collection("aiPromptTemplates").get(),
@@ -36,6 +38,7 @@ export const createAIProvider = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "ai.create", { companyId });
     const { companyId: _c, ...data } = request.data;
     if (!data.name || !data.providerType) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
@@ -61,6 +64,7 @@ export const updateAIProvider = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "ai.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
@@ -80,6 +84,7 @@ export const createAIPromptTemplate = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "ai.create", { companyId });
     const { companyId: _c, ...data } = request.data;
     if (!data.name || !data.userPrompt) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("aiPromptTemplates").add({
@@ -101,6 +106,7 @@ export const updateAIPromptTemplate = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "ai.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("aiPromptTemplates").doc(id).update({ ...data, updatedAt: nowIso() });
@@ -116,6 +122,7 @@ export const createAIAgent = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "ai.create", { companyId });
     const { companyId: _c, ...data } = request.data;
     if (!data.name || !data.role) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("aiAgents").add({
@@ -137,6 +144,7 @@ export const updateAIAgent = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "ai.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("aiAgents").doc(id).update({ ...data, updatedAt: nowIso() });
@@ -152,6 +160,7 @@ export const planAIExecution = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "ai.create", { companyId });
     const { agentId, promptTemplateId, providerId, inputData } = request.data;
 
     let renderedSystem = "";

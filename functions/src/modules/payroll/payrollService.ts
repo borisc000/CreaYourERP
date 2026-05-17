@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
@@ -36,6 +37,7 @@ export const seedPayrollParameters = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.create", { companyId });
     const existing = await companyRef(companyId).collection("payrollLegalParameters").limit(1).get();
     if (!existing.empty) return { alreadySeeded: true };
     for (const p of DEFAULT_PARAMS) {
@@ -71,6 +73,7 @@ export const getPayrollDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.view", { companyId });
     const [periods, profiles, settlements] = await Promise.all([
       companyRef(companyId).collection("payrollPeriods").limit(200).get(),
       companyRef(companyId).collection("payrollProfiles").limit(200).get(),
@@ -94,6 +97,7 @@ export const createPayrollPeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.create", { companyId });
     const { name, year, month, startDate, endDate, paymentDate } = request.data;
     if (!name || !year || !month) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("payrollPeriods").add({
@@ -112,6 +116,7 @@ export const calculatePeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.edit", { companyId });
     const { periodId } = request.data;
     if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
@@ -254,6 +259,7 @@ export const approvePeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.edit", { companyId });
     const { periodId } = request.data;
     if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
@@ -273,6 +279,7 @@ export const closePeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.edit", { companyId });
     const { periodId } = request.data;
     if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
@@ -292,6 +299,7 @@ export const savePayrollProfile = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.edit", { companyId });
     const { id, ...data } = request.data;
     if (!data.employeeId) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (id) {

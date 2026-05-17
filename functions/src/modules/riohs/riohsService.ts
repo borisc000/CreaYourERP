@@ -3,6 +3,7 @@
  */
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
@@ -28,6 +29,7 @@ export const saveRiohsConfig = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "riohs.edit", { companyId });
 
     const data = request.data as Record<string, any>;
     const id = data.id ? String(data.id) : "";
@@ -127,6 +129,7 @@ export const getRiohsConfig = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "riohs.view", { companyId });
 
     try {
       const snap = await companyRef(companyId)
@@ -161,6 +164,7 @@ export const generateRiohsDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "riohs.create", { companyId });
 
     const { id } = request.data as { id?: string };
     if (!id) {

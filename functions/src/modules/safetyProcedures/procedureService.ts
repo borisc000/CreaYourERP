@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
@@ -13,6 +14,7 @@ export const getProcedureDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_procedures.view", { companyId });
     const snap = await companyRef(companyId).collection("safetyProcedureTemplates").get();
     const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     return {
@@ -37,6 +39,7 @@ export const createProcedure = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_procedures.create", { companyId });
     const { companyId: _c, ...data } = request.data;
     if (!data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
     const count = (await companyRef(companyId).collection("safetyProcedureTemplates").count().get()).data().count;
@@ -62,6 +65,7 @@ export const updateProcedure = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_procedures.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("safetyProcedureTemplates").doc(id).update({ ...data, updatedAt: nowIso() });
@@ -77,6 +81,7 @@ export const approveProcedure = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_procedures.edit", { companyId });
     const { id } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const proc = await companyRef(companyId).collection("safetyProcedureTemplates").doc(id).get();
@@ -104,6 +109,7 @@ export const createProcedureStep = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_procedures.create", { companyId });
     const { companyId: _c, procedureId, ...data } = request.data;
     if (!procedureId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("safetyProcedureSteps").add({
@@ -125,6 +131,7 @@ export const updateProcedureStep = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_procedures.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("safetyProcedureSteps").doc(id).update({ ...data, updatedAt: nowIso() });

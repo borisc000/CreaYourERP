@@ -7,6 +7,7 @@
  */
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 function companyRef(companyId: string) {
@@ -42,6 +43,7 @@ export const createTask = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "tasks.create", { companyId });
 
     const payload = request.data as CreateTaskPayload;
     if (!payload.title?.trim()) {
@@ -106,6 +108,7 @@ export const updateTask = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "tasks.edit", { companyId });
 
     const { id, ...payload } = request.data as UpdateTaskPayload;
     if (!id) {
@@ -161,6 +164,7 @@ export const completeTask = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "tasks.edit", { companyId });
 
     const { id } = request.data as CompleteTaskPayload;
     if (!id) {
@@ -207,6 +211,7 @@ export const deleteTask = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "tasks.delete", { companyId });
 
     const { id } = request.data as DeleteTaskPayload;
     if (!id) {

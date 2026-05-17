@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
@@ -13,6 +14,7 @@ export const getGoogleWorkspaceDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "google_workspace.view", { companyId });
     const accounts = await companyRef(companyId).collection("googleWorkspaceAccounts").get();
     const list = accounts.docs.map((d) => ({ id: d.id, ...d.data() }));
     return {
@@ -31,6 +33,7 @@ export const createGoogleWorkspaceAccount = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "google_workspace.create", { companyId });
     const { companyId: _c, ...data } = request.data;
     if (!data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
@@ -56,6 +59,7 @@ export const updateGoogleWorkspaceAccount = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "google_workspace.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
@@ -75,6 +79,7 @@ export const testGoogleWorkspaceAccount = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "google_workspace.edit", { companyId });
     const { id } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     // TODO: Implement real Google API connection test
@@ -93,6 +98,7 @@ export const listGoogleDriveFiles = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "google_workspace.view", { companyId });
     const { accountId, query: _query } = request.data;
     if (!accountId) throw new HttpsError("invalid-argument", "Datos incompletos");
     // TODO: Implement real Google Drive API call

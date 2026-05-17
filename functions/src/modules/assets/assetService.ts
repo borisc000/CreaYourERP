@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = [
@@ -19,6 +20,7 @@ export const getAssetDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.view", { companyId });
 
     const assetsSnap = await db.collection("companies").doc(companyId).collection("assets").limit(500).get();
     const maintenanceSnap = await db.collection("companies").doc(companyId).collection("assetMaintenance").limit(100).get();
@@ -56,6 +58,7 @@ export const createAsset = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.create", { companyId });
     const { code, name, category, acquisitionDate, acquisitionCost, depreciationRate, location, assignedTo, assignedToName, supplier, serialNumber, brand, model, plateNumber, maintenanceIntervalMonths, notes } = request.data;
     if (!code || !name) throw new HttpsError("invalid-argument", "code y name requeridos");
 
@@ -84,6 +87,7 @@ export const updateAsset = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.edit", { companyId });
     const { id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
@@ -102,6 +106,7 @@ export const deleteAsset = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.delete", { companyId });
     const { id } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
@@ -121,6 +126,7 @@ export const createAssetMaintenance = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.create", { companyId });
     const { assetId, maintenanceType, description, cost, performedBy, performedByName, performedDate, nextDueDate, notes } = request.data;
     if (!assetId || !description) throw new HttpsError("invalid-argument", "Datos incompletos");
 

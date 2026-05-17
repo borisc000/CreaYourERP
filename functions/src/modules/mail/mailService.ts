@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = [
@@ -25,6 +26,7 @@ export const getMailStatus = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "mail.view", { companyId });
 
     const accounts = await db.collection("companies").doc(companyId).collection("mailAccounts").get();
     const active = accounts.docs.find((d) => d.data().isActive);
@@ -46,6 +48,7 @@ export const saveMailAccount = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "mail.edit", { companyId });
     const { id, ...data } = request.data;
 
     if (data.isDefault) {
@@ -77,6 +80,7 @@ export const sendEmail = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "mail.create", { companyId });
     const { accountId, recipients, subject, bodyText, bodyHtml } = request.data;
     if (!recipients?.length || !subject) throw new HttpsError("invalid-argument", "Datos incompletos");
 
@@ -97,6 +101,7 @@ export const getEmailLogs = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "mail.view", { companyId });
     const { limit = 50 } = request.data;
 
     const snap = await db.collection("companies").doc(companyId).collection("emailLogs").orderBy("createdAt", "desc").limit(limit).get();

@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
@@ -15,6 +16,7 @@ export const getOrCreateGanttPlan = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "gantt.view", { companyId });
     const { leadId } = request.data;
     if (!leadId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
@@ -43,6 +45,7 @@ export const importProcedureToGantt = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "gantt.create", { companyId });
     const { planId, procedureId, mode = "replace" } = request.data;
     if (!planId || !procedureId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
@@ -86,6 +89,7 @@ export const createGanttTask = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "gantt.create", { companyId });
     const { companyId: _c, planId, ...data } = request.data;
     if (!planId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const plan = await companyRef(companyId).collection("leadGanttPlans").doc(planId).get();
@@ -110,6 +114,7 @@ export const updateGanttTask = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "gantt.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };

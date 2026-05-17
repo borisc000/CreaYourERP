@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = [
@@ -27,6 +28,7 @@ export const getRentalDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.view", { companyId });
 
     const cref = companyRef(companyId);
 
@@ -88,6 +90,7 @@ export const createRentalAsset = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.create", { companyId });
     const { code, name, category, assetType, trackingMode, unit, brand, model, serialNumber, plateNumber, totalQuantity, dailyRate, weeklyRate, monthlyRate, replacementValue, guaranteeRequired, defaultGuaranteeAmount, currentLocation, status } = request.data;
     if (!code || !name) throw new HttpsError("invalid-argument", "code y name requeridos");
 
@@ -136,6 +139,7 @@ export const updateRentalAsset = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.edit", { companyId });
     const { id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
@@ -159,6 +163,7 @@ export const createRentalContract = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.create", { companyId });
     const { title, leadId, customerId, customerName, sourceType, sourceQuoteId, startDate, endDate, returnDueDate, assignedTo, contractValue, depositAmount, notes, lines } = request.data;
     if (!title) throw new HttpsError("invalid-argument", "title requerido");
 
@@ -241,6 +246,7 @@ export const updateRentalContract = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.edit", { companyId });
     const { id, lines, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
@@ -310,6 +316,7 @@ export const dispatchRentalContract = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.create", { companyId });
     const { id, dispatchDate } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
@@ -373,6 +380,7 @@ export const returnRentalContract = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.edit", { companyId });
     const { id, actualReturnDate, lineReturns } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
@@ -431,6 +439,7 @@ export const closeRentalContract = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.edit", { companyId });
     const { id, closureSummary } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 

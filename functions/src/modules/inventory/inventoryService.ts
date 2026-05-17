@@ -9,6 +9,7 @@
  */
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 import * as crypto from "crypto";
 
@@ -53,6 +54,7 @@ export const getInventoryDashboard = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.view", { companyId });
 
     try {
       const cref = companyRef(companyId);
@@ -194,6 +196,7 @@ export const createInventoryItem = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.create", { companyId });
 
     const payload = request.data as CreateInventoryItemPayload;
     if (!payload.code?.trim() || !payload.name?.trim() || !payload.category?.trim() || !payload.unit?.trim() || !payload.location?.trim()) {
@@ -314,6 +317,7 @@ export const updateInventoryItem = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.edit", { companyId });
 
     const { itemId, ...updates } = request.data as UpdateInventoryItemPayload;
     if (!itemId) {
@@ -384,6 +388,7 @@ export const deleteInventoryItem = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.delete", { companyId });
 
     const { itemId } = request.data as DeleteInventoryItemPayload;
     if (!itemId) {
@@ -445,6 +450,7 @@ export const createInventoryMovement = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.create", { companyId });
 
     const payload = request.data as CreateInventoryMovementPayload;
     if (!payload.itemId || !payload.movementType || payload.quantity === undefined || payload.quantity === null) {
@@ -602,6 +608,7 @@ export const createInventoryBackup = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.create", { companyId });
 
     const payload = request.data as CreateInventoryBackupPayload;
     if (!payload.backupName?.trim()) {

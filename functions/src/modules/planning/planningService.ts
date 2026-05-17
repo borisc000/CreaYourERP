@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = [
@@ -27,6 +28,7 @@ export const getPlanningDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.view", { companyId });
     const { year } = request.data;
 
     const cref = companyRef(companyId);
@@ -126,6 +128,7 @@ export const createPlanningBudget = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.create", { companyId });
     const { name, year, scenarioType, openingCash, notes } = request.data;
     if (!name || !year) throw new HttpsError("invalid-argument", "name y year requeridos");
 
@@ -170,6 +173,7 @@ export const updatePlanningBudget = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.edit", { companyId });
     const { id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
@@ -212,6 +216,7 @@ export const createBudgetLine = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.create", { companyId });
     const { budgetId, lineType, originType, lineName, category, costCenter, leadId, monthStart, monthEnd, plannedAmounts, forecastAmounts, notes } = request.data;
     if (!budgetId || !lineType || !lineName) {
       throw new HttpsError("invalid-argument", "budgetId, lineType y lineName requeridos");
@@ -251,6 +256,7 @@ export const updateBudgetLine = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.edit", { companyId });
     const { id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
@@ -274,6 +280,7 @@ export const deleteBudgetLine = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.delete", { companyId });
     const { id } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 

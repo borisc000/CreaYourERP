@@ -3,6 +3,7 @@
  */
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 function companyRef(companyId: string) {
@@ -27,6 +28,7 @@ export const getSupplierDashboard = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "suppliers.view", { companyId });
 
     try {
       const snap = await companyRef(companyId).collection("suppliers").get();
@@ -72,6 +74,7 @@ export const createSupplier = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "suppliers.create", { companyId });
 
     const data = request.data as Record<string, any>;
     const code = String(data.code || "").trim();
@@ -146,6 +149,7 @@ export const updateSupplier = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "suppliers.edit", { companyId });
 
     const { id, ...data } = request.data as Record<string, any>;
     if (!id) {
@@ -209,6 +213,7 @@ export const deleteSupplier = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "suppliers.delete", { companyId });
 
     const { id } = request.data as { id?: string };
     if (!id) {

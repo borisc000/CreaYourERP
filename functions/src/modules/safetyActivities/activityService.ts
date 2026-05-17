@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
@@ -22,6 +23,7 @@ export const getActivityDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_activities.view", { companyId });
     const [blocks, hazards] = await Promise.all([
       companyRef(companyId).collection("safetyActivityBlocks").get(),
       companyRef(companyId).collection("safetyActivityHazards").get(),
@@ -45,6 +47,7 @@ export const createActivityBlock = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_activities.create", { companyId });
     const { companyId: _c, ...data } = request.data;
     if (!data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
     const count = (await companyRef(companyId).collection("safetyActivityBlocks").count().get()).data().count;
@@ -69,6 +72,7 @@ export const updateActivityBlock = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_activities.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     // Create version snapshot
@@ -92,6 +96,7 @@ export const createActivityHazard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_activities.create", { companyId });
     const { companyId: _c, activityBlockId, ...data } = request.data;
     if (!activityBlockId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const risk = calculateRisk(data.probability || 1, data.consequence || 1);
@@ -119,6 +124,7 @@ export const updateActivityHazard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "safety_activities.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };
