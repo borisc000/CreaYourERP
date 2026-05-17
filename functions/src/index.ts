@@ -88,6 +88,7 @@ export { listQuoteTemplates };
 export { createBillingDocumentFromQuote };
 export { exportSafetyMatrixPdf };
 export { publishReportMirror };
+export { generateReportPdf } from "./modules/reports/generateReportPdf";
 export { exportSafetyMatrixXlsx };
 
 export const onQuoteUpdated = onDocumentUpdated(

@@ -64,6 +64,8 @@ export const publishReportMirror = onCall(
       mandante: report.mandante || "",
       notes: report.notes || "",
       status: report.status || "",
+      verificationCode: report.verificationCode || "",
+      signatureStatus: report.signatureStatus || "",
       createdAt: report.createdAt,
       closedAt: report.closedAt,
       checkpoints,

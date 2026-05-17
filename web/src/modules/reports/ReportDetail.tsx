@@ -5,7 +5,8 @@ import { usePermission } from "../../hooks/usePermission";
 import { useFirestoreDocument, useFirestoreCollection } from "../../hooks/useFirestore";
 import { Report, ReportCheckpoint, ReportPhoto } from "../../types";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "../../firebase/config";
+import { functions, storage } from "../../firebase/config";
+import { ref as storageRef, getDownloadURL } from "firebase/storage";
 import { publishReportMirror } from "../../services/reports";
 
 export default function ReportDetail() {
@@ -24,6 +25,7 @@ export default function ReportDetail() {
   );
 
   const [showCheckpointForm, setShowCheckpointForm] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [cpForm, setCpForm] = useState({ checkpointType: "control" as any, title: "", description: "", displayOrder: 0 });
 
   const checkpoints = id ? allCheckpoints.filter((c) => c.reportId === id).sort((a, b) => a.displayOrder - b.displayOrder) : [];
@@ -32,6 +34,42 @@ export default function ReportDetail() {
   const handleClose = async () => {
     if (!companyId || !id) return;
     await httpsCallable(functions, "closeReport")({ companyId: companyId, id });
+  };
+
+  const handleGeneratePdf = async () => {
+    if (!id) return;
+    setGeneratingPdf(true);
+    try {
+      const res = await httpsCallable(functions, "generateReportPdf")({ reportId: id });
+      const data = res.data as any;
+      alert(`PDF generado: ${data.storagePath}`);
+    } catch (err: any) {
+      alert(err.message || "Error generando PDF");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleRequestSignature = async () => {
+    if (!id || !report?.generatedPdfPath) {
+      alert("Primero genera el PDF del reporte");
+      return;
+    }
+    try {
+      const res = await httpsCallable(functions, "createSignatureRequest")({
+        name: `Reporte: ${report.servicio || report.id}`,
+        description: `Firma de reporte de terreno - ${report.empresa || ""}`,
+        requestToEmail: report.supervisor || "firmante@ejemplo.cl",
+        requestToName: report.supervisor || "",
+        sourceModule: "reports",
+        sourceRecordId: id,
+        storagePath: report.generatedPdfPath,
+      });
+      const data = res.data as any;
+      alert(`Solicitud de firma creada: ${data.id}`);
+    } catch (err: any) {
+      alert(err.message || "Error solicitando firma");
+    }
   };
 
   const handleToggleCheckpoint = async (cp: ReportCheckpoint) => {
@@ -56,9 +94,17 @@ export default function ReportDetail() {
           <h1 className="text-2xl font-bold">Reporte de Terreno</h1>
           <p className="text-gray-500 mt-1">{report.servicio} | {report.empresa} | {report.area}/{report.sector}</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           {report.status !== "cerrado" && hasPermission("reports.close_report") && (
             <button onClick={handleClose} className="erp-btn-primary">Cerrar reporte</button>
+          )}
+          {hasPermission("reports.edit_report") && (
+            <button onClick={handleGeneratePdf} disabled={generatingPdf} className="erp-btn-secondary">
+              {generatingPdf ? "Generando PDF..." : "Generar PDF"}
+            </button>
+          )}
+          {report.generatedPdfPath && (
+            <button onClick={handleRequestSignature} className="erp-btn-secondary">Solicitar firma</button>
           )}
           {hasPermission("reports.edit_report") && (
             <button onClick={() => navigate(`/reports/${id}/edit`)} className="erp-btn-secondary">Editar</button>

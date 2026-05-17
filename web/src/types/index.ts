@@ -2593,8 +2593,12 @@ export interface Report {
   serviceId?: string;
   status: "abierto" | "cerrado" | "en_revision";
   publicToken?: string;
+  verificationCode?: string;
+  generatedPdfPath?: string;
   signatureRequestId?: string;
   signatureStatus?: string;
+  signedAt?: string;
+  signedBy?: string;
   servicio?: string;
   empresa?: string;
   area?: string;

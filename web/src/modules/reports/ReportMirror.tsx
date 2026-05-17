@@ -15,6 +15,8 @@ interface PublicMirror {
   mandante?: string;
   notes?: string;
   status?: string;
+  verificationCode?: string;
+  signatureStatus?: string;
   createdAt?: string;
   closedAt?: string;
   checkpoints?: Array<{
@@ -98,6 +100,11 @@ export function ReportMirror() {
             ) : (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-900/30 text-blue-400 rounded-full">
                 <ClockIcon className="w-3.5 h-3.5" /> Abierto
+              </span>
+            )}
+            {mirror.signatureStatus === "signed" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-900/30 text-emerald-400 rounded-full">
+                <CheckCircleIcon className="w-3.5 h-3.5" /> Firmado
               </span>
             )}
           </div>
@@ -184,6 +191,15 @@ export function ReportMirror() {
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-8">
             <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-2">Notas</h2>
             <p className="text-gray-400 text-sm whitespace-pre-wrap">{mirror.notes}</p>
+          </div>
+        )}
+
+        {/* Verification */}
+        {mirror.verificationCode && (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6 text-center">
+            <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Código de verificación</p>
+            <p className="text-2xl font-mono font-bold text-white tracking-widest">{mirror.verificationCode}</p>
+            <p className="text-gray-500 text-xs mt-1">Comparte este código para confirmar autenticidad</p>
           </div>
         )}
 

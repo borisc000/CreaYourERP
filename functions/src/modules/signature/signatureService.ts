@@ -402,6 +402,23 @@ export const signDocument = onCall(
           .update({ status: "signed", signedAt: now, updatedAt: now });
       }
 
+      // Reports loop
+      if (requestData.sourceModule === "reports" && requestData.sourceRecordId && finalStatus === "signed") {
+        try {
+          await companyRef(resolvedCompanyId)
+            .collection("reports")
+            .doc(requestData.sourceRecordId)
+            .update({
+              signatureStatus: "signed",
+              signedAt: now,
+              signedBy: signerEmail,
+              updatedAt: now,
+            });
+        } catch (loopErr: any) {
+          console.error("[signDocument] Error actualizando reporte:", loopErr);
+        }
+      }
+
       // Accreditation loop
       if (requestData.sourceModule === "accreditation" && finalStatus === "signed") {
         try {
