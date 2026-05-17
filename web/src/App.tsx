@@ -28,6 +28,7 @@ import { EmployeeForm } from "./modules/hr/EmployeeForm";
 import { EmployeeDetail } from "./modules/hr/EmployeeDetail";
 import { DepartmentList } from "./modules/hr/DepartmentList";
 import { JobProfileList } from "./modules/hr/JobProfileList";
+import { JobProfileDetail } from "./modules/hr/JobProfileDetail";
 import { SignatureCenter } from "./modules/signature/SignatureCenter";
 import { SafetyFolderList } from "./modules/safety/SafetyFolderList";
 import { SafetyFolderForm } from "./modules/safety/SafetyFolderForm";
@@ -188,6 +189,7 @@ function App() {
                 <Route path="/hr/employees/:id/edit" element={<EmployeeForm />} />
                 <Route path="/hr/departments" element={<DepartmentList />} />
                 <Route path="/hr/job-profiles" element={<JobProfileList />} />
+                <Route path="/hr/job-profiles/:id" element={<JobProfileDetail />} />
                 <Route path="/safety" element={<SafetyFolderList />} />
                 <Route path="/safety/new" element={<SafetyFolderForm />} />
                 <Route path="/safety/:id" element={<SafetyFolderDetail />} />

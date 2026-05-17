@@ -840,7 +840,9 @@ export interface JobProfile {
   salaryRangeMin?: number;
   salaryRangeMax?: number;
   isActive: boolean;
+  status?: "draft" | "active" | "archived";
   createdAt: string;
+  updatedAt?: string;
 }
 
 // ==========================================
