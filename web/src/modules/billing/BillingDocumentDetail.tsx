@@ -7,6 +7,7 @@ import { functions } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
 import type { BillingDocument, BillingLine, BillingEvent } from "@/types";
+import { toCents, formatCurrency } from "@/lib/money";
 import {
   ArrowLeftIcon,
   PencilIcon,
@@ -160,14 +161,14 @@ export function BillingDocumentDetail() {
   const handleRegisterPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !paymentAmount) return;
-    const amount = Number(paymentAmount);
-    if (amount <= 0) {
+    const amountCents = toCents(Number(paymentAmount));
+    if (amountCents <= 0) {
       alert("El monto debe ser mayor a 0");
       return;
     }
     setActionLoading("payment");
     try {
-      await httpsCallable(functions, "registerPayment")({ documentId: id, amount });
+      await httpsCallable(functions, "registerPayment")({ documentId: id, amount: amountCents });
       setPaymentAmount("");
       setShowPaymentForm(false);
     } catch (err: any) {
@@ -269,19 +270,19 @@ export function BillingDocumentDetail() {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-500 text-xs uppercase tracking-wider">Total</p>
           <p className="text-xl font-bold text-white mt-1">
-            ${Math.round(docData.totalAmount).toLocaleString("es-CL")}
+            {formatCurrency(docData.totalAmount, docData.currency)}
           </p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-500 text-xs uppercase tracking-wider">Pagado</p>
           <p className="text-xl font-bold text-emerald-400 mt-1">
-            ${Math.round(docData.paidAmount).toLocaleString("es-CL")}
+            {formatCurrency(docData.paidAmount, docData.currency)}
           </p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-500 text-xs uppercase tracking-wider">Saldo</p>
           <p className="text-xl font-bold text-amber-400 mt-1">
-            ${Math.round(docData.balanceDue).toLocaleString("es-CL")}
+            {formatCurrency(docData.balanceDue, docData.currency)}
           </p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -318,11 +319,11 @@ export function BillingDocumentDetail() {
                         <td className="py-2 text-white">{line.description}</td>
                         <td className="py-2 text-right text-gray-400">{line.quantity}</td>
                         <td className="py-2 text-right text-gray-400">
-                          ${Math.round(line.unitPrice).toLocaleString("es-CL")}
+                          {formatCurrency(line.unitPrice, docData.currency)}
                         </td>
                         <td className="py-2 text-right text-gray-400">{line.discountPct}%</td>
                         <td className="py-2 text-right text-white font-medium">
-                          ${Math.round(line.lineTotal).toLocaleString("es-CL")}
+                          {formatCurrency(line.lineTotal, docData.currency)}
                         </td>
                       </tr>
                     ))}
@@ -331,19 +332,19 @@ export function BillingDocumentDetail() {
                     <tr className="border-t border-gray-700">
                       <td colSpan={4} className="pt-3 text-right text-gray-400">Subtotal</td>
                       <td className="pt-3 text-right text-white font-medium">
-                        ${Math.round(docData.subtotalAmount).toLocaleString("es-CL")}
+                        {formatCurrency(docData.subtotalAmount, docData.currency)}
                       </td>
                     </tr>
                     <tr>
                       <td colSpan={4} className="py-1 text-right text-gray-400">Impuesto ({docData.taxRate}%)</td>
                       <td className="py-1 text-right text-white font-medium">
-                        ${Math.round(docData.taxAmount).toLocaleString("es-CL")}
+                        {formatCurrency(docData.taxAmount, docData.currency)}
                       </td>
                     </tr>
                     <tr>
                       <td colSpan={4} className="pt-2 text-right text-white font-bold text-base">Total</td>
                       <td className="pt-2 text-right text-blue-400 font-bold text-base">
-                        ${Math.round(docData.totalAmount).toLocaleString("es-CL")}
+                        {formatCurrency(docData.totalAmount, docData.currency)}
                       </td>
                     </tr>
                   </tfoot>

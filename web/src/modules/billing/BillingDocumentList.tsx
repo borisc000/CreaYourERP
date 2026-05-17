@@ -6,6 +6,7 @@ import { usePermission } from "@/hooks/usePermission";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import type { BillingDocument } from "@/types";
+import { formatCurrency } from "@/lib/money";
 import {
   DocumentTextIcon,
   PlusIcon,
@@ -144,13 +145,13 @@ export function BillingDocumentList() {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-500 text-xs uppercase tracking-wider">Cobranza Pendiente</p>
           <p className="text-2xl font-bold text-amber-400 mt-1">
-            ${Math.round(totals.pending).toLocaleString("es-CL")}
+            {formatCurrency(totals.pending, "CLP")}
           </p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-500 text-xs uppercase tracking-wider">Aceptados SII</p>
           <p className="text-2xl font-bold text-emerald-400 mt-1">
-            ${Math.round(totals.accepted).toLocaleString("es-CL")}
+            {formatCurrency(totals.accepted, "CLP")}
           </p>
         </div>
       </div>
@@ -256,7 +257,7 @@ export function BillingDocumentList() {
                     </span>
                   </div>
                   <p className="text-gray-500 text-sm mt-0.5">
-                    {doc.customerName} • ${Math.round(doc.totalAmount).toLocaleString("es-CL")} •{" "}
+                    {doc.customerName} • {formatCurrency(doc.totalAmount, doc.currency)} •{" "}
                     {new Date(doc.issueDate).toLocaleDateString("es-CL")} • Vence{" "}
                     {new Date(doc.dueDate).toLocaleDateString("es-CL")}
                   </p>

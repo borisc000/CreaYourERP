@@ -68,6 +68,7 @@ export const SERVICE_ACTIONS = [
   "billing.simulate_sii",
   "billing.register_payment",
   "billing.send_document",
+  "billing.manage_caf",
   // Reports
   "reports.view_dashboard",
   "reports.create_report",
@@ -171,6 +172,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "billing.simulate_sii": ["finance"],
   "billing.register_payment": ["finance"],
   "billing.send_document": ["finance"],
+  "billing.manage_caf": ["finance"],
   // Reports
   "reports.view_dashboard": ["reports"],
   "reports.create_report": ["reports"],

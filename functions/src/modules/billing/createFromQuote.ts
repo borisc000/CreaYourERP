@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
 import { assertAction } from "../../shared/rbac";
+import { toCents, taxFromSubtotalCents } from "../../shared/money";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -57,11 +58,11 @@ export const createBillingDocumentFromQuote = onCall(
       }
     }
 
-    // Build lines from quote lines
+    // Build lines from quote lines (convert unitPrice to cents)
     const lines = (quote.lines || []).map((l: any) => ({
       description: l.description || "",
       quantity: Number(l.quantity) || 1,
-      unitPrice: Number(l.unitPrice) || 0,
+      unitPrice: toCents(Number(l.unitPrice) || 0),
       discountPct: Number(l.discountPercent) || 0,
       isExempt: false,
     }));
@@ -70,22 +71,21 @@ export const createBillingDocumentFromQuote = onCall(
       throw new HttpsError("failed-precondition", "La cotización no tiene líneas para facturar");
     }
 
-    // Compute totals
+    // Compute totals in cents
     const taxRate = Number(quote.taxPct) || 19;
     const factor = 1;
-    let subtotalAmount = 0;
+    let subtotalAmountCents = 0;
     const computedLines = lines.map((l: any) => {
       const quantity = Math.max(0, Number(l.quantity) || 0);
-      const unitPrice = Math.max(0, Number(l.unitPrice) || 0);
+      const unitPriceCents = Math.max(0, Math.round(Number(l.unitPrice) || 0));
       const discountPct = Math.max(0, Math.min(100, Number(l.discountPct) || 0));
-      const lineSub = quantity * unitPrice * (1 - discountPct / 100);
-      const lineTotal = Math.round(lineSub * 100) / 100;
-      subtotalAmount += lineTotal;
-      return { ...l, quantity, unitPrice, discountPct, lineTotal };
+      const lineSubCents = Math.round(quantity * unitPriceCents * (1 - discountPct / 100));
+      subtotalAmountCents += lineSubCents;
+      return { ...l, quantity, unitPrice: unitPriceCents, discountPct, lineTotal: lineSubCents };
     });
-    subtotalAmount = Math.round(subtotalAmount * 100) / 100;
-    const taxAmount = Math.round(subtotalAmount * taxRate) / 100;
-    const totalAmount = Math.round((subtotalAmount + taxAmount) * factor * 100) / 100;
+    subtotalAmountCents = Math.round(subtotalAmountCents);
+    const taxAmountCents = taxFromSubtotalCents(subtotalAmountCents, taxRate);
+    const totalAmountCents = Math.round((subtotalAmountCents + taxAmountCents) * factor);
 
     // Generate document number
     const countSnap = await cref.collection("billingDocuments").count().get();
@@ -118,11 +118,11 @@ export const createBillingDocumentFromQuote = onCall(
       paymentStatus: "pending",
       deliveryStatus: "pending",
       taxRate,
-      subtotalAmount: Math.round(subtotalAmount * factor * 100) / 100,
-      taxAmount: Math.round(taxAmount * factor * 100) / 100,
-      totalAmount,
+      subtotalAmount: Math.round(subtotalAmountCents * factor),
+      taxAmount: Math.round(taxAmountCents * factor),
+      totalAmount: totalAmountCents,
       paidAmount: 0,
-      balanceDue: Math.abs(totalAmount),
+      balanceDue: Math.abs(totalAmountCents),
       customerMessage: `Documento generado desde cotización ${quote.quoteNumber || quoteId}`,
       internalNotes: `Quote grossTotal: ${quote.grossTotal || 0}`,
       createdAt: now,

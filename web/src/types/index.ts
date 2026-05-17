@@ -1865,6 +1865,19 @@ export interface BillingEvent {
   occurredAt: string;
 }
 
+export interface BillingCafRange {
+  id: string;
+  companyId: string;
+  documentType: "33" | "34" | "61" | "56";
+  startFolio: number;
+  endFolio: number;
+  nextFolio: number;
+  cafXmlBase64?: string;
+  uploadDate: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 // ==========================================
 // EXPENSES
 // ==========================================

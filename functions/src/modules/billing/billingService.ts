@@ -12,6 +12,8 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
 import { assertAction } from "../../shared/rbac";
+import { toCents, taxFromSubtotalCents } from "../../shared/money";
+import { simulateSiiSubmission } from "./siiProviderService";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -21,9 +23,9 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function paymentStatusFromBalance(balanceDue: number, paidAmount: number, dueDate: string) {
-  if (balanceDue <= 0) return "paid";
-  if (paidAmount > 0) return "partial";
+function paymentStatusFromBalance(balanceDueCents: number, paidAmountCents: number, dueDate: string) {
+  if (balanceDueCents <= 0) return "paid";
+  if (paidAmountCents > 0) return "partial";
   const today = new Date().toISOString().split("T")[0];
   if (dueDate < today) return "overdue";
   return "pending";
@@ -38,35 +40,35 @@ function computeDocumentTotals(
   const isExempt = documentType === "34";
   const taxRate = isExempt ? 0 : Math.max(0, taxRateInput || 19);
 
-  let subtotalAmount = 0;
+  let subtotalAmountCents = 0;
   const computedLines = lines.map((l) => {
     const quantity = Math.max(0, Number(l.quantity) || 0);
-    const unitPrice = Math.max(0, Number(l.unitPrice) || 0);
+    // unitPrice is now expected in cents from frontend
+    const unitPriceCents = Math.max(0, Math.round(Number(l.unitPrice) || 0));
     const discountPct = Math.max(0, Math.min(100, Number(l.discountPct) || 0));
-    const lineSub = quantity * unitPrice * (1 - discountPct / 100);
-    const lineTotal = Math.round(lineSub * 100) / 100;
-    subtotalAmount += lineTotal;
+    const lineSubCents = Math.round(quantity * unitPriceCents * (1 - discountPct / 100));
+    subtotalAmountCents += lineSubCents;
     return {
       ...l,
       quantity,
-      unitPrice,
+      unitPrice: unitPriceCents,
       discountPct,
-      lineTotal,
+      lineTotal: lineSubCents,
     };
   });
 
-  subtotalAmount = Math.round(subtotalAmount * 100) / 100;
-  const taxAmount = Math.round(subtotalAmount * taxRate) / 100;
-  const totalAmount = Math.round((subtotalAmount + taxAmount) * factor * 100) / 100;
-  const absTotal = Math.abs(totalAmount);
+  subtotalAmountCents = Math.round(subtotalAmountCents);
+  const taxAmountCents = taxFromSubtotalCents(subtotalAmountCents, taxRate);
+  const totalAmountCents = Math.round((subtotalAmountCents + taxAmountCents) * factor);
+  const absTotalCents = Math.abs(totalAmountCents);
 
   return {
     lines: computedLines,
     taxRate,
-    subtotalAmount: Math.round(subtotalAmount * factor * 100) / 100,
-    taxAmount: Math.round(taxAmount * factor * 100) / 100,
-    totalAmount,
-    balanceDue: absTotal,
+    subtotalAmount: Math.round(subtotalAmountCents * factor),
+    taxAmount: Math.round(taxAmountCents * factor),
+    totalAmount: totalAmountCents,
+    balanceDue: absTotalCents,
     paidAmount: 0,
     factor,
   };
@@ -191,9 +193,9 @@ export const getBillingDashboard = onCall(
         stats: {
           totalDocuments,
           siiCounts,
-          pendingCollection: Math.round(pendingCollection * 100) / 100,
+          pendingCollection,
           overdueCount,
-          currentMonthTotal: Math.round(currentMonthTotal * 100) / 100,
+          currentMonthTotal,
         },
         recentDocuments,
         overdueDocuments,
@@ -584,61 +586,21 @@ export const simulateSii = onCall(
         throw new HttpsError("failed-precondition", "El documento debe ser enviado al cliente o marcado como listo antes de simular SII");
       }
 
-      const now = nowIso();
-      let newSiiStatus = doc.siiStatus;
-      let newStatus = doc.status;
-      let eventTitle = "";
-      let eventDetail = "";
+      const result = await simulateSiiSubmission(
+        companyId,
+        payload.documentId,
+        doc.documentType,
+        payload.profile
+      );
 
-      switch (payload.profile) {
-        case "auto_accept":
-          newSiiStatus = "accepted";
-          newStatus = "issued";
-          eventTitle = "SII - Aceptado";
-          eventDetail = "El documento fue aceptado automáticamente por el SII (simulación)";
-          break;
-        case "observed_then_accept":
-          if (doc.siiStatus === "observed") {
-            newSiiStatus = "accepted";
-            newStatus = "issued";
-            eventTitle = "SII - Observación resuelta";
-            eventDetail = "El documento fue aceptado tras resolver observaciones";
-          } else {
-            newSiiStatus = "observed";
-            newStatus = "observed";
-            eventTitle = "SII - Observado";
-            eventDetail = "El SII observó el documento; requiere corrección";
-          }
-          break;
-        case "rejected_then_accept":
-          if (doc.siiStatus === "rejected") {
-            newSiiStatus = "accepted";
-            newStatus = "issued";
-            eventTitle = "SII - Rechazo revertido";
-            eventDetail = "El documento fue aceptado tras corregir el rechazo";
-          } else {
-            newSiiStatus = "rejected";
-            newStatus = "rejected";
-            eventTitle = "SII - Rechazado";
-            eventDetail = "El SII rechazó el documento; edítalo y reenvía";
-          }
-          break;
-        case "manual":
-          newSiiStatus = "queued";
-          eventTitle = "SII - En cola";
-          eventDetail = "El documento fue puesto en cola de envío al SII";
-          break;
-      }
-
-      await docRef.update({
-        siiStatus: newSiiStatus,
-        status: newStatus,
-        updatedAt: now,
-      });
-
-      await addBillingEvent(companyId, payload.documentId, "sii_simulated", eventTitle, eventDetail, request.auth.token.name || "", { profile: payload.profile, newSiiStatus });
-
-      return { success: true, siiStatus: newSiiStatus, status: newStatus };
+      return {
+        success: true,
+        siiStatus: result.siiStatus,
+        status: result.status,
+        trackId: result.trackId,
+        folio: result.folio,
+        glosa: result.glosa,
+      };
     } catch (error: any) {
       console.error("[simulateSii] Error:", error);
       if (error instanceof HttpsError) throw error;
@@ -678,8 +640,8 @@ export const registerPayment = onCall(
     if (!payload.documentId || payload.amount === undefined || payload.amount === null) {
       throw new HttpsError("invalid-argument", "documentId y amount son requeridos");
     }
-    const amount = Math.max(0, Number(payload.amount) || 0);
-    if (amount <= 0) {
+    const amountCents = toCents(Math.max(0, Number(payload.amount) || 0));
+    if (amountCents <= 0) {
       throw new HttpsError("invalid-argument", "El monto debe ser mayor a 0");
     }
 
@@ -691,19 +653,19 @@ export const registerPayment = onCall(
         throw new HttpsError("not-found", "Documento no encontrado");
       }
       const doc = snap.data() as any;
-      const absoluteTotal = Math.abs(doc.totalAmount || 0);
-      const currentPaid = doc.paidAmount || 0;
-      const newPaid = currentPaid + amount;
-      let balanceDue = Math.round((absoluteTotal - newPaid) * 100) / 100;
-      if (balanceDue < 0) balanceDue = 0;
+      const absoluteTotalCents = Math.abs(doc.totalAmount || 0);
+      const currentPaidCents = doc.paidAmount || 0;
+      const newPaidCents = currentPaidCents + amountCents;
+      let balanceDueCents = absoluteTotalCents - newPaidCents;
+      if (balanceDueCents < 0) balanceDueCents = 0;
 
       const today = new Date().toISOString().split("T")[0];
-      const newPaymentStatus = paymentStatusFromBalance(balanceDue, newPaid, doc.dueDate || today);
+      const newPaymentStatus = paymentStatusFromBalance(balanceDueCents, newPaidCents, doc.dueDate || today);
       const paidAt = newPaymentStatus === "paid" ? (payload.paidAt || nowIso()) : doc.paidAt || "";
 
       await docRef.update({
-        paidAmount: Math.round(newPaid * 100) / 100,
-        balanceDue,
+        paidAmount: newPaidCents,
+        balanceDue: balanceDueCents,
         paymentStatus: newPaymentStatus,
         paidAt,
         updatedAt: nowIso(),
@@ -714,12 +676,12 @@ export const registerPayment = onCall(
         payload.documentId,
         "payment_registered",
         "Pago registrado",
-        `Abono de $${amount.toLocaleString("es-CL")}${payload.notes ? ` - ${payload.notes}` : ""}`,
+        `Abono de $${(amountCents / 100).toLocaleString("es-CL")}${payload.notes ? ` - ${payload.notes}` : ""}`,
         request.auth.token.name || "",
-        { amount, paymentMethod: payload.paymentMethod || "", newBalance: balanceDue }
+        { amountCents, paymentMethod: payload.paymentMethod || "", newBalanceCents: balanceDueCents }
       );
 
-      return { success: true, paidAmount: newPaid, balanceDue, paymentStatus: newPaymentStatus };
+      return { success: true, paidAmount: newPaidCents, balanceDue: balanceDueCents, paymentStatus: newPaymentStatus };
     } catch (error: any) {
       console.error("[registerPayment] Error:", error);
       if (error instanceof HttpsError) throw error;

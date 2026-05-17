@@ -7,3 +7,4 @@ export {
   registerPayment,
   sendDocumentToCustomer,
 } from "./billingService";
+export { uploadCafRange, getNextFolio } from "./cafService";

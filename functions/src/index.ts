@@ -464,7 +464,7 @@ export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs } from "./modul
 // BILLING MODULE
 // ==========================================
 
-export { getBillingDashboard, createBillingDocument, updateBillingDocument, deleteBillingDocument, simulateSii, registerPayment, sendDocumentToCustomer } from "./modules/billing";
+export { getBillingDashboard, createBillingDocument, updateBillingDocument, deleteBillingDocument, simulateSii, registerPayment, sendDocumentToCustomer, uploadCafRange, getNextFolio } from "./modules/billing";
 
 // ==========================================
 // EXPENSES MODULE
