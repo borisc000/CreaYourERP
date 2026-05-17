@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
-import { sendQuote, acceptQuote, rejectQuote, deleteQuote } from "@/services/quotes";
+import { sendQuote, acceptQuote, rejectQuote, deleteQuote, getQuoteControl } from "@/services/quotes";
 import { createBillingDocumentFromQuote } from "@/services/billing";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
@@ -18,6 +18,9 @@ import {
   PrinterIcon,
   TruckIcon,
   BanknotesIcon,
+  ClipboardDocumentListIcon,
+  ShieldCheckIcon,
+  WrenchScrewdriverIcon,
 } from "@heroicons/react/24/outline";
 
 export function QuoteDetail() {
@@ -29,6 +32,14 @@ export function QuoteDetail() {
   const [lead, setLead] = useState<Lead | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"detail" | "control">("detail");
+  const [controlData, setControlData] = useState<Awaited<ReturnType<typeof getQuoteControl>> | null>(null);
+  const [controlLoading, setControlLoading] = useState(false);
+
+  function dateLabel(value?: string) {
+    if (!value) return "-";
+    return value.slice(0, 10);
+  }
 
   useEffect(() => {
     if (!id || !companyId) return;
@@ -53,6 +64,15 @@ export function QuoteDetail() {
 
     return () => unsub();
   }, [id, companyId]);
+
+  useEffect(() => {
+    if (!id || activeTab !== "control") return;
+    setControlLoading(true);
+    getQuoteControl(id)
+      .then(setControlData)
+      .catch(console.error)
+      .finally(() => setControlLoading(false));
+  }, [id, activeTab]);
 
   const handleSend = async () => {
     if (!id) return;
@@ -221,6 +241,29 @@ export function QuoteDetail() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-gray-800 mb-6">
+        <nav className="flex gap-2">
+          <button
+            onClick={() => setActiveTab("detail")}
+            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "detail" ? "border-blue-500 text-blue-300" : "border-transparent text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            Detalle
+          </button>
+          <button
+            onClick={() => setActiveTab("control")}
+            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "control" ? "border-blue-500 text-blue-300" : "border-transparent text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            Control operativo
+          </button>
+        </nav>
+      </div>
+
+      {activeTab === "detail" && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left - Info & Relations */}
         <div className="lg:col-span-1 space-y-4">
@@ -369,6 +412,178 @@ export function QuoteDetail() {
           </div>
         </div>
       </div>
+      )}
+
+      {activeTab === "control" && (
+        <div className="space-y-6">
+          {controlLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+            </div>
+          ) : !controlData ? (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+              <p className="text-gray-400">No hay datos de control disponibles</p>
+            </div>
+          ) : (
+            <>
+              {/* Status cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Facturado</p>
+                  <p className="text-xl font-semibold text-white mt-1">
+                    ${Math.round(controlData.billing.totalBilled).toLocaleString("es-CL")}
+                  </p>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Pagado</p>
+                  <p className="text-xl font-semibold text-green-300 mt-1">
+                    ${Math.round(controlData.billing.totalPaid).toLocaleString("es-CL")}
+                  </p>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">Pendiente</p>
+                  <p className="text-xl font-semibold text-amber-300 mt-1">
+                    ${Math.round(controlData.billing.pendingBalance).toLocaleString("es-CL")}
+                  </p>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">DTEs</p>
+                  <p className="text-xl font-semibold text-white mt-1">{controlData.billing.documentCount}</p>
+                </div>
+              </div>
+
+              {/* Billing documents */}
+              {controlData.billing.documents.length > 0 && (
+                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                  <div className="p-4 border-b border-gray-800">
+                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Documentos tributarios</h2>
+                  </div>
+                  <div className="divide-y divide-gray-800">
+                    {controlData.billing.documents.map((doc: any) => (
+                      <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/billing/documents/${doc.id}`)}>
+                        <div>
+                          <p className="text-sm font-medium text-white">{doc.documentNumber} ({doc.documentType})</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{doc.siiStatus} · {dateLabel(doc.issueDate)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-white">${Math.round(doc.totalAmount || 0).toLocaleString("es-CL")}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${doc.paymentStatus === "paid" ? "bg-green-500/10 text-green-400" : doc.paymentStatus === "partial" ? "bg-yellow-500/10 text-yellow-400" : "bg-gray-500/10 text-gray-400"}`}>
+                            {doc.paymentStatus}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Reports */}
+              {controlData.reports.length > 0 && (
+                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                  <div className="p-4 border-b border-gray-800">
+                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Reportes de terreno</h2>
+                  </div>
+                  <div className="divide-y divide-gray-800">
+                    {controlData.reports.map((r: any) => (
+                      <div key={r.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/reports/${r.id}`)}>
+                        <div>
+                          <p className="text-sm font-medium text-white">{r.servicio || "Reporte"}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{dateLabel(r.createdAt)}</p>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${r.status === "cerrado" ? "bg-green-500/10 text-green-400" : "bg-blue-500/10 text-blue-400"}`}>
+                          {r.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Rentals */}
+              {controlData.rentals.length > 0 && (
+                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                  <div className="p-4 border-b border-gray-800">
+                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Arriendos</h2>
+                  </div>
+                  <div className="divide-y divide-gray-800">
+                    {controlData.rentals.map((r: any) => (
+                      <div key={r.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/rentals/contracts/${r.id}`)}>
+                        <div>
+                          <p className="text-sm font-medium text-white">{r.title || r.rentalNumber}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{r.status}</p>
+                        </div>
+                        <p className="text-sm font-medium text-white">${Math.round(r.contractValue || 0).toLocaleString("es-CL")}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Service Orders */}
+              {controlData.serviceOrders.length > 0 && (
+                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                  <div className="p-4 border-b border-gray-800">
+                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Órdenes de servicio</h2>
+                  </div>
+                  <div className="divide-y divide-gray-800">
+                    {controlData.serviceOrders.map((so: any) => (
+                      <div key={so.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/accreditation/${so.id}`)}>
+                        <div>
+                          <p className="text-sm font-medium text-white">{so.title}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{so.status}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tasks */}
+              {controlData.tasks.length > 0 && (
+                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                  <div className="p-4 border-b border-gray-800">
+                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Tareas</h2>
+                  </div>
+                  <div className="divide-y divide-gray-800">
+                    {controlData.tasks.map((t: any) => (
+                      <div key={t.id} className="p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-white">{t.title}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{dateLabel(t.dueDate)}</p>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${t.status === "completed" || t.status === "done" ? "bg-green-500/10 text-green-400" : t.priority === "high" ? "bg-red-500/10 text-red-400" : "bg-blue-500/10 text-blue-400"}`}>
+                          {t.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Control snapshot */}
+              {controlData.controlSnapshot && (
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Snapshot de aceptación</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-500 text-xs">Aceptada el</p>
+                      <p className="text-gray-200">{dateLabel(controlData.controlSnapshot.acceptedAt as string)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs">Total aceptado</p>
+                      <p className="text-gray-200">${Math.round(Number(controlData.controlSnapshot.grossTotal) || 0).toLocaleString("es-CL")}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs">Número</p>
+                      <p className="text-gray-200">{String(controlData.controlSnapshot.quoteNumber || "—")}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

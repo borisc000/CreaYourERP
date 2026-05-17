@@ -32,6 +32,37 @@ export async function getQuoteExportData(quoteId: string): Promise<QuoteExportDa
   return result.data as QuoteExportData;
 }
 
+export interface QuoteControlData {
+  quoteId: string;
+  quoteStatus: string;
+  grossTotal: number;
+  acceptedAt?: string;
+  rentalContractId?: string | null;
+  controlSnapshot: Record<string, unknown> | null;
+  billing: {
+    documents: Array<Record<string, unknown>>;
+    totalBilled: number;
+    totalPaid: number;
+    pendingBalance: number;
+    documentCount: number;
+  };
+  reports: Array<Record<string, unknown>>;
+  rentals: Array<Record<string, unknown>>;
+  serviceOrders: Array<Record<string, unknown>>;
+  tasks: Array<Record<string, unknown>>;
+  hasActiveBilling: boolean;
+  hasPendingPayment: boolean;
+  hasOpenReports: boolean;
+  hasActiveRentals: boolean;
+  allTasksCompleted: boolean;
+}
+
+export async function getQuoteControl(quoteId: string): Promise<QuoteControlData> {
+  const fn = httpsCallable(functions, "getQuoteControl");
+  const result = await fn({ quoteId });
+  return result.data as QuoteControlData;
+}
+
 export async function createQuote(payload: Partial<Quote>): Promise<{ id: string; quoteNumber: string }> {
   const fn = httpsCallable(functions, "createQuote");
   const result = await fn(payload);
