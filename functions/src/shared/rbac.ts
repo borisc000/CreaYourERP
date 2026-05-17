@@ -104,6 +104,11 @@ export const SERVICE_ACTIONS = [
   // Notifications
   "notifications.view",
   "notifications.manage",
+  // Attendance
+  "attendance.manage_policies",
+  "attendance.register_check",
+  "attendance.view_records",
+  "attendance.approve_records",
 ] as const;
 
 export type ServiceAction = (typeof SERVICE_ACTIONS)[number];
@@ -211,6 +216,11 @@ const moduleMap: Record<ServiceAction, string[]> = {
   // Notifications
   "notifications.view": ["system"],
   "notifications.manage": ["system"],
+  // Attendance
+  "attendance.manage_policies": ["hr"],
+  "attendance.register_check": ["hr"],
+  "attendance.view_records": ["hr"],
+  "attendance.approve_records": ["hr"],
 };
 
 // ==========================================

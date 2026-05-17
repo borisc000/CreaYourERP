@@ -9,6 +9,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -43,6 +44,7 @@ export const saveAttendancePolicy = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "attendance.manage_policies", { companyId });
 
     const payload = request.data as SaveAttendancePolicyPayload;
     if (!payload.name?.trim()) {
@@ -129,6 +131,7 @@ export const registerCheckIn = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "attendance.register_check", { companyId });
 
     const { employeeId, employeeName, latitude, longitude, photoUrl, notes } =
       request.data as RegisterCheckInPayload;
@@ -246,6 +249,7 @@ export const registerCheckOut = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "attendance.register_check", { companyId });
 
     const { employeeId, employeeName, latitude, longitude, photoUrl, notes } =
       request.data as RegisterCheckOutPayload;
@@ -379,6 +383,7 @@ export const getAttendanceRecords = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "attendance.view_records", { companyId });
 
     const { employeeId, startDate, endDate, limit = 100 } =
       request.data as GetAttendanceRecordsPayload;
@@ -429,6 +434,7 @@ export const approveAttendanceRecord = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "attendance.approve_records", { companyId });
 
     const { recordId, notes } = request.data as ApproveAttendanceRecordPayload;
     if (!recordId) {
