@@ -109,6 +109,12 @@ export const SERVICE_ACTIONS = [
   "attendance.register_check",
   "attendance.view_records",
   "attendance.approve_records",
+  // Expenses
+  "expenses.view_dashboard",
+  "expenses.create_expense",
+  "expenses.edit_expense",
+  "expenses.delete_expense",
+  "expenses.create_backup",
 ] as const;
 
 export type ServiceAction = (typeof SERVICE_ACTIONS)[number];
@@ -221,6 +227,12 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "attendance.register_check": ["hr"],
   "attendance.view_records": ["hr"],
   "attendance.approve_records": ["hr"],
+  // Expenses
+  "expenses.view_dashboard": ["finance", "expenses"],
+  "expenses.create_expense": ["finance", "expenses"],
+  "expenses.edit_expense": ["finance", "expenses"],
+  "expenses.delete_expense": ["finance", "expenses"],
+  "expenses.create_backup": ["finance", "expenses"],
 };
 
 // ==========================================
