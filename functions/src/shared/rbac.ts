@@ -101,6 +101,9 @@ export const SERVICE_ACTIONS = [
   // Signature
   "signature.create_request",
   "signature.send_request",
+  // Notifications
+  "notifications.view",
+  "notifications.manage",
 ] as const;
 
 export type ServiceAction = (typeof SERVICE_ACTIONS)[number];
@@ -205,6 +208,9 @@ const moduleMap: Record<ServiceAction, string[]> = {
   // Signature
   "signature.create_request": ["signature"],
   "signature.send_request": ["signature"],
+  // Notifications
+  "notifications.view": ["system"],
+  "notifications.manage": ["system"],
 };
 
 // ==========================================

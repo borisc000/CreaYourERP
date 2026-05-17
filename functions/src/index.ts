@@ -525,6 +525,8 @@ export { getReportDashboard, createReport, updateReport, closeReport, createChec
 // ==========================================
 
 export { getNotificationDashboard, createNotificationTemplate, updateNotificationTemplate, sendNotification, saveNotificationPreference } from "./modules/notifications";
+export { markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, getUnreadNotificationCount } from "./modules/notifications";
+export { onSignatureRequestCreated, onBillingDocumentSiiAccepted, onSafetyMatrixGenerated } from "./modules/notifications";
 
 // ==========================================
 // GOOGLE WORKSPACE MODULE
