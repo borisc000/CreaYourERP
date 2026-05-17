@@ -554,6 +554,35 @@ export interface TimeOffRequest {
   createdAt: string;
 }
 
+export interface LeaveBalance {
+  id: string;
+  companyId: string;
+  employeeId: string;
+  vacationDays: number;
+  sickLeaveDays: number;
+  personalDays: number;
+  year: number;
+  updatedAt: string;
+}
+
+export interface TerminationRecord {
+  id: string;
+  companyId: string;
+  employeeId: string;
+  terminationDate: string;
+  reason: string;
+  noticePeriodDays: number;
+  yearsOfService: number;
+  severancePay: number;
+  pendingVacationPay: number;
+  proportionalBonus: number;
+  otherSettlements: number;
+  totalSettlement: number;
+  status: "draft" | "processed" | "paid";
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface EmploymentStatusEvent {
   id: string;
   companyId: string;

@@ -5,6 +5,8 @@ import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
 import { createContract, updateContract, deleteContract } from "@/services/contracts";
+import { TimeOffSection } from "./TimeOffSection";
+import { TerminationSection } from "./TerminationSection";
 import type { Employee, Department, JobProfile, EmployeeContract, EmployeeAccreditation } from "@/types";
 import {
   ArrowLeftIcon,
@@ -554,6 +556,12 @@ export function EmployeeDetail() {
               </div>
             </div>
           )}
+
+          {/* Time Off */}
+          <TimeOffSection employeeId={employee.id} />
+
+          {/* Terminations */}
+          <TerminationSection employeeId={employee.id} />
 
           {/* Notes */}
           {employee.notes && (

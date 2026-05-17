@@ -40,6 +40,9 @@ import { updateEmployee } from "./modules/hr/updateEmployee";
 import { createContract } from "./modules/hr/createContract";
 import { updateContract } from "./modules/hr/updateContract";
 import { deleteContract } from "./modules/hr/deleteContract";
+import { saveTimeOffRequest } from "./modules/hr/saveTimeOffRequest";
+import { approveTimeOffRequest } from "./modules/hr/approveTimeOffRequest";
+import { saveTerminationRecord } from "./modules/hr/saveTerminationRecord";
 import { onLeadCreated } from "./modules/crm/generateProjectCode";
 import { onLeadUpdated } from "./modules/crm/activityLog";
 import { onLeadWon, ensureServiceSync } from "./modules/crm/ensureService";
@@ -377,6 +380,9 @@ export { updateEmployee };
 export { createContract };
 export { updateContract };
 export { deleteContract };
+export { saveTimeOffRequest };
+export { approveTimeOffRequest };
+export { saveTerminationRecord };
 
 // ==========================================
 // SAFETY MODULE
