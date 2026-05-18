@@ -21,6 +21,7 @@ export function PayrollDashboard() {
 
   const activePeriods = periods.filter((p) => p.status === "calculated" || p.status === "approved");
   const recentSettlements = settlements.slice(0, 10);
+  const pendingSignatureCount = settlements.filter((s) => s.status === "approved" && s.requiresSignature).length;
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -37,7 +38,7 @@ export function PayrollDashboard() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-400 text-xs">Períodos</p>
           <p className="text-2xl font-bold text-white">{stats?.totalPeriods || periods.length}</p>
@@ -49,6 +50,10 @@ export function PayrollDashboard() {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-400 text-xs">Liquidaciones</p>
           <p className="text-2xl font-bold text-white">{stats?.totalSettlements || settlements.length}</p>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+          <p className="text-gray-400 text-xs">Pendientes de Firma</p>
+          <p className="text-2xl font-bold text-amber-400">{pendingSignatureCount}</p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-400 text-xs">Total Neto Pagado</p>

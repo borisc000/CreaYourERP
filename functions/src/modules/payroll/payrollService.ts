@@ -6,6 +6,46 @@ const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-er
 function nowIso() { return new Date().toISOString(); }
 function companyRef(companyId: string) { return db.collection("companies").doc(companyId); }
 
+function calculateWorkedDays(contractStart: string, contractEnd: string | null | undefined, periodStart: string, periodEnd: string): number {
+  const start = new Date(contractStart);
+  const end = contractEnd ? new Date(contractEnd) : new Date(periodEnd);
+  const pStart = new Date(periodStart);
+  const pEnd = new Date(periodEnd);
+
+  const overlapStart = start > pStart ? start : pStart;
+  const overlapEnd = end < pEnd ? end : pEnd;
+
+  if (overlapStart > overlapEnd) return 0;
+
+  const diffTime = overlapEnd.getTime() - overlapStart.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  return Math.min(diffDays, 30);
+}
+
+function buildAccountingLines(settlement: any): any[] {
+  const lines = [
+    { accountCode: "510100", accountName: "Gasto remuneraciones", debit: settlement.totalEarnings, credit: 0 },
+    { accountCode: "510200", accountName: "Gasto cargas patronales", debit: settlement.employerTotal, credit: 0 },
+    { accountCode: "210100", accountName: "Por pagar líquidos trabajadores", debit: 0, credit: settlement.netPay },
+    { accountCode: "210110", accountName: "Por pagar AFP y comisiones", debit: 0, credit: settlement.pensionAmount + settlement.afpCommissionAmount },
+    { accountCode: "210120", accountName: "Por pagar salud", debit: 0, credit: settlement.healthAmount },
+    { accountCode: "210130", accountName: "Por pagar AFC", debit: 0, credit: settlement.afcEmployeeAmount + settlement.employerAfcAmount },
+    { accountCode: "210140", accountName: "Por pagar impuesto único", debit: 0, credit: settlement.taxAmount },
+    { accountCode: "210150", accountName: "Por pagar descuentos y préstamos", debit: 0, credit: (settlement.otherDeductions || 0) + (settlement.loanDeduction || 0) + (settlement.advanceDeduction || 0) },
+    { accountCode: "210160", accountName: "Por pagar SIS", debit: 0, credit: settlement.employerSisAmount },
+    { accountCode: "210170", accountName: "Por pagar ley 16.744", debit: 0, credit: settlement.employerAccidentAmount },
+    { accountCode: "210180", accountName: "Por pagar reforma previsional", debit: 0, credit: settlement.employerPensionReformAmount },
+  ];
+
+  const totalDebits = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
+  const totalCredits = lines.reduce((sum, l) => sum + (l.credit || 0), 0);
+  if (Math.abs(totalDebits - totalCredits) > 1) {
+    console.warn(`[calculatePeriod] Accounting lines imbalance: debits=${totalDebits}, credits=${totalCredits}`);
+  }
+
+  return lines;
+}
+
 const DEFAULT_PARAMS = [
   { code: "IMM", name: "Sueldo Mínimo Mensual", category: "salary", valueNumeric: 539000, sourceLabel: "Ministerio del Trabajo" },
   { code: "UTM", name: "Unidad Tributaria Mensual", category: "tax", valueNumeric: 69889, sourceLabel: "SII" },
@@ -140,13 +180,31 @@ export const calculatePeriod = onCall(
     const employeeMap: Record<string, any> = {};
     employeesSnap.docs.forEach((d) => { employeeMap[d.id] = d.data(); });
 
+    // Get contracts for worked-days calculation
+    const contractsSnap = await companyRef(companyId).collection("contracts").get();
+    const contractMap: Record<string, any> = {};
+    contractsSnap.docs.forEach((d) => { contractMap[d.data().employeeId] = d.data(); });
+
+    const periodData = period.data() || {};
+    const periodStart = periodData.startDate || "";
+    const periodEnd = periodData.endDate || "";
+
     const settlements: any[] = [];
 
     for (const profDoc of profilesSnap.docs) {
       const prof = profDoc.data();
       const emp = employeeMap[prof.employeeId] || {};
+      const contract = contractMap[prof.employeeId];
       const baseSalary = emp.baseSalary || params.IMM || 539000;
-      const workedDays = 30; // simplified
+
+      // Calculate real worked days from contract overlap with period
+      let workedDays = 30;
+      if (periodStart && periodEnd) {
+        const cStart = contract?.startDate || periodStart;
+        const cEnd = contract?.endDate || periodEnd;
+        workedDays = calculateWorkedDays(cStart, cEnd, periodStart, periodEnd);
+      }
+
       const taxableIncome = Math.round(baseSalary * (workedDays / 30));
 
       // AFP
@@ -222,27 +280,42 @@ export const calculatePeriod = onCall(
         { type: "earning", concept: "Sueldo base", amount: taxableIncome },
         { type: "earning", concept: "Gratificación legal", amount: legalGratificationAmount },
         { type: "earning", concept: "Asignación familiar", amount: familyAllowanceAmount },
+        { type: "earning", concept: "Bono imponible recurrente", amount: prof.recurringTaxableBonus || 0 },
+        { type: "earning", concept: "Asignación no imponible recurrente", amount: prof.recurringNonTaxableAllowance || 0 },
         { type: "deduction", concept: "AFP pension", amount: pensionAmount },
         { type: "deduction", concept: "AFP comisión", amount: afpCommissionAmount },
         { type: "deduction", concept: "Salud", amount: healthAmount },
         { type: "deduction", concept: "Impuesto único", amount: taxAmount },
         { type: "deduction", concept: "AFC trabajador", amount: afcEmployeeAmount },
+        { type: "deduction", concept: "Otros descuentos", amount: prof.recurringOtherDeduction || 0 },
+        { type: "deduction", concept: "Préstamo", amount: prof.loanDeduction || 0 },
+        { type: "deduction", concept: "Anticipo", amount: prof.advanceDeduction || 0 },
       ];
 
       const warnings: string[] = [];
       if (taxableIncome < (params.IMM || 539000)) warnings.push("Sueldo base inferior al mínimo legal");
       if (netPay < 0) warnings.push("Líquido a pagar negativo");
+      if (workedDays < 30) warnings.push(`Período parcial: ${workedDays} días trabajados`);
 
-      const settleRef = await companyRef(companyId).collection("payrollSettlements").add({
+      const settlementData: any = {
         companyId, periodId, employeeId: prof.employeeId, employeeName: emp.fullName || "",
-        payrollProfileId: profDoc.id, status: "calculated", workedDays, overtimeHours: 0,
+        payrollProfileId: profDoc.id, contractId: contract?.id || "",
+        status: "calculated", workedDays, overtimeHours: 0,
         baseSalary, taxableIncome, nonTaxableIncome, totalEarnings, totalDeductions, netPay,
         taxBase: taxableTotal, taxAmount, legalGratificationAmount, familyAllowanceAmount,
         pensionAmount, afpCommissionAmount, healthAmount, afcEmployeeAmount,
         employerAfcAmount: employerAfc, employerSisAmount: employerSis,
         employerAccidentAmount: employerAccident, employerPensionReformAmount: employerPensionReform,
-        employerTotal, employerCost, lineItems, warnings, notes: "", createdAt: nowIso(), updatedAt: nowIso(),
-      });
+        employerTotal, employerCost,
+        otherDeductions: prof.recurringOtherDeduction || 0,
+        loanDeduction: prof.loanDeduction || 0,
+        advanceDeduction: prof.advanceDeduction || 0,
+        lineItems, warnings, notes: "", createdAt: nowIso(), updatedAt: nowIso(),
+      };
+
+      settlementData.accountingLines = buildAccountingLines(settlementData);
+
+      const settleRef = await companyRef(companyId).collection("payrollSettlements").add(settlementData);
       settlements.push({ id: settleRef.id, employeeName: emp.fullName, netPay });
     }
 

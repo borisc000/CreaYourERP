@@ -5,7 +5,7 @@ import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import type { PayrollPeriod, PayrollSettlement } from "@/types";
-import { ArrowLeftIcon, CalculatorIcon, CheckCircleIcon, LockClosedIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, CalculatorIcon, CheckCircleIcon, LockClosedIcon, DocumentArrowDownIcon, PaperAirplaneIcon, EyeIcon } from "@heroicons/react/24/outline";
 
 export function PayrollPeriodDetail() {
   const { id } = useParams();
@@ -61,6 +61,32 @@ export function PayrollPeriodDetail() {
       await httpsCallable(getFunctions(), "closePeriod")({ companyId, periodId: id });
     } catch (err: any) {
       alert(err.message || "Error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generatePdf = async (settlementId: string) => {
+    if (!companyId) return;
+    setLoading(true);
+    try {
+      const res: any = await httpsCallable(getFunctions(), "generateSettlementPdf")({ companyId, settlementId });
+      window.open(res.data.downloadUrl, "_blank");
+    } catch (err: any) {
+      alert(err.message || "Error al generar PDF");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendToSignature = async (settlementId: string) => {
+    if (!companyId || !confirm("¿Enviar liquidación a firma digital del trabajador?")) return;
+    setLoading(true);
+    try {
+      const res: any = await httpsCallable(getFunctions(), "sendSettlementToSignature")({ companyId, settlementId });
+      alert(`Enviado a firma. Token: ${res.data.publicToken}`);
+    } catch (err: any) {
+      alert(err.message || "Error al enviar a firma");
     } finally {
       setLoading(false);
     }
@@ -125,6 +151,7 @@ export function PayrollPeriodDetail() {
               <th className="px-4 py-3 text-right">Descuentos</th>
               <th className="px-4 py-3 text-right">Líquido</th>
               <th className="px-4 py-3 text-left">Estado</th>
+              <th className="px-4 py-3 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
@@ -137,9 +164,24 @@ export function PayrollPeriodDetail() {
                 <td className="px-4 py-3 text-right text-emerald-400 font-medium">${s.netPay.toLocaleString()}</td>
                 <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-medium ${
                   s.status === "closed" ? "bg-emerald-900/50 text-emerald-400" :
-                  s.status === "approved" ? "bg-blue-900/50 text-blue-400" :
+                  s.status === "approved" || s.status === "signature_pending" || s.status === "signed" ? "bg-blue-900/50 text-blue-400" :
                   s.status === "calculated" ? "bg-amber-900/50 text-amber-400" :
                   "bg-gray-700 text-gray-400"}`}>{s.status}</span></td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <button onClick={() => navigate(`/payroll/settlements/${s.id}`)} className="text-gray-400 hover:text-white" title="Ver detalle">
+                      <EyeIcon className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => generatePdf(s.id)} disabled={loading} className="text-gray-400 hover:text-blue-400" title="Descargar PDF">
+                      <DocumentArrowDownIcon className="w-4 h-4" />
+                    </button>
+                    {s.status === "approved" && (
+                      <button onClick={() => sendToSignature(s.id)} disabled={loading} className="text-gray-400 hover:text-emerald-400" title="Enviar a firma">
+                        <PaperAirplaneIcon className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

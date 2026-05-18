@@ -105,6 +105,8 @@ import { PayrollPeriodList } from "./modules/payroll/PayrollPeriodList";
 import { PayrollPeriodForm } from "./modules/payroll/PayrollPeriodForm";
 import { PayrollPeriodDetail } from "./modules/payroll/PayrollPeriodDetail";
 import { PayrollProfileList } from "./modules/payroll/PayrollProfileList";
+import { PayrollProfileForm } from "./modules/payroll/PayrollProfileForm";
+import { SettlementDetail } from "./modules/payroll/SettlementDetail";
 
 // Safety Procedures
 import { ProcedureList } from "./modules/safetyProcedures";
@@ -281,6 +283,9 @@ function App() {
                 <Route path="/payroll/periods/new" element={<PayrollPeriodForm />} />
                 <Route path="/payroll/periods/:id" element={<PayrollPeriodDetail />} />
                 <Route path="/payroll/profiles" element={<PayrollProfileList />} />
+                <Route path="/payroll/profiles/new" element={<PayrollProfileForm />} />
+                <Route path="/payroll/profiles/:id/edit" element={<PayrollProfileForm />} />
+                <Route path="/payroll/settlements/:id" element={<SettlementDetail />} />
 
                 {/* Safety Procedures */}
                 <Route path="/safety/procedures" element={<ProcedureList />} />

@@ -151,6 +151,8 @@ export const SERVICE_ACTIONS = [
   "payroll.view",
   "payroll.create",
   "payroll.edit",
+  "payroll.generate_pdf",
+  "payroll.send_signature",
   // PDF Workspace
   "pdf_workspace.view",
   "pdf_workspace.edit",
@@ -345,6 +347,8 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "payroll.view": ["payroll"],
   "payroll.create": ["payroll"],
   "payroll.edit": ["payroll"],
+  "payroll.generate_pdf": ["payroll"],
+  "payroll.send_signature": ["payroll"],
   // PDF Workspace
   "pdf_workspace.view": ["document_center"],
   "pdf_workspace.edit": ["document_center"],

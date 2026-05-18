@@ -495,7 +495,7 @@ export { seedRecruitmentStages, getRecruitmentStats, createJobOpening, updateJob
 // PAYROLL MODULE
 // ==========================================
 
-export { seedPayrollParameters, getPayrollDashboard, createPayrollPeriod, calculatePeriod, approvePeriod, closePeriod, savePayrollProfile } from "./modules/payroll";
+export { seedPayrollParameters, getPayrollDashboard, createPayrollPeriod, calculatePeriod, approvePeriod, closePeriod, savePayrollProfile, generateSettlementPdf, sendSettlementToSignature } from "./modules/payroll";
 
 // ==========================================
 // SAFETY PROCEDURES MODULE
