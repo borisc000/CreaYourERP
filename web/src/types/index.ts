@@ -183,7 +183,11 @@ export type ServiceAction =
   | "crm.create_lead"
   | "crm.edit_lead"
   | "crm.delete_lead"
-  | "crm.manage_pipeline";
+  | "crm.manage_pipeline"
+  | "hr.manage_job_profile_functions"
+  | "hr.manage_job_profile_responsibilities"
+  | "hr.manage_job_profile_risks"
+  | "hr.view_job_profile_matrix";
 
 export interface ServicePermissionContext {
   uid: string;
@@ -827,6 +831,19 @@ export interface EmployeeAccreditation {
   createdAt: string;
 }
 
+export interface JobProfileFunction {
+  title: string;
+  description?: string;
+  displayOrder?: number;
+}
+
+export interface JobProfileResponsibility {
+  title: string;
+  description?: string;
+  category?: "general" | "operational" | "safety" | "compliance";
+  displayOrder?: number;
+}
+
 export interface JobProfile {
   id: string;
   companyId: string;
@@ -834,6 +851,8 @@ export interface JobProfile {
   code?: string;
   departmentId?: string;
   description?: string;
+  objective?: string;
+  scope?: string;
   riskLevel?: string;
   requiredCourseIds: string[];
   requiredRequirementIds: string[];
@@ -841,8 +860,49 @@ export interface JobProfile {
   salaryRangeMax?: number;
   isActive: boolean;
   status?: "draft" | "active" | "archived";
+  functions?: JobProfileFunction[];
+  responsibilities?: JobProfileResponsibility[];
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface JobProfileRisk {
+  id: string;
+  profileId: string;
+  companyId: string;
+  processName?: string;
+  taskName: string;
+  hazardFactor: string;
+  riskName: string;
+  consequence?: string;
+  controlsSummary?: string;
+  requiredPpe?: string[];
+  protocolCodes?: string[];
+  masterRiskCode?: string;
+  probability?: number;
+  severity?: number;
+  vep?: number;
+  riskLevelLabel?: string;
+  ownerName?: string;
+  sourceNote?: string;
+  displayOrder?: number;
+  active?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface JobProfileRiskLink {
+  id: string;
+  profileId: string;
+  companyId: string;
+  masterRiskId: string;
+  masterRiskCode?: string;
+  hazardCategory?: string;
+  hazardName?: string;
+  riskName?: string;
+  displayOrder?: number;
+  active?: boolean;
+  createdAt: string;
 }
 
 // ==========================================

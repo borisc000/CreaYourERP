@@ -35,6 +35,10 @@ type ServiceAction =
   | "hr.delete_employee"
   | "hr.view_contracts"
   | "hr.manage_contracts"
+  | "hr.manage_job_profile_functions"
+  | "hr.manage_job_profile_responsibilities"
+  | "hr.manage_job_profile_risks"
+  | "hr.view_job_profile_matrix"
   | "accreditation.create_service_order"
   | "accreditation.edit_service_order"
   | "accreditation.delete_service_order"
@@ -114,6 +118,10 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "hr.delete_employee": ["hr"],
   "hr.view_contracts": ["hr"],
   "hr.manage_contracts": ["hr"],
+  "hr.manage_job_profile_functions": ["hr"],
+  "hr.manage_job_profile_responsibilities": ["hr"],
+  "hr.manage_job_profile_risks": ["hr"],
+  "hr.view_job_profile_matrix": ["hr"],
   "accreditation.create_service_order": ["accreditation"],
   "accreditation.edit_service_order": ["accreditation"],
   "accreditation.delete_service_order": ["accreditation"],

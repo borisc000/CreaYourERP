@@ -13,12 +13,27 @@ const cors = [
   "http://localhost:5173",
 ];
 
+interface JobProfileFunctionInput {
+  title: string;
+  description?: string;
+  displayOrder?: number;
+}
+
+interface JobProfileResponsibilityInput {
+  title: string;
+  description?: string;
+  category?: string;
+  displayOrder?: number;
+}
+
 interface SavePayload {
   id?: string;
   name: string;
   code?: string;
   departmentId?: string;
   description?: string;
+  objective?: string;
+  scope?: string;
   riskLevel?: string;
   requiredCourseIds?: string[];
   requiredRequirementIds?: string[];
@@ -26,6 +41,8 @@ interface SavePayload {
   salaryRangeMax?: number;
   isActive?: boolean;
   status?: "draft" | "active" | "archived";
+  functions?: JobProfileFunctionInput[];
+  responsibilities?: JobProfileResponsibilityInput[];
 }
 
 export const saveJobProfile = onCall(
@@ -48,12 +65,14 @@ export const saveJobProfile = onCall(
     }
 
     const now = new Date().toISOString();
-    const cleanPayload = {
+    const cleanPayload: Record<string, unknown> = {
       companyId,
       name: payload.name.trim(),
       code: payload.code?.trim() || "",
       departmentId: payload.departmentId || "",
       description: payload.description || "",
+      objective: payload.objective || "",
+      scope: payload.scope || "",
       riskLevel: payload.riskLevel || "low",
       requiredCourseIds: payload.requiredCourseIds || [],
       requiredRequirementIds: payload.requiredRequirementIds || [],
@@ -63,6 +82,31 @@ export const saveJobProfile = onCall(
       status: payload.status || "active",
       updatedAt: now,
     };
+
+    // Normalize functions array
+    if (Array.isArray(payload.functions)) {
+      cleanPayload.functions = payload.functions
+        .filter((f) => f.title?.trim())
+        .map((f, idx) => ({
+          title: f.title.trim(),
+          description: f.description?.trim() || "",
+          displayOrder: f.displayOrder ?? idx,
+        }));
+    }
+
+    // Normalize responsibilities array
+    if (Array.isArray(payload.responsibilities)) {
+      cleanPayload.responsibilities = payload.responsibilities
+        .filter((r) => r.title?.trim())
+        .map((r, idx) => ({
+          title: r.title.trim(),
+          description: r.description?.trim() || "",
+          category: ["general", "operational", "safety", "compliance"].includes(r.category || "")
+            ? (r.category as string)
+            : "general",
+          displayOrder: r.displayOrder ?? idx,
+        }));
+    }
 
     try {
       // Validate unique code within company

@@ -386,6 +386,7 @@ export { approveTimeOffRequest };
 export { saveTerminationRecord };
 export { saveJobProfile } from "./modules/hr/saveJobProfile";
 export { deleteJobProfile } from "./modules/hr/deleteJobProfile";
+export { saveJobProfileRisk, deleteJobProfileRisk, saveJobProfileRiskLink, deleteJobProfileRiskLink, getJobProfileComplete } from "./modules/hr/jobProfileRiskService";
 
 // ==========================================
 // SAFETY MODULE
