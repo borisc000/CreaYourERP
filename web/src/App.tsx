@@ -40,6 +40,8 @@ import { InventoryDashboard } from "./modules/inventory/InventoryDashboard";
 import { InventoryItemList } from "./modules/inventory/InventoryItemList";
 import { InventoryItemForm } from "./modules/inventory/InventoryItemForm";
 import { InventoryItemDetail } from "./modules/inventory/InventoryItemDetail";
+import { InventoryMovementList } from "./modules/inventory/InventoryMovementList";
+import { InventoryMovementDetail } from "./modules/inventory/InventoryMovementDetail";
 
 // Suppliers
 import { SupplierList } from "./modules/suppliers/SupplierList";
@@ -207,6 +209,8 @@ function App() {
                 <Route path="/inventory/items/new" element={<InventoryItemForm />} />
                 <Route path="/inventory/items/:id" element={<InventoryItemDetail />} />
                 <Route path="/inventory/items/:id/edit" element={<InventoryItemForm />} />
+                <Route path="/inventory/movements" element={<InventoryMovementList />} />
+                <Route path="/inventory/movements/:id" element={<InventoryMovementDetail />} />
 
                 {/* Suppliers */}
                 <Route path="/suppliers" element={<SupplierList />} />

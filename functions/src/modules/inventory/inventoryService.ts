@@ -77,6 +77,19 @@ export const getInventoryDashboard = onCall(
       const outOfStockItems = items.filter((i) => i.stockStatus === "out").length;
       const totalInventoryValue = items.reduce((sum, i) => sum + (i.inventoryValue || 0), 0);
 
+      const today = new Date().toISOString().split("T")[0];
+      const todayMovements = movementsSnap.docs
+        .map((d) => d.data() as any)
+        .filter((m) => (m.movementDate || "").startsWith(today) || (m.createdAt || "").startsWith(today));
+      const inboundToday = todayMovements.filter((m) => m.movementDirection === "in").length;
+      const outboundToday = todayMovements.filter((m) => m.movementDirection === "out").length;
+      const inboundValueToday = todayMovements
+        .filter((m) => m.movementDirection === "in")
+        .reduce((sum, m) => sum + (m.totalCost || 0), 0);
+      const outboundValueToday = todayMovements
+        .filter((m) => m.movementDirection === "out")
+        .reduce((sum, m) => sum + (m.totalCost || 0), 0);
+
       const categories = Array.from(new Set(items.map((i) => i.category).filter(Boolean)));
       const categoryBreakdown = categories.map((cat) => ({
         name: cat,
@@ -150,6 +163,10 @@ export const getInventoryDashboard = onCall(
           lowStockItems,
           outOfStockItems,
           totalInventoryValue: Math.round(totalInventoryValue * 100) / 100,
+          inboundToday,
+          outboundToday,
+          inboundValueToday: Math.round(inboundValueToday * 100) / 100,
+          outboundValueToday: Math.round(outboundValueToday * 100) / 100,
         },
         categories: categoryBreakdown,
         alerts,
@@ -432,6 +449,8 @@ interface CreateInventoryMovementPayload {
   hasSignatureEvidence?: boolean;
   evidencePhotoData?: string;
   evidenceSignatureData?: string;
+  photoBase64?: string;
+  signatureBase64?: string;
   notes?: string;
   movementDate?: string;
 }
@@ -469,12 +488,17 @@ export const createInventoryMovement = onCall(
       throw new HttpsError("invalid-argument", "Tipo de movimiento no válido");
     }
 
+    const photoData = payload.photoBase64?.trim() || payload.evidencePhotoData?.trim() || "";
+    const signatureData = payload.signatureBase64?.trim() || payload.evidenceSignatureData?.trim() || "";
+    const hasPhoto = Boolean(photoData);
+    const hasSignature = Boolean(signatureData);
+
     // For in/out movements, require deliveredByName, receivedByName, and at least one evidence
     if (payload.movementType === "in" || payload.movementType === "out") {
       if (!payload.deliveredByName?.trim() || !payload.receivedByName?.trim()) {
         throw new HttpsError("invalid-argument", "Las entradas y salidas requieren nombre de quien entrega y quien recibe");
       }
-      if (!payload.hasPhotoEvidence && !payload.hasSignatureEvidence) {
+      if (!hasPhoto && !hasSignature && !payload.hasPhotoEvidence && !payload.hasSignatureEvidence) {
         throw new HttpsError("invalid-argument", "Las entradas y salidas requieren al menos una evidencia (foto o firma)");
       }
     }
@@ -560,11 +584,11 @@ export const createInventoryMovement = onCall(
           destination: payload.destination?.trim() || "",
           deliveredByName: payload.deliveredByName?.trim() || "",
           receivedByName: payload.receivedByName?.trim() || "",
-          hasPhotoEvidence: Boolean(payload.hasPhotoEvidence),
-          hasSignatureEvidence: Boolean(payload.hasSignatureEvidence),
-          evidenceAvailable: Boolean(payload.hasPhotoEvidence) || Boolean(payload.hasSignatureEvidence),
-          evidencePhotoData: payload.evidencePhotoData?.trim() || "",
-          evidenceSignatureData: payload.evidenceSignatureData?.trim() || "",
+          hasPhotoEvidence: hasPhoto || Boolean(payload.hasPhotoEvidence),
+          hasSignatureEvidence: hasSignature || Boolean(payload.hasSignatureEvidence),
+          evidenceAvailable: hasPhoto || hasSignature || Boolean(payload.hasPhotoEvidence) || Boolean(payload.hasSignatureEvidence),
+          evidencePhotoData: photoData,
+          evidenceSignatureData: signatureData,
           notes: payload.notes?.trim() || "",
           performedBy,
           performedByName,

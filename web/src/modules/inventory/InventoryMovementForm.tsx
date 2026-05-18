@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import type { InventoryItem } from "@/types";
@@ -9,6 +9,7 @@ import {
   ExclamationTriangleIcon,
   CameraIcon,
   PencilSquareIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 
 interface InventoryMovementFormProps {
@@ -28,14 +29,112 @@ export function InventoryMovementForm({ item, onClose, onSaved }: InventoryMovem
     destination: "",
     deliveredByName: "",
     receivedByName: "",
-    hasPhotoEvidence: false,
-    hasSignatureEvidence: false,
-    evidencePhotoData: "",
-    evidenceSignatureData: "",
     notes: "",
     movementDate: new Date().toISOString().slice(0, 16),
   });
+  const [photoBase64, setPhotoBase64] = useState("");
   const [error, setError] = useState("");
+
+  // Signature pad state
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasSignature, setHasSignature] = useState(false);
+
+  // Resize canvas for HDPI
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.scale(dpr, dpr);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#ffffff";
+    }
+  }, []);
+
+  const getCtx = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    return canvas.getContext("2d");
+  }, []);
+
+  const getPos = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    let clientX: number, clientY: number;
+    if ("touches" in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }, []);
+
+  const startDrawing = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsDrawing(true);
+    const ctx = getCtx();
+    if (!ctx) return;
+    const { x, y } = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  }, [getCtx, getPos]);
+
+  const draw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+    const { x, y } = getPos(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }, [isDrawing, getCtx, getPos]);
+
+  const stopDrawing = useCallback(() => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    setHasSignature(true);
+    const ctx = getCtx();
+    if (ctx) ctx.closePath();
+  }, [isDrawing, getCtx]);
+
+  const clearSignature = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, rect.width * dpr, rect.height * dpr);
+    setHasSignature(false);
+  }, []);
+
+  const getSignatureBase64 = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !hasSignature) return "";
+    return canvas.toDataURL("image/png");
+  }, [hasSignature]);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+      setError("La imagen no debe superar 1MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => setPhotoBase64(reader.result as string);
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,12 +147,14 @@ export function InventoryMovementForm({ item, onClose, onSaved }: InventoryMovem
     }
 
     const isInOut = form.movementType === "in" || form.movementType === "out";
+    const signatureData = getSignatureBase64();
+
     if (isInOut) {
       if (!form.deliveredByName.trim() || !form.receivedByName.trim()) {
         setError("Las entradas y salidas requieren nombre de quien entrega y quien recibe");
         return;
       }
-      if (!form.hasPhotoEvidence && !form.hasSignatureEvidence) {
+      if (!photoBase64 && !signatureData) {
         setError("Las entradas y salidas requieren al menos una evidencia (foto o firma)");
         return;
       }
@@ -71,10 +172,8 @@ export function InventoryMovementForm({ item, onClose, onSaved }: InventoryMovem
         destination: form.destination,
         deliveredByName: form.deliveredByName,
         receivedByName: form.receivedByName,
-        hasPhotoEvidence: form.hasPhotoEvidence,
-        hasSignatureEvidence: form.hasSignatureEvidence,
-        evidencePhotoData: form.evidencePhotoData,
-        evidenceSignatureData: form.evidenceSignatureData,
+        photoBase64: photoBase64 || undefined,
+        signatureBase64: signatureData || undefined,
         notes: form.notes,
         movementDate: new Date(form.movementDate).toISOString(),
       });
@@ -237,27 +336,63 @@ export function InventoryMovementForm({ item, onClose, onSaved }: InventoryMovem
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.hasPhotoEvidence}
-                    onChange={(e) => setForm({ ...form, hasPhotoEvidence: e.target.checked })}
-                    className="rounded border-gray-700 bg-gray-900 text-blue-600"
-                  />
+              {/* Photo capture */}
+              <div>
+                <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer mb-2">
                   <CameraIcon className="w-4 h-4 text-gray-500" />
-                  Foto
+                  <span>Foto de evidencia</span>
                 </label>
-                <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.hasSignatureEvidence}
-                    onChange={(e) => setForm({ ...form, hasSignatureEvidence: e.target.checked })}
-                    className="rounded border-gray-700 bg-gray-900 text-blue-600"
-                  />
-                  <PencilSquareIcon className="w-4 h-4 text-gray-500" />
-                  Firma
-                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePhotoChange}
+                  className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-gray-800 file:text-gray-300 hover:file:bg-gray-700"
+                />
+                {photoBase64 && (
+                  <div className="mt-2 relative inline-block">
+                    <img src={photoBase64} alt="Evidencia" className="w-32 h-32 object-cover rounded-lg border border-gray-700" />
+                    <button
+                      type="button"
+                      onClick={() => setPhotoBase64("")}
+                      className="absolute -top-2 -right-2 p-1 bg-red-600 hover:bg-red-500 text-white rounded-full"
+                    >
+                      <XMarkIcon className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Signature pad */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-300">
+                    <PencilSquareIcon className="w-4 h-4 text-gray-500" />
+                    <span>Firma digital</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={clearSignature}
+                    className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300"
+                  >
+                    <TrashIcon className="w-3 h-3" />
+                    Limpiar
+                  </button>
+                </div>
+                <canvas
+                  ref={canvasRef}
+                  className="w-full h-32 bg-gray-900 border border-gray-700 rounded-lg cursor-crosshair touch-none"
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {hasSignature ? "Firma capturada" : "Dibuja la firma en el área de arriba"}
+                </p>
               </div>
             </div>
           )}

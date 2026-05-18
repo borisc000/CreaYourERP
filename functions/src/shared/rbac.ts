@@ -141,6 +141,7 @@ export const SERVICE_ACTIONS = [
   "google_workspace.edit",
   // Inventory
   "inventory.view",
+  "inventory.view_movements",
   "inventory.create",
   "inventory.edit",
   "inventory.delete",
@@ -342,6 +343,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "google_workspace.edit": ["google_workspace"],
   // Inventory
   "inventory.view": ["inventory"],
+  "inventory.view_movements": ["inventory"],
   "inventory.create": ["inventory"],
   "inventory.edit": ["inventory"],
   "inventory.delete": ["inventory"],
