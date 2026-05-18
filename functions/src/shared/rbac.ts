@@ -90,6 +90,8 @@ export const SERVICE_ACTIONS = [
   "safety.save_talk",
   "safety.delete_talk",
   "safety.seed_catalogs",
+  "safety.link_procedure",
+  "safety.unlink_procedure",
   // Document Center
   "document_center.save_template",
   "document_center.delete_template",
@@ -161,6 +163,7 @@ export const SERVICE_ACTIONS = [
   "recruitment.view",
   "recruitment.create",
   "recruitment.edit",
+  "recruitment.hire",
   // Rentals
   "rentals.view",
   "rentals.create",
@@ -281,6 +284,8 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "safety.save_talk": ["safety"],
   "safety.delete_talk": ["safety"],
   "safety.seed_catalogs": ["safety"],
+  "safety.link_procedure": ["safety"],
+  "safety.unlink_procedure": ["safety"],
   // Document Center
   "document_center.save_template": ["document_center"],
   "document_center.delete_template": ["document_center"],
@@ -352,6 +357,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "recruitment.view": ["hr"],
   "recruitment.create": ["hr"],
   "recruitment.edit": ["hr"],
+  "recruitment.hire": ["hr"],
   // Rentals
   "rentals.view": ["rentals"],
   "rentals.create": ["rentals"],

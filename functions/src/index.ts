@@ -395,6 +395,7 @@ export { seedSafetyCatalogs };
 export { generateRiskMatrix };
 export { generateJobProfileMatrix } from "./modules/safety/generateJobProfileMatrix";
 export { refreshFolderMetrics };
+export { linkProcedureToFolder, unlinkProcedureFromFolder } from "./modules/safety/procedureLinkService";
 export { generateIRL, saveIRL, deleteIRL } from "./modules/safety/irlService";
 export { savePPEDelivery, deletePPEDelivery } from "./modules/safety/ppeService";
 export { saveTalk, deleteTalk } from "./modules/safety/talkService";

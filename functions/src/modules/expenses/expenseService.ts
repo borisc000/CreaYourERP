@@ -211,6 +211,7 @@ interface CreateExpensePayload {
   assetRecordId?: string;
   assetRecordCode?: string;
   assetRecordName?: string;
+  assetMaintenanceId?: string;
   expenseDate?: string;
   vendorName?: string;
   spenderName?: string;
@@ -227,7 +228,7 @@ interface CreateExpensePayload {
   supportData?: string;
 }
 
-async function generateExpenseNumber(companyId: string): Promise<string> {
+export async function generateExpenseNumber(companyId: string): Promise<string> {
   const now = new Date();
   const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
   const prefix = `GTO-${yearMonth}-`;
@@ -300,6 +301,7 @@ export const createExpenseRecord = onCall(
         assetRecordId: payload.assetRecordId || "",
         assetRecordCode: payload.assetRecordCode || "",
         assetRecordName: payload.assetRecordName || "",
+        assetMaintenanceId: payload.assetMaintenanceId || "",
         expenseDate: payload.expenseDate || now.split("T")[0],
         vendorName: payload.vendorName?.trim() || "",
         spenderName: payload.spenderName?.trim() || "",
@@ -346,6 +348,7 @@ interface UpdateExpensePayload {
   assetRecordId?: string;
   assetRecordCode?: string;
   assetRecordName?: string;
+  assetMaintenanceId?: string;
   expenseDate?: string;
   vendorName?: string;
   spenderName?: string;
@@ -405,6 +408,7 @@ export const updateExpenseRecord = onCall(
       if (payload.assetRecordId !== undefined) updateData.assetRecordId = payload.assetRecordId || "";
       if (payload.assetRecordCode !== undefined) updateData.assetRecordCode = payload.assetRecordCode || "";
       if (payload.assetRecordName !== undefined) updateData.assetRecordName = payload.assetRecordName || "";
+      if (payload.assetMaintenanceId !== undefined) updateData.assetMaintenanceId = payload.assetMaintenanceId || "";
       if (payload.expenseDate !== undefined) updateData.expenseDate = payload.expenseDate;
       if (payload.vendorName !== undefined) updateData.vendorName = payload.vendorName.trim();
       if (payload.spenderName !== undefined) updateData.spenderName = payload.spenderName.trim();

@@ -1,6 +1,11 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
+import {
+  cleanString,
+  isValidChileanRut,
+  generateEmployeeCode,
+} from "../hr/hrService";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function nowIso() { return new Date().toISOString(); }
@@ -198,38 +203,152 @@ export const hireApplication = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    await assertAction(request, "recruitment.create", { companyId });
-    const { applicationId, employeeData } = request.data;
-    if (!applicationId) throw new HttpsError("invalid-argument", "Datos incompletos");
+    await assertAction(request, "recruitment.hire", { companyId });
+
+    const { applicationId, employeeData } = request.data || {};
+    if (!applicationId) throw new HttpsError("invalid-argument", "applicationId requerido");
+
+    const firstName = cleanString(employeeData?.firstName);
+    const lastName = cleanString(employeeData?.lastName);
+    const email = cleanString(employeeData?.email).toLowerCase();
+    if (!firstName || !lastName) throw new HttpsError("invalid-argument", "firstName y lastName son obligatorios");
+    if (!email) throw new HttpsError("invalid-argument", "El email es obligatorio");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpsError("invalid-argument", "El email no es válido");
+
+    const cedula = cleanString(employeeData?.cedula || employeeData?.nationalId);
+    if (cedula && !isValidChileanRut(cedula)) throw new HttpsError("invalid-argument", "El RUT no es válido");
 
     const appRef = companyRef(companyId).collection("jobApplications").doc(applicationId);
-    const app = await appRef.get();
-    if (!app.exists) throw new HttpsError("not-found", "Postulación no encontrada");
-    const appData = app.data()!;
+    const appSnap = await appRef.get();
+    if (!appSnap.exists) throw new HttpsError("not-found", "Postulación no encontrada");
+    const appData = appSnap.data()!;
 
-    // Create employee
-    const empRef = await companyRef(companyId).collection("employees").add({
-      companyId, fullName: employeeData.fullName || appData.candidateName,
-      nationalId: employeeData.nationalId || "", email: employeeData.email || "",
-      phone: employeeData.phone || "", positionTitle: appData.jobTitle,
-      departmentId: employeeData.departmentId || "", hireDate: nowIso().slice(0, 10),
-      status: "active", isActive: true, createdAt: nowIso(), updatedAt: nowIso(),
+    const candidateSnap = appData.candidateId
+      ? await companyRef(companyId).collection("candidates").doc(appData.candidateId).get()
+      : null;
+    const candidateData = candidateSnap?.exists ? candidateSnap.data()! : {};
+
+    const jobRef = companyRef(companyId).collection("jobOpenings").doc(appData.jobId);
+    const jobSnap = await jobRef.get();
+    const jobData = jobSnap.exists ? jobSnap.data()! : {};
+
+    const employeeCode = await generateEmployeeCode(companyId);
+    const now = nowIso();
+    const hireDate = cleanString(employeeData?.startDate) || now.slice(0, 10);
+    const baseSalary = typeof employeeData?.baseSalary === "number" ? employeeData.baseSalary : 0;
+
+    // Transaction: create employee + contract + payroll + invite + update app + update job
+    const empRef = companyRef(companyId).collection("employees").doc();
+    const contractRef = companyRef(companyId).collection("contracts").doc();
+    const payrollRef = companyRef(companyId).collection("payrollProfiles").doc();
+    const inviteRef = companyRef(companyId).collection("pendingInvites").doc();
+
+    await db.runTransaction(async (t) => {
+      // 1. Employee (rich)
+      t.set(empRef, {
+        companyId,
+        employeeCode,
+        firstName,
+        lastName,
+        fullName: `${firstName} ${lastName}`,
+        email,
+        workEmail: email,
+        personalEmail: candidateData.personalEmail || null,
+        phone: cleanString(employeeData?.phone) || candidateData.phone || null,
+        alternatePhone: candidateData.alternatePhone || null,
+        cedula: cedula || null,
+        birthDate: candidateData.birthDate || null,
+        gender: candidateData.gender || null,
+        maritalStatus: candidateData.maritalStatus || null,
+        nationality: candidateData.nationality || null,
+        address: candidateData.address || null,
+        commune: candidateData.commune || null,
+        city: candidateData.city || null,
+        region: candidateData.region || null,
+        emergencyContactName: candidateData.emergencyContactName || null,
+        emergencyContactPhone: candidateData.emergencyContactPhone || null,
+        healthSystem: candidateData.healthSystem || null,
+        afpCode: candidateData.afpCode || null,
+        criminalRecordStatus: candidateData.criminalRecordStatus || "not_provided",
+        departmentId: cleanString(employeeData?.departmentId) || jobData.departmentId || null,
+        jobProfileId: cleanString(employeeData?.jobProfileId) || jobData.jobProfileId || null,
+        managerUserId: null,
+        positionTitle: appData.jobTitle || jobData.title || null,
+        hireDate,
+        baseSalary,
+        status: "active",
+        isActive: true,
+        photoURL: null,
+        notes: null,
+        courses: [],
+        certifications: [],
+        assignedCustomerIds: [],
+        createdBy: request.auth!.uid,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // 2. Contract (active)
+      t.set(contractRef, {
+        companyId,
+        employeeId: empRef.id,
+        contractType: cleanString(employeeData?.contractType) || "indefinite",
+        status: "active",
+        startDate: hireDate,
+        endDate: null,
+        salaryAmount: baseSalary,
+        workSchedule: null,
+        shiftPattern: null,
+        workLocation: cleanString(employeeData?.workLocation) || null,
+        assignedCustomer: null,
+        assignedService: null,
+        notes: null,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: request.auth!.uid,
+      });
+
+      // 3. Payroll profile
+      t.set(payrollRef, {
+        companyId,
+        employeeId: empRef.id,
+        payrollEnabled: true,
+        requireSignature: false,
+        afpCode: candidateData.afpCode || null,
+        healthSystem: candidateData.healthSystem || null,
+        baseSalary,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // 4. Pending invite (auth provisioning)
+      t.set(inviteRef, {
+        companyId,
+        email,
+        role: "employee",
+        status: "pending",
+        invitedBy: request.auth!.uid,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // 5. Update application
+      t.update(appRef, { status: "hired", hiredEmployeeId: empRef.id, updatedAt: now });
+
+      // 6. Update job opening
+      const newCount = (jobData.hiredCount || 0) + 1;
+      const jobUpdates: any = { hiredCount: newCount, updatedAt: now };
+      if (newCount >= (jobData.openingsCount || 1)) jobUpdates.status = "closed";
+      t.update(jobRef, jobUpdates);
     });
 
-    // Update application
-    await appRef.update({ status: "hired", hiredEmployeeId: empRef.id, updatedAt: nowIso() });
-
-    // Update job hired count
-    const jobRef = companyRef(companyId).collection("jobOpenings").doc(appData.jobId);
-    const job = await jobRef.get();
-    if (job.exists) {
-      const newCount = (job.data()?.hiredCount || 0) + 1;
-      const updates: any = { hiredCount: newCount };
-      if (newCount >= (job.data()?.openingsCount || 1)) updates.status = "closed";
-      await jobRef.update(updates);
-    }
-
-    return { hired: true, employeeId: empRef.id };
+    return {
+      hired: true,
+      employeeId: empRef.id,
+      contractId: contractRef.id,
+      payrollProfileId: payrollRef.id,
+      inviteId: inviteRef.id,
+    };
   }
 );
 

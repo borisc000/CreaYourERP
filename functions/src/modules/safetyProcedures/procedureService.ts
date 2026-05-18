@@ -68,6 +68,13 @@ export const updateProcedure = onCall(
     await assertAction(request, "safety_procedures.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
+
+    const proc = await companyRef(companyId).collection("safetyProcedureTemplates").doc(id).get();
+    if (!proc.exists) throw new HttpsError("not-found", "Procedimiento no encontrado");
+    if (proc.data()?.status === "approved") {
+      throw new HttpsError("failed-precondition", "No se puede editar un procedimiento aprobado. Cree una nueva versión o clone.");
+    }
+
     await companyRef(companyId).collection("safetyProcedureTemplates").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }
@@ -84,20 +91,59 @@ export const approveProcedure = onCall(
     await assertAction(request, "safety_procedures.edit", { companyId });
     const { id } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
+
     const proc = await companyRef(companyId).collection("safetyProcedureTemplates").doc(id).get();
     if (!proc.exists) throw new HttpsError("not-found", "Procedimiento no encontrado");
+    const procData = proc.data()!;
 
-    // Create version snapshot
-    await companyRef(companyId).collection("safetyProcedureVersions").add({
-      companyId, procedureId: id, procedureCode: proc.data()?.procedureCode,
-      version: proc.data()?.version || "V1", status: "approved",
-      snapshot: proc.data(), approvedBy: request.auth?.uid || "", approvedAt: nowIso(), active: true,
+    // Read all steps
+    const stepsSnap = await companyRef(companyId).collection("safetyProcedureSteps").where("procedureId", "==", id).get();
+    const stepSnapshots = stepsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    // Compute next version
+    const currentVersion = procData.version || "V1";
+    let nextVersion = "V2";
+    const match = currentVersion.match(/V(\d+)/);
+    if (match) {
+      nextVersion = `V${String(parseInt(match[1], 10) + 1)}`;
+    }
+
+    const now = nowIso();
+
+    await db.runTransaction(async (t) => {
+      // Deactivate previous versions
+      const prevVersions = await companyRef(companyId).collection("safetyProcedureVersions").where("procedureId", "==", id).get();
+      for (const v of prevVersions.docs) {
+        t.update(v.ref, { active: false, updatedAt: now });
+      }
+
+      // Create new version snapshot
+      const versionRef = companyRef(companyId).collection("safetyProcedureVersions").doc();
+      t.set(versionRef, {
+        companyId,
+        procedureId: id,
+        procedureCode: procData.procedureCode,
+        version: nextVersion,
+        status: "approved",
+        snapshot: procData,
+        stepSnapshots,
+        approvedBy: request.auth?.uid || "",
+        approvedAt: now,
+        active: true,
+        createdAt: now,
+      });
+
+      // Update template
+      t.update(companyRef(companyId).collection("safetyProcedureTemplates").doc(id), {
+        status: "approved",
+        version: nextVersion,
+        approvedBy: request.auth?.uid || "",
+        approvedAt: now,
+        updatedAt: now,
+      });
     });
 
-    await companyRef(companyId).collection("safetyProcedureTemplates").doc(id).update({
-      status: "approved", approvedBy: request.auth?.uid || "", approvedAt: nowIso(), updatedAt: nowIso(),
-    });
-    return { approved: true };
+    return { approved: true, version: nextVersion };
   }
 );
 
@@ -134,6 +180,17 @@ export const updateProcedureStep = onCall(
     await assertAction(request, "safety_procedures.edit", { companyId });
     const { companyId: _c, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
+
+    const step = await companyRef(companyId).collection("safetyProcedureSteps").doc(id).get();
+    if (!step.exists) throw new HttpsError("not-found", "Paso no encontrado");
+    const procedureId = step.data()?.procedureId;
+    if (procedureId) {
+      const proc = await companyRef(companyId).collection("safetyProcedureTemplates").doc(procedureId).get();
+      if (proc.exists && proc.data()?.status === "approved") {
+        throw new HttpsError("failed-precondition", "No se puede editar pasos de un procedimiento aprobado.");
+      }
+    }
+
     await companyRef(companyId).collection("safetyProcedureSteps").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }

@@ -3,9 +3,10 @@
  *
  * Criterios:
  * - 20%: Matriz MIPER aprobada y sin riesgos intolerables
- * - 20%: Documentos críticos aprobados
- * - 20%: Personal asignado
- * - 20%: EPP entregado
+ * - 15%: Documentos críticos aprobados
+ * - 15%: Procedimientos vinculados con versión activa
+ * - 15%: Personal asignado
+ * - 15%: EPP entregado
  * - 20%: Checklists conformes
  */
 
@@ -48,7 +49,7 @@ export const refreshFolderMetrics = onDocumentUpdated(
         else if (!hasIntolerable) readiness += 10; // Has matrix but not approved
       }
 
-      // 2. Check critical documents (20%)
+      // 2. Check critical documents (15%)
       const docsSnap = await db
         .collection("companies")
         .doc(companyId)
@@ -60,15 +61,35 @@ export const refreshFolderMetrics = onDocumentUpdated(
       const criticalDocs = allDocs.filter((d) => d.isCritical);
       const approvedCritical = criticalDocs.filter((d) => d.status === "approved").length;
       checks.documents = criticalDocs.length > 0 && approvedCritical === criticalDocs.length;
-      if (checks.documents) readiness += 20;
-      else if (criticalDocs.length > 0) readiness += Math.round((approvedCritical / criticalDocs.length) * 20);
+      if (checks.documents) readiness += 15;
+      else if (criticalDocs.length > 0) readiness += Math.round((approvedCritical / criticalDocs.length) * 15);
 
-      // 3. Check assigned personnel (20%)
+      // 3. Check linked procedures with active version (15%)
+      const linkedProcedureIds = after.procedureIds || [];
+      let activeProcedures = 0;
+      if (linkedProcedureIds.length > 0) {
+        for (const procId of linkedProcedureIds) {
+          const versionSnap = await db
+            .collection("companies")
+            .doc(companyId)
+            .collection("safetyProcedureVersions")
+            .where("procedureId", "==", procId)
+            .where("active", "==", true)
+            .limit(1)
+            .get();
+          if (!versionSnap.empty) activeProcedures++;
+        }
+      }
+      checks.procedures = linkedProcedureIds.length > 0 && activeProcedures === linkedProcedureIds.length;
+      if (checks.procedures) readiness += 15;
+      else if (linkedProcedureIds.length > 0) readiness += Math.round((activeProcedures / linkedProcedureIds.length) * 15);
+
+      // 4. Check assigned personnel (15%)
       const assignedCount = (after.assignedEmployeeIds || []).length;
       checks.personnel = assignedCount > 0;
-      if (checks.personnel) readiness += 20;
+      if (checks.personnel) readiness += 15;
 
-      // 4. Check PPE deliveries (20%)
+      // 5. Check PPE deliveries (15%)
       const ppeSnap = await db
         .collection("companies")
         .doc(companyId)
@@ -77,9 +98,9 @@ export const refreshFolderMetrics = onDocumentUpdated(
         .where("status", "==", "delivered")
         .get();
       checks.ppe = !ppeSnap.empty;
-      if (checks.ppe) readiness += 20;
+      if (checks.ppe) readiness += 15;
 
-      // 5. Check checklists (20%)
+      // 6. Check checklists (20%)
       const checklistSnap = await db
         .collection("companies")
         .doc(companyId)

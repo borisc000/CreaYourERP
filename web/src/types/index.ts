@@ -1606,6 +1606,7 @@ export interface InventoryMovement {
   performedBy?: string;
   performedByName?: string;
   movementDate: string;
+  assetMaintenanceId?: string;
   createdAt: string;
 }
 
@@ -1776,6 +1777,9 @@ export interface AssetMaintenance {
   nextDueDate?: string;
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
   notes?: string;
+  partsUsed?: Array<{ inventoryItemId: string; quantity: number; unitCost?: number }>;
+  expenseId?: string;
+  inventoryMovementIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -1892,6 +1896,7 @@ export interface ExpenseRecord {
   assetRecordId?: string;
   assetRecordCode?: string;
   assetRecordName?: string;
+  assetMaintenanceId?: string;
   expenseDate: string;
   vendorName?: string;
   spenderName?: string;
