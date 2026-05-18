@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { orderBy } from "firebase/firestore";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
 import type { AttendanceRecord, Employee } from "@/types";
@@ -10,12 +11,11 @@ import {
   UserGroupIcon,
   SunIcon,
   ArrowTrendingUpIcon,
+  ShieldCheckIcon,
+  FlagIcon,
 } from "@heroicons/react/24/outline";
 
-const statusConfig: Record<
-  string,
-  { label: string; color: string; icon: React.ElementType }
-> = {
+const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   present: { label: "Presente", color: "text-green-400", icon: CheckCircleIcon },
   absent: { label: "Ausente", color: "text-red-400", icon: XCircleIcon },
   late: { label: "Tarde", color: "text-yellow-400", icon: ExclamationTriangleIcon },
@@ -34,6 +34,7 @@ const statusBadge: Record<string, string> = {
 };
 
 export function AttendanceDashboard() {
+  const navigate = useNavigate();
   const { data: records, isLoading: loadingRecords } = useFirestoreCollection<AttendanceRecord>(
     "attendanceRecords",
     [orderBy("date", "desc")]
@@ -56,14 +57,33 @@ export function AttendanceDashboard() {
     const late = todayRecords.filter((r) => r.status === "late").length;
     const absent = todayRecords.filter((r) => r.status === "absent").length;
     const earlyLeave = todayRecords.filter((r) => r.status === "early_leave").length;
-    return { present, late, absent, earlyLeave, total: todayRecords.length };
+    const withFlags = todayRecords.filter((r) => (r.flags || []).length > 0).length;
+    const totalOvertime = todayRecords.reduce((sum, r) => sum + (r.overtimeMinutes || 0), 0);
+    return { present, late, absent, earlyLeave, withFlags, totalOvertime, total: todayRecords.length };
   }, [todayRecords]);
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Asistencia</h1>
-        <p className="text-gray-400 text-sm mt-1">Resumen diario y registros recientes</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Asistencia</h1>
+          <p className="text-gray-400 text-sm mt-1">Resumen diario y registros recientes</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/attendance/register")}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            Registrar marcación
+          </button>
+          <button
+            onClick={() => navigate("/attendance/compliance")}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            <ShieldCheckIcon className="w-4 h-4" />
+            Compliance
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -83,6 +103,22 @@ export function AttendanceDashboard() {
           <p className="text-gray-500 text-xs uppercase tracking-wider">Salida temprana</p>
           <p className="text-2xl font-bold text-orange-400 mt-1">{stats.earlyLeave}</p>
         </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+          <p className="text-gray-500 text-xs uppercase tracking-wider">Alertas hoy</p>
+          <div className="flex items-center gap-2 mt-1">
+            <FlagIcon className="w-5 h-5 text-amber-400" />
+            <p className="text-2xl font-bold text-amber-400">{stats.withFlags}</p>
+          </div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+          <p className="text-gray-500 text-xs uppercase tracking-wider">Horas extras hoy</p>
+          <div className="flex items-center gap-2 mt-1">
+            <ArrowTrendingUpIcon className="w-5 h-5 text-blue-400" />
+            <p className="text-2xl font-bold text-blue-400">
+              {Math.floor(stats.totalOvertime / 60)}h {stats.totalOvertime % 60}m
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
@@ -101,14 +137,10 @@ export function AttendanceDashboard() {
             {recentRecords.map((r) => {
               const cfg = statusConfig[r.status] || statusConfig.present;
               const Icon = cfg.icon;
+              const hasFlags = (r.flags || []).length > 0;
               return (
-                <div
-                  key={r.id}
-                  className="flex items-center gap-4 p-4 hover:bg-gray-800/50 transition-colors"
-                >
-                  <div
-                    className={`w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center shrink-0 ${cfg.color}`}
-                  >
+                <div key={r.id} className="flex items-center gap-4 p-4 hover:bg-gray-800/50 transition-colors">
+                  <div className={`w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center shrink-0 ${cfg.color}`}>
                     <Icon className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -118,22 +150,19 @@ export function AttendanceDashboard() {
                     <p className="text-sm text-gray-500">
                       {r.date} • Entrada:{" "}
                       {r.checkIn
-                        ? new Date(r.checkIn).toLocaleTimeString("es-CL", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
+                        ? new Date(r.checkIn).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
                         : "--:--"}
                       {" • Salida: "}
                       {r.checkOut
-                        ? new Date(r.checkOut).toLocaleTimeString("es-CL", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
+                        ? new Date(r.checkOut).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
                         : "--:--"}
                       {r.workMinutes > 0 && (
                         <span className="ml-2 text-gray-400">
                           ({Math.floor(r.workMinutes / 60)}h {r.workMinutes % 60}m)
                         </span>
+                      )}
+                      {hasFlags && (
+                        <span className="ml-2 text-amber-400 text-xs">[{r.flags!.join(", ")}]</span>
                       )}
                     </p>
                   </div>

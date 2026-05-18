@@ -441,7 +441,8 @@ export { saveRiohsConfig, getRiohsConfig, generateRiohsDocument } from "./module
 // ATTENDANCE MODULE
 // ==========================================
 
-export { saveAttendancePolicy, registerCheckIn, registerCheckOut, getAttendanceRecords, approveAttendanceRecord } from "./modules/attendance";
+export { saveAttendancePolicy, registerCheckIn, registerCheckOut, registerPunch, getAttendanceRecords, approveAttendanceRecord, getAttendanceComplianceReport } from "./modules/attendance";
+export { onAttendanceEventCreated } from "./modules/attendance";
 
 // ==========================================
 // TASKS MODULE

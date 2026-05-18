@@ -54,6 +54,7 @@ import { RiohsEditorPage } from "./modules/riohs/RiohsEditorPage";
 import { AttendanceDashboard } from "./modules/attendance/AttendanceDashboard";
 import { AttendanceRegister } from "./modules/attendance/AttendanceRegister";
 import { AttendancePolicyForm } from "./modules/attendance/AttendancePolicyForm";
+import { AttendanceComplianceReport } from "./modules/attendance/AttendanceComplianceReport";
 
 // Tasks
 import { TaskBoard } from "./modules/tasks/TaskBoard";
@@ -221,6 +222,7 @@ function App() {
                 <Route path="/attendance" element={<AttendanceDashboard />} />
                 <Route path="/attendance/register" element={<AttendanceRegister />} />
                 <Route path="/attendance/policies" element={<AttendancePolicyForm />} />
+                <Route path="/attendance/compliance" element={<AttendanceComplianceReport />} />
 
                 {/* Tasks */}
                 <Route path="/tasks" element={<TaskBoard />} />

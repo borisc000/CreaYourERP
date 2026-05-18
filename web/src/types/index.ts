@@ -1638,9 +1638,14 @@ export interface AttendancePolicy {
   workHoursStart: string; // '08:00'
   workHoursEnd: string; // '17:00'
   lunchBreakMinutes: number;
+  minBreakMinutes?: number;
+  standardDailyMinutes?: number;
   toleranceMinutesEarly: number;
   toleranceMinutesLate: number;
   overtimeThresholdMinutes: number;
+  declarationText?: string;
+  legalBasis?: string;
+  timezone?: string;
   isDefault: boolean;
   isActive: boolean;
   createdAt: string;
@@ -1660,9 +1665,13 @@ export interface AttendanceRecord {
   checkInPhoto?: string;
   checkOutPhoto?: string;
   workMinutes: number;
+  breakMinutes?: number;
   overtimeMinutes: number;
   lunchMinutes: number;
+  lateMinutes?: number;
+  earlyExitMinutes?: number;
   status: "present" | "absent" | "late" | "early_leave" | "on_leave" | "holiday";
+  flags?: string[];
   notes?: string;
   approvedBy?: string;
   approvedAt?: string;
@@ -1675,14 +1684,29 @@ export interface AttendanceEvent {
   companyId: string;
   employeeId: string;
   employeeName?: string;
-  eventType: "check_in" | "check_out" | "overtime_start" | "overtime_end" | "manual_correction";
+  eventType: "entry" | "exit" | "break_start" | "break_end" | "check_in" | "check_out" | "overtime_start" | "overtime_end" | "manual_correction";
   timestamp: string;
+  date?: string;
   latitude?: number;
   longitude?: number;
   photoUrl?: string;
   notes?: string;
   createdBy?: string;
   createdAt: string;
+  evidencePayload?: Record<string, unknown>;
+  payloadHash?: string;
+  previousHash?: string;
+  chainHash?: string;
+}
+
+export interface AttendanceComplianceSummary {
+  employeeId: string;
+  employeeName: string;
+  daysWorked: number;
+  daysWithFlags: number;
+  totalLateMinutes: number;
+  totalOvertimeMinutes: number;
+  flagsBreakdown: Record<string, number>;
 }
 
 // ==========================================

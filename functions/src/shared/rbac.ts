@@ -111,6 +111,7 @@ export const SERVICE_ACTIONS = [
   "attendance.register_check",
   "attendance.view_records",
   "attendance.approve_records",
+  "attendance.compliance_report",
   // Expenses
   "expenses.view_dashboard",
   "expenses.create_expense",
@@ -307,6 +308,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "attendance.register_check": ["hr"],
   "attendance.view_records": ["hr"],
   "attendance.approve_records": ["hr"],
+  "attendance.compliance_report": ["hr"],
   // Expenses
   "expenses.view_dashboard": ["finance", "expenses"],
   "expenses.create_expense": ["finance", "expenses"],
