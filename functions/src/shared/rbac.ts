@@ -172,6 +172,10 @@ export const SERVICE_ACTIONS = [
   "rentals.create",
   "rentals.edit",
   "rentals.delete",
+  "rentals.manage_guarantees",
+  "rentals.view_timeline",
+  "rentals.create_backup",
+  "rentals.recompute_allocations",
   // Riohs
   "riohs.view",
   "riohs.create",
@@ -369,6 +373,10 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "rentals.create": ["rentals"],
   "rentals.edit": ["rentals"],
   "rentals.delete": ["rentals"],
+  "rentals.manage_guarantees": ["rentals"],
+  "rentals.view_timeline": ["rentals"],
+  "rentals.create_backup": ["rentals"],
+  "rentals.recompute_allocations": ["rentals"],
   // Riohs
   "riohs.view": ["safety"],
   "riohs.create": ["safety"],

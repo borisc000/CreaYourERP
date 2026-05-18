@@ -1998,7 +1998,7 @@ export interface RentalContract {
   customerName?: string;
   sourceType?: string;
   sourceQuoteId?: string;
-  status: "draft" | "dispatched" | "returned" | "closed";
+  status: "draft" | "precheck" | "quoted" | "approved" | "reserved" | "contracted" | "dispatched" | "active" | "returned" | "closed" | "cancelled";
   precheckStatus: string;
   legalStatus: string;
   guaranteeStatus: string;
@@ -2058,6 +2058,8 @@ export interface RentalGuarantee {
   status: string;
   receivedAt?: string;
   releasedAt?: string;
+  notes?: string;
+  documentUrl?: string;
   createdAt: string;
 }
 
@@ -2071,6 +2073,17 @@ export interface RentalEvent {
   details?: string;
   payload?: Record<string, any>;
   eventAt: string;
+  createdAt: string;
+}
+
+export interface RentalBackup {
+  id: string;
+  contractId: string;
+  companyId: string;
+  backupName: string;
+  checksum: string;
+  snapshotSize?: number;
+  createdByUserId?: string;
   createdAt: string;
 }
 

@@ -7,4 +7,11 @@ export {
   dispatchRentalContract,
   returnRentalContract,
   closeRentalContract,
+  createRentalGuarantee,
+  updateRentalGuarantee,
+  deleteRentalGuarantee,
+  createRentalEvent,
+  getRentalTimeline,
+  createRentalBackup,
+  recomputeAssetAllocations,
 } from "./rentalService";

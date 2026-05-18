@@ -235,8 +235,22 @@ export const createRentalContract = onCall(
 );
 
 // ==========================================
-// updateRentalContract
+// updateRentalContract (with transition validation + lead side effects)
 // ==========================================
+
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  draft: ["precheck", "quoted", "approved", "reserved", "contracted", "dispatched", "cancelled"],
+  precheck: ["quoted", "approved", "reserved", "contracted", "dispatched", "cancelled"],
+  quoted: ["approved", "reserved", "contracted", "dispatched", "cancelled"],
+  approved: ["reserved", "contracted", "dispatched", "cancelled"],
+  reserved: ["contracted", "dispatched", "cancelled"],
+  contracted: ["dispatched", "cancelled"],
+  dispatched: ["active", "returned", "cancelled"],
+  active: ["returned", "cancelled"],
+  returned: ["closed", "cancelled"],
+  closed: [],
+  cancelled: [],
+};
 
 export const updateRentalContract = onCall(
   { region: "us-central1", cors },
@@ -251,9 +265,23 @@ export const updateRentalContract = onCall(
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
     const cref = companyRef(companyId);
-    const updates: any = { ...data, updatedAt: nowIso() };
+    const contractRef = cref.collection("rentalContracts").doc(id);
+    const contractSnap = await contractRef.get();
+    if (!contractSnap.exists) throw new HttpsError("not-found", "Contrato no encontrado");
 
-    await cref.collection("rentalContracts").doc(id).update(updates);
+    const before = contractSnap.data() as any;
+    const currentStatus = before.status || "draft";
+
+    // Validate status transition
+    if (data.status && data.status !== currentStatus) {
+      const allowed = VALID_TRANSITIONS[currentStatus] || [];
+      if (!allowed.includes(data.status)) {
+        throw new HttpsError("failed-precondition", `Transición no permitida: ${currentStatus} → ${data.status}`);
+      }
+    }
+
+    const updates: any = { ...data, updatedAt: nowIso() };
+    await contractRef.update(updates);
 
     // Upsert lines if provided
     if (Array.isArray(lines)) {
@@ -292,12 +320,43 @@ export const updateRentalContract = onCall(
         }
       }
 
-      // Delete removed lines
       for (const removedId of existingIds) {
         batch.delete(cref.collection("rentalContractLines").doc(removedId));
       }
 
       await batch.commit();
+    }
+
+    // Lead-change side effects
+    if (data.leadId !== undefined && data.leadId !== before.leadId) {
+      const userId = request.auth?.uid || "";
+      const now = nowIso();
+      // Event for old lead unlink
+      if (before.leadId) {
+        await cref.collection("rentalEvents").add({
+          contractId: id,
+          companyId,
+          userId,
+          eventType: "lead_unlinked",
+          title: "Lead desvinculado",
+          details: `Lead anterior: ${before.leadId}`,
+          eventAt: now,
+          createdAt: now,
+        });
+      }
+      // Event for new lead link
+      if (data.leadId) {
+        await cref.collection("rentalEvents").add({
+          contractId: id,
+          companyId,
+          userId,
+          eventType: "lead_linked",
+          title: "Lead vinculado",
+          details: `Nuevo lead: ${data.leadId}`,
+          eventAt: now,
+          createdAt: now,
+        });
+      }
     }
 
     return { updated: true };
@@ -462,5 +521,375 @@ export const closeRentalContract = onCall(
     });
 
     return { closed: true };
+  }
+);
+
+
+// ==========================================
+// createRentalGuarantee
+// ==========================================
+
+export const createRentalGuarantee = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.manage_guarantees", { companyId });
+
+    const { contractId, guaranteeType, amount, currency, reference, status, receivedAt, releasedAt, notes, documentUrl } = request.data;
+    if (!contractId) throw new HttpsError("invalid-argument", "contractId requerido");
+
+    const cref = companyRef(companyId);
+    const contractSnap = await cref.collection("rentalContracts").doc(contractId).get();
+    if (!contractSnap.exists) throw new HttpsError("not-found", "Contrato no encontrado");
+
+    const ref = cref.collection("rentalGuarantees").doc();
+    const now = nowIso();
+    await ref.set({
+      contractId,
+      companyId,
+      guaranteeType: guaranteeType || "other",
+      amount: amount || 0,
+      currency: currency || "CLP",
+      reference: reference || "",
+      status: status || "pending",
+      receivedAt: receivedAt || "",
+      releasedAt: releasedAt || "",
+      notes: notes || "",
+      documentUrl: documentUrl || "",
+      createdAt: now,
+    });
+
+    // Sync contract guaranteeStatus & depositAmount
+    const guaranteeStatus = status || "pending";
+    const depositAmount = amount || 0;
+    await cref.collection("rentalContracts").doc(contractId).update({
+      guaranteeStatus,
+      depositAmount,
+      updatedAt: now,
+    });
+
+    // Timeline event
+    await cref.collection("rentalEvents").add({
+      contractId,
+      companyId,
+      userId: request.auth?.uid || "",
+      eventType: "guarantee",
+      title: "Garantía registrada",
+      details: `Tipo: ${guaranteeType}, Monto: ${amount} ${currency}`,
+      eventAt: now,
+      createdAt: now,
+    });
+
+    return { id: ref.id };
+  }
+);
+
+// ==========================================
+// updateRentalGuarantee
+// ==========================================
+
+export const updateRentalGuarantee = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.manage_guarantees", { companyId });
+
+    const { id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const cref = companyRef(companyId);
+    const snap = await cref.collection("rentalGuarantees").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Garantía no encontrada");
+
+    const now = nowIso();
+    await cref.collection("rentalGuarantees").doc(id).update({ ...data, updatedAt: now });
+
+    // Sync contract if status or amount changed
+    if (data.status || data.amount !== undefined) {
+      const guarantee = { ...snap.data(), ...data } as any;
+      await cref.collection("rentalContracts").doc(guarantee.contractId).update({
+        guaranteeStatus: guarantee.status,
+        depositAmount: guarantee.amount || 0,
+        updatedAt: now,
+      });
+    }
+
+    return { updated: true };
+  }
+);
+
+// ==========================================
+// deleteRentalGuarantee
+// ==========================================
+
+export const deleteRentalGuarantee = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.manage_guarantees", { companyId });
+
+    const { id } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const cref = companyRef(companyId);
+    const snap = await cref.collection("rentalGuarantees").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Garantía no encontrada");
+
+    const guarantee = snap.data() as any;
+    await cref.collection("rentalGuarantees").doc(id).delete();
+
+    // Re-sync contract guaranteeStatus from latest guarantee
+    const latestSnap = await cref
+      .collection("rentalGuarantees")
+      .where("contractId", "==", guarantee.contractId)
+      .orderBy("createdAt", "desc")
+      .limit(1)
+      .get();
+
+    const newStatus = latestSnap.empty ? "pending" : (latestSnap.docs[0].data().status as string);
+    const newAmount = latestSnap.empty ? 0 : (latestSnap.docs[0].data().amount as number) || 0;
+    await cref.collection("rentalContracts").doc(guarantee.contractId).update({
+      guaranteeStatus: newStatus,
+      depositAmount: newAmount,
+      updatedAt: nowIso(),
+    });
+
+    return { deleted: true };
+  }
+);
+
+// ==========================================
+// createRentalEvent
+// ==========================================
+
+export const createRentalEvent = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.view_timeline", { companyId });
+
+    const { contractId, eventType, title, details, payload } = request.data;
+    if (!contractId || !eventType || !title) throw new HttpsError("invalid-argument", "contractId, eventType y title requeridos");
+
+    const cref = companyRef(companyId);
+    const now = nowIso();
+    const ref = await cref.collection("rentalEvents").add({
+      contractId,
+      companyId,
+      userId: request.auth?.uid || "",
+      eventType,
+      title,
+      details: details || "",
+      payload: payload || {},
+      eventAt: now,
+      createdAt: now,
+    });
+
+    return { id: ref.id };
+  }
+);
+
+// ==========================================
+// getRentalTimeline
+// ==========================================
+
+export const getRentalTimeline = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.view_timeline", { companyId });
+
+    const { contractId } = request.data;
+    if (!contractId) throw new HttpsError("invalid-argument", "contractId requerido");
+
+    const snap = await companyRef(companyId)
+      .collection("rentalEvents")
+      .where("contractId", "==", contractId)
+      .orderBy("eventAt", "desc")
+      .limit(200)
+      .get();
+
+    const events = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    return { events };
+  }
+);
+
+// ==========================================
+// createRentalBackup
+// ==========================================
+
+import { createHash } from "crypto";
+
+export const createRentalBackup = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.create_backup", { companyId });
+
+    const { contractId, backupName } = request.data;
+    if (!contractId) throw new HttpsError("invalid-argument", "contractId requerido");
+
+    const cref = companyRef(companyId);
+    const contractSnap = await cref.collection("rentalContracts").doc(contractId).get();
+    if (!contractSnap.exists) throw new HttpsError("not-found", "Contrato no encontrado");
+
+    const contract = contractSnap.data() as any;
+
+    const [linesSnap, guaranteesSnap, eventsSnap, backupsSnap] = await Promise.all([
+      cref.collection("rentalContractLines").where("contractId", "==", contractId).get(),
+      cref.collection("rentalGuarantees").where("contractId", "==", contractId).get(),
+      cref.collection("rentalEvents").where("contractId", "==", contractId).orderBy("eventAt", "desc").limit(100).get(),
+      cref.collection("rentalBackups").where("contractId", "==", contractId).orderBy("createdAt", "desc").limit(20).get(),
+    ]);
+
+    const lines = linesSnap.docs.map((d) => d.data());
+    const guarantees = guaranteesSnap.docs.map((d) => d.data());
+    const timeline = eventsSnap.docs.map((d) => d.data());
+    const previousBackups = backupsSnap.docs.map((d) => d.data());
+
+    const requestedQty = lines.reduce((sum: number, l: any) => sum + (l.quantity || 0), 0);
+    const deliveredQty = lines.reduce((sum: number, l: any) => sum + (l.deliveredQuantity || 0), 0);
+    const returnedQty = lines.reduce((sum: number, l: any) => sum + (l.returnedQuantity || 0), 0);
+
+    const snapshot = {
+      contract: { id: contractSnap.id, ...contract },
+      lines,
+      guarantees,
+      timeline,
+      backups: previousBackups,
+      totals: {
+        requested_quantity: requestedQty,
+        delivered_quantity: deliveredQty,
+        returned_quantity: returnedQty,
+        pending_delivery_quantity: Math.max(0, requestedQty - deliveredQty),
+        pending_return_quantity: Math.max(0, deliveredQty - returnedQty),
+        contract_value: Math.max(contract.contractValue || 0, 0),
+      },
+      captured_at: nowIso(),
+    };
+
+    const snapshotJson = JSON.stringify(snapshot, Object.keys(snapshot).sort(), 0);
+    const checksum = createHash("sha256").update(snapshotJson, "utf-8").digest("hex");
+
+    const ref = await cref.collection("rentalBackups").add({
+      contractId,
+      companyId,
+      backupName: backupName || `Backup ${nowIso()}`,
+      checksum,
+      snapshotSize: snapshotJson.length,
+      snapshotJson,
+      createdByUserId: request.auth?.uid || "",
+      createdAt: nowIso(),
+    });
+
+    // Timeline event
+    await cref.collection("rentalEvents").add({
+      contractId,
+      companyId,
+      userId: request.auth?.uid || "",
+      eventType: "backup",
+      title: "Backup creado",
+      details: `Checksum: ${checksum.slice(0, 16)}…`,
+      eventAt: nowIso(),
+      createdAt: nowIso(),
+    });
+
+    return { id: ref.id, checksum };
+  }
+);
+
+// ==========================================
+// recomputeAssetAllocations
+// ==========================================
+
+export const recomputeAssetAllocations = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "rentals.recompute_allocations", { companyId });
+
+    const cref = companyRef(companyId);
+
+    // Read all contracts except cancelled/closed/draft/quoted (keep returned)
+    const contractsSnap = await cref
+      .collection("rentalContracts")
+      .where("status", "not-in", ["cancelled", "closed", "draft", "quoted"])
+      .limit(500)
+      .get();
+
+    const contractIds = contractsSnap.docs.map((d) => d.id);
+    if (contractIds.length === 0) return { recomputed: 0 };
+
+    // Read all lines for these contracts (Firestore "in" max 30, so batch)
+    const linesByContract: Record<string, any[]> = {};
+    const batches: string[][] = [];
+    for (let i = 0; i < contractIds.length; i += 30) {
+      batches.push(contractIds.slice(i, i + 30));
+    }
+
+    for (const batchIds of batches) {
+      const snap = await cref.collection("rentalContractLines").where("contractId", "in", batchIds).get();
+      for (const doc of snap.docs) {
+        const d = doc.data();
+        if (!linesByContract[d.contractId]) linesByContract[d.contractId] = [];
+        linesByContract[d.contractId].push(d);
+      }
+    }
+
+    // Accumulate per asset
+    const byAsset: Record<string, { reserved: number; rented: number }> = {};
+
+    for (const contractDoc of contractsSnap.docs) {
+      const contract = contractDoc.data() as any;
+      const lines = linesByContract[contractDoc.id] || [];
+      const status = contract.status;
+
+      for (const line of lines) {
+        const assetId = line.assetId;
+        if (!assetId) continue;
+        if (!byAsset[assetId]) byAsset[assetId] = { reserved: 0, rented: 0 };
+
+        const requested = line.quantity || 0;
+        const delivered = line.deliveredQuantity || 0;
+        const returned = line.returnedQuantity || 0;
+
+        const rented = Math.max(delivered - returned, 0);
+        let reserved = 0;
+        if (["reserved", "contracted", "approved", "dispatched", "active"].includes(status)) {
+          reserved = Math.max(requested - delivered, 0);
+        }
+
+        byAsset[assetId].rented += rented;
+        byAsset[assetId].reserved += reserved;
+      }
+    }
+
+    // Persist
+    const batch = db.batch();
+    for (const [assetId, stats] of Object.entries(byAsset)) {
+      const ref = cref.collection("rentalAssets").doc(assetId);
+      batch.update(ref, {
+        reservedQuantity: Math.round(stats.reserved * 100) / 100,
+        rentedQuantity: Math.round(stats.rented * 100) / 100,
+        updatedAt: nowIso(),
+      });
+    }
+    await batch.commit();
+
+    return { recomputed: Object.keys(byAsset).length };
   }
 );

@@ -478,7 +478,7 @@ export { getExpenseDashboard, createExpenseRecord, updateExpenseRecord, deleteEx
 // RENTALS MODULE
 // ==========================================
 
-export { getRentalDashboard, createRentalAsset, updateRentalAsset, createRentalContract, updateRentalContract, dispatchRentalContract, returnRentalContract, closeRentalContract } from "./modules/rentals";
+export { getRentalDashboard, createRentalAsset, updateRentalAsset, createRentalContract, updateRentalContract, dispatchRentalContract, returnRentalContract, closeRentalContract, createRentalGuarantee, updateRentalGuarantee, deleteRentalGuarantee, createRentalEvent, getRentalTimeline, createRentalBackup, recomputeAssetAllocations } from "./modules/rentals";
 
 // ==========================================
 // PLANNING MODULE

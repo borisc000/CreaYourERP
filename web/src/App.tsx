@@ -83,6 +83,7 @@ import { ExpenseForm } from "./modules/expenses/ExpenseForm";
 // Rentals
 import { RentalDashboard } from "./modules/rentals/RentalDashboard";
 import { RentalAssetList } from "./modules/rentals/RentalAssetList";
+import { RentalAssetForm } from "./modules/rentals/RentalAssetForm";
 import { RentalContractList } from "./modules/rentals/RentalContractList";
 import { RentalContractForm } from "./modules/rentals/RentalContractForm";
 import { RentalContractDetail } from "./modules/rentals/RentalContractDetail";
@@ -256,6 +257,9 @@ function App() {
                 {/* Rentals */}
                 <Route path="/rentals" element={<RentalDashboard />} />
                 <Route path="/rentals/assets" element={<RentalAssetList />} />
+                <Route path="/rentals/assets/new" element={<RentalAssetForm />} />
+                <Route path="/rentals/assets/:id" element={<RentalAssetForm />} />
+                <Route path="/rentals/assets/:id/edit" element={<RentalAssetForm />} />
                 <Route path="/rentals/contracts" element={<RentalContractList />} />
                 <Route path="/rentals/contracts/new" element={<RentalContractForm />} />
                 <Route path="/rentals/contracts/:id" element={<RentalContractDetail />} />
