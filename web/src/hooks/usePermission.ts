@@ -77,6 +77,11 @@ type ServiceAction =
   | "safety.save_talk"
   | "safety.delete_talk"
   | "safety.seed_catalogs"
+  // Recruitment
+  | "recruitment.view"
+  | "recruitment.create"
+  | "recruitment.edit"
+  | "recruitment.hire"
   // Document Center
   | "document_center.save_template"
   | "document_center.delete_template"
@@ -160,6 +165,11 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "safety.save_talk": ["safety"],
   "safety.delete_talk": ["safety"],
   "safety.seed_catalogs": ["safety"],
+  // Recruitment
+  "recruitment.view": ["hr"],
+  "recruitment.create": ["hr"],
+  "recruitment.edit": ["hr"],
+  "recruitment.hire": ["hr"],
   // Document Center
   "document_center.save_template": ["document_center"],
   "document_center.delete_template": ["document_center"],

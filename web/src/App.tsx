@@ -102,6 +102,7 @@ import { JobOpeningList } from "./modules/recruitment/JobOpeningList";
 import { JobOpeningForm } from "./modules/recruitment/JobOpeningForm";
 import { CandidateList } from "./modules/recruitment/CandidateList";
 import { CandidateForm } from "./modules/recruitment/CandidateForm";
+import { ApplicationDetail } from "./modules/recruitment/ApplicationDetail";
 
 // Payroll
 import { PayrollDashboard } from "./modules/payroll/PayrollDashboard";
@@ -286,6 +287,7 @@ function App() {
                 <Route path="/recruitment/candidates/new" element={<CandidateForm />} />
                 <Route path="/recruitment/candidates/:id" element={<CandidateForm />} />
                 <Route path="/recruitment/candidates/:id/edit" element={<CandidateForm />} />
+                <Route path="/recruitment/applications/:id" element={<ApplicationDetail />} />
 
                 {/* Payroll */}
                 <Route path="/payroll" element={<PayrollDashboard />} />
