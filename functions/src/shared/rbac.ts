@@ -178,6 +178,7 @@ export const SERVICE_ACTIONS = [
   "recruitment.create",
   "recruitment.edit",
   "recruitment.hire",
+  "recruitment.calculate_score",
   // Rentals
   "rentals.view",
   "rentals.create",
@@ -390,6 +391,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "recruitment.create": ["hr"],
   "recruitment.edit": ["hr"],
   "recruitment.hire": ["hr"],
+  "recruitment.calculate_score": ["hr"],
   // Rentals
   "rentals.view": ["rentals"],
   "rentals.create": ["rentals"],

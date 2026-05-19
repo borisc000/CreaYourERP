@@ -9,9 +9,15 @@ export function CandidateList() {
   const { data: candidates, isLoading } = useFirestoreCollection<Candidate>("candidates");
   const [search, setSearch] = useState("");
 
+  const [sortByScore, setSortByScore] = useState(false);
+
   const filtered = candidates.filter((c) =>
     !search || c.fullName.toLowerCase().includes(search.toLowerCase()) || (c.email || "").toLowerCase().includes(search.toLowerCase()) || (c.nationalId || "").includes(search)
   );
+
+  const sorted = sortByScore
+    ? [...filtered].sort((a, b) => (b.calculatedScore ?? 0) - (a.calculatedScore ?? 0))
+    : filtered;
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -34,10 +40,13 @@ export function CandidateList() {
             <thead className="bg-gray-800 text-gray-400"><tr>
               <th className="px-4 py-3 text-left">Nombre</th><th className="px-4 py-3 text-left">RUT</th>
               <th className="px-4 py-3 text-left">Email</th><th className="px-4 py-3 text-left">Completo</th>
+              <th className="px-4 py-3 text-left cursor-pointer select-none" onClick={() => setSortByScore(!sortByScore)}>
+                Score {sortByScore ? "↓" : "↕"}
+              </th>
               <th className="px-4 py-3 text-left">Rating</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-800">
-              {filtered.map((c) => (
+              {sorted.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/recruitment/candidates/${c.id}`)}>
                   <td className="px-4 py-3 text-white font-medium">{c.fullName}</td>
                   <td className="px-4 py-3 text-gray-400">{c.nationalId || "—"}</td>
@@ -47,6 +56,13 @@ export function CandidateList() {
                       <div className="h-full bg-emerald-500" style={{ width: `${c.completionPct}%` }} />
                     </div>
                     <span className="text-xs text-gray-500">{c.completionPct}%</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {c.calculatedScore !== undefined ? (
+                      <span className="text-white font-medium">{c.calculatedScore}</span>
+                    ) : (
+                      <span className="text-gray-500">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-amber-400">{c.rating > 0 ? "★".repeat(Math.round(c.rating)) : "—"}</td>
                 </tr>

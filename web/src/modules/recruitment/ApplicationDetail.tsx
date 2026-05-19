@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useFirestoreDocument, useFirestoreCollection } from "@/hooks/useFirestore";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +15,8 @@ import {
   ArrowLeftIcon,
   CheckCircleIcon,
   XMarkIcon,
+  StarIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 
 export function ApplicationDetail() {
@@ -24,6 +26,8 @@ export function ApplicationDetail() {
   const { hasPermission } = usePermission();
   const [showHireForm, setShowHireForm] = useState(false);
   const [hiring, setHiring] = useState(false);
+  const [scoreLoading, setScoreLoading] = useState(false);
+  const [scoreData, setScoreData] = useState<{ calculatedScore: number; components: any } | null>(null);
 
   const { data: app } = useFirestoreDocument<JobApplication>("jobApplications", id);
   const { data: candidate } = useFirestoreDocument<Candidate>(
@@ -36,6 +40,26 @@ export function ApplicationDetail() {
   );
   const { data: departments } = useFirestoreCollection<Department>(`companies/${companyId}/departments`);
   const { data: profiles } = useFirestoreCollection<JobProfile>(`companies/${companyId}/jobProfiles`);
+
+  useEffect(() => {
+    if (candidate?.calculatedScore !== undefined) {
+      setScoreData({ calculatedScore: candidate.calculatedScore, components: null });
+    }
+  }, [candidate?.calculatedScore]);
+
+  const handleCalculateScore = async () => {
+    if (!candidate) return;
+    setScoreLoading(true);
+    try {
+      const fn = httpsCallable(functions, "calculateCandidateScore");
+      const res = await fn({ candidateId: candidate.id });
+      setScoreData(res.data as any);
+    } catch (err) {
+      alert("Error calculando score");
+    } finally {
+      setScoreLoading(false);
+    }
+  };
 
   const statusLabel: Record<string, string> = {
     active: "Activa",
@@ -108,12 +132,46 @@ export function ApplicationDetail() {
           </h3>
           <div className="text-sm text-gray-300 space-y-1">
             <p><span className="text-gray-500">Etapa:</span> {app.stageName || "—"}</p>
-            <p><span className="text-gray-500">Score:</span> {app.score ?? "—"}</p>
+            <p><span className="text-gray-500">Score manual:</span> {app.score ?? "—"}</p>
             <p><span className="text-gray-500">Salario propuesto:</span> {app.proposedSalary ? `$${app.proposedSalary.toLocaleString("es-CL")}` : "—"}</p>
             <p><span className="text-gray-500">Inicio proyectado:</span> {app.projectedStartDate || "—"}</p>
             <p><span className="text-gray-500">Tipo contrato:</span> {app.contractType || "—"}</p>
             <p><span className="text-gray-500">Ubicación:</span> {app.workLocation || "—"}</p>
           </div>
+        </div>
+
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <StarIcon className="w-4 h-4 text-amber-400" />
+              Score Calculado
+            </h3>
+            {hasPermission("recruitment.calculate_score") && (
+              <button
+                onClick={handleCalculateScore}
+                disabled={scoreLoading}
+                className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 disabled:opacity-50"
+              >
+                <ArrowPathIcon className="w-3 h-3" />
+                {scoreLoading ? "Calculando..." : "Recalcular"}
+              </button>
+            )}
+          </div>
+          {scoreData ? (
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-white">{scoreData.calculatedScore}<span className="text-sm text-gray-500 font-normal">/100</span></div>
+              {scoreData.components && (
+                <div className="text-xs text-gray-400 space-y-1">
+                  <p>Entrevistas (40%): {scoreData.components.interviewAvg}</p>
+                  <p>Completitud (30%): {scoreData.components.completionPct}%</p>
+                  <p>Experiencia (20%): {scoreData.components.experienceYears} años</p>
+                  <p>Rating (10%): {scoreData.components.rating}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm">Sin score calculado</p>
+          )}
         </div>
       </div>
 

@@ -191,7 +191,12 @@ export type ServiceAction =
   | "hr.manage_job_profile_functions"
   | "hr.manage_job_profile_responsibilities"
   | "hr.manage_job_profile_risks"
-  | "hr.view_job_profile_matrix";
+  | "hr.view_job_profile_matrix"
+  | "recruitment.view"
+  | "recruitment.create"
+  | "recruitment.edit"
+  | "recruitment.hire"
+  | "recruitment.calculate_score";
 
 export interface ServicePermissionContext {
   uid: string;
@@ -2271,8 +2276,10 @@ export interface Candidate {
   resumeUrl?: string;
   portfolioUrl?: string;
   summary?: string;
+  experienceYears?: number;
   rating: number;
   completionPct: number;
+  calculatedScore?: number;
   createdAt: string;
   updatedAt: string;
 }

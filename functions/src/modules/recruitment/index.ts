@@ -1,1 +1,15 @@
-export { seedRecruitmentStages, getRecruitmentStats, createJobOpening, updateJobOpening, createCandidate, updateCandidate, createApplication, updateApplication, hireApplication, createInterview, updateInterview } from "./recruitmentService";
+export {
+  seedRecruitmentStages,
+  getRecruitmentStats,
+  createJobOpening,
+  updateJobOpening,
+  createCandidate,
+  updateCandidate,
+  createApplication,
+  updateApplication,
+  hireApplication,
+  createInterview,
+  updateInterview,
+  calculateCandidateScore,
+  getCandidateRanking,
+} from "./recruitmentService";

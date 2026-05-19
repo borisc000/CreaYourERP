@@ -125,6 +125,7 @@ export const createCandidate = onCall(
       afpCode: data.afpCode || "", criminalRecordStatus: data.criminalRecordStatus || "pending",
       completionPct, rating: data.rating || 0, source: data.source || "", currentPosition: data.currentPosition || "",
       expectedSalary: data.expectedSalary || 0, summary: data.summary || "", resumeUrl: data.resumeUrl || "",
+      experienceYears: Number(data.experienceYears) || 0,
       createdAt: nowIso(), updatedAt: nowIso(),
     });
     return { id: ref.id };
@@ -142,7 +143,9 @@ export const updateCandidate = onCall(
     await assertAction(request, "recruitment.edit", { companyId });
     const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
-    await companyRef(companyId).collection("candidates").doc(id).update({ ...data, updatedAt: nowIso() });
+    const update: any = { ...data, updatedAt: nowIso() };
+    if (data.experienceYears !== undefined) update.experienceYears = Number(data.experienceYears) || 0;
+    await companyRef(companyId).collection("candidates").doc(id).update(update);
     return { updated: true };
   }
 );
@@ -237,7 +240,7 @@ export const hireApplication = onCall(
     const hireDate = cleanString(employeeData?.startDate) || now.slice(0, 10);
     const baseSalary = typeof employeeData?.baseSalary === "number" ? employeeData.baseSalary : 0;
 
-    // Transaction: create employee + contract + payroll + invite + update app + update job
+    // Transaction: create employee + contract + payroll + invite + update app + update job + audit
     const empRef = companyRef(companyId).collection("employees").doc();
     const contractRef = companyRef(companyId).collection("contracts").doc();
     const payrollRef = companyRef(companyId).collection("payrollProfiles").doc();
@@ -340,6 +343,30 @@ export const hireApplication = onCall(
       const jobUpdates: any = { hiredCount: newCount, updatedAt: now };
       if (newCount >= (jobData.openingsCount || 1)) jobUpdates.status = "closed";
       t.update(jobRef, jobUpdates);
+
+      // 7. EmploymentStatusEvent
+      t.set(companyRef(companyId).collection("employmentStatusEvents").doc(), {
+        companyId,
+        employeeId: empRef.id,
+        eventType: "hired",
+        newStatus: "active",
+        reason: `Contratado desde postulación ${applicationId}`,
+        effectiveDate: hireDate,
+        processedBy: request.auth!.uid,
+        createdAt: now,
+      });
+
+      // 8. Activity log
+      t.set(companyRef(companyId).collection("activityLogs").doc(), {
+        companyId,
+        type: "recruitment.hired",
+        employeeId: empRef.id,
+        applicationId,
+        message: `Candidato contratado: ${firstName} ${lastName}`,
+        userId: request.auth!.uid,
+        metadata: { jobId: appData.jobId, jobTitle: jobData.title, contractType: employeeData?.contractType || "indefinite" },
+        createdAt: now,
+      });
     });
 
     return {
@@ -387,5 +414,139 @@ export const updateInterview = onCall(
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("interviews").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
+  }
+);
+
+export const calculateCandidateScore = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.calculate_score", { companyId });
+
+    const candidateId = cleanString(request.data?.candidateId);
+    if (!candidateId) throw new HttpsError("invalid-argument", "candidateId requerido");
+
+    const candidateRef = companyRef(companyId).collection("candidates").doc(candidateId);
+    const candidateSnap = await candidateRef.get();
+    if (!candidateSnap.exists) throw new HttpsError("not-found", "Candidato no encontrado");
+    const candidateData = candidateSnap.data()!;
+
+    // Fetch all interviews for this candidate (via applications)
+    const applicationsSnap = await companyRef(companyId)
+      .collection("jobApplications")
+      .where("candidateId", "==", candidateId)
+      .get();
+
+    const applicationIds = applicationsSnap.docs.map((d) => d.id);
+    let interviewScores: number[] = [];
+
+    if (applicationIds.length > 0) {
+      // Firestore "in" query limited to 10; chunk if needed
+      const chunks: string[][] = [];
+      for (let i = 0; i < applicationIds.length; i += 10) {
+        chunks.push(applicationIds.slice(i, i + 10));
+      }
+      for (const chunk of chunks) {
+        const interviewsSnap = await companyRef(companyId)
+          .collection("interviews")
+          .where("applicationId", "in", chunk)
+          .get();
+        for (const doc of interviewsSnap.docs) {
+          const score = Number(doc.data().overallScore);
+          if (!isNaN(score) && score > 0) interviewScores.push(score);
+        }
+      }
+    }
+
+    const interviewAvg = interviewScores.length > 0
+      ? interviewScores.reduce((a, b) => a + b, 0) / interviewScores.length
+      : 0;
+
+    const completionPct = Number(candidateData.completionPct) || 0;
+    const experienceYears = Number(candidateData.experienceYears) || 0;
+    const rating = Number(candidateData.rating) || 0;
+
+    // Normalize experience to 0-100 scale (cap at 20 years)
+    const experienceScore = Math.min(experienceYears, 20) * 5;
+
+    const calculatedScore = Math.round(
+      (interviewAvg * 0.4) +
+      (completionPct * 0.3) +
+      (experienceScore * 0.2) +
+      (rating * 0.1)
+    );
+
+    const now = nowIso();
+    await candidateRef.update({
+      calculatedScore,
+      scoreUpdatedAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      candidateId,
+      calculatedScore,
+      components: {
+        interviewAvg: Math.round(interviewAvg * 10) / 10,
+        completionPct,
+        experienceYears,
+        rating,
+      },
+    };
+  }
+);
+
+export const getCandidateRanking = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.view", { companyId });
+
+    const jobOpeningId = cleanString(request.data?.jobOpeningId);
+    if (!jobOpeningId) throw new HttpsError("invalid-argument", "jobOpeningId requerido");
+
+    // Get applications for this job
+    const appsSnap = await companyRef(companyId)
+      .collection("jobApplications")
+      .where("jobId", "==", jobOpeningId)
+      .get();
+
+    const candidateIds = appsSnap.docs.map((d) => d.data().candidateId as string).filter(Boolean);
+    if (candidateIds.length === 0) return { jobOpeningId, candidates: [], total: 0 };
+
+    // Fetch candidates in chunks (max 10 per "in" query)
+    const candidates: Array<{ id: string; fullName: string; calculatedScore?: number; rating: number; completionPct: number }> = [];
+    for (let i = 0; i < candidateIds.length; i += 10) {
+      const chunk = candidateIds.slice(i, i + 10);
+      const chunkSnap = await companyRef(companyId)
+        .collection("candidates")
+        .where("__name__", "in", chunk)
+        .get();
+      for (const doc of chunkSnap.docs) {
+        const d = doc.data();
+        candidates.push({
+          id: doc.id,
+          fullName: d.fullName || "",
+          calculatedScore: d.calculatedScore,
+          rating: d.rating || 0,
+          completionPct: d.completionPct || 0,
+        });
+      }
+    }
+
+    // Sort by calculatedScore desc, then rating desc
+    candidates.sort((a, b) => (b.calculatedScore ?? 0) - (a.calculatedScore ?? 0) || b.rating - a.rating);
+
+    const ranked = candidates.map((c, idx) => ({ ...c, rank: idx + 1 }));
+
+    return { jobOpeningId, candidates: ranked, total: ranked.length };
   }
 );

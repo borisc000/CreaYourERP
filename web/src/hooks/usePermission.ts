@@ -85,6 +85,7 @@ type ServiceAction =
   | "recruitment.create"
   | "recruitment.edit"
   | "recruitment.hire"
+  | "recruitment.calculate_score"
   // Payroll
   | "payroll.view"
   | "payroll.create"
@@ -194,6 +195,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "recruitment.create": ["hr"],
   "recruitment.edit": ["hr"],
   "recruitment.hire": ["hr"],
+  "recruitment.calculate_score": ["hr"],
   // Document Center
   "document_center.save_template": ["document_center"],
   "document_center.delete_template": ["document_center"],
