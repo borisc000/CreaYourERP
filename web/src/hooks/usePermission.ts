@@ -35,6 +35,9 @@ type ServiceAction =
   | "hr.delete_employee"
   | "hr.view_contracts"
   | "hr.manage_contracts"
+  | "hr.manage_terminations"
+  | "hr.verify_accreditation"
+  | "hr.cancel_timeoff"
   | "hr.manage_job_profile_functions"
   | "hr.manage_job_profile_responsibilities"
   | "hr.manage_job_profile_risks"
@@ -132,6 +135,9 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "hr.delete_employee": ["hr"],
   "hr.view_contracts": ["hr"],
   "hr.manage_contracts": ["hr"],
+  "hr.manage_terminations": ["hr"],
+  "hr.verify_accreditation": ["hr"],
+  "hr.cancel_timeoff": ["hr"],
   "hr.manage_job_profile_functions": ["hr"],
   "hr.manage_job_profile_responsibilities": ["hr"],
   "hr.manage_job_profile_risks": ["hr"],

@@ -1,15 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
 import type { TimeOffRequest } from "@/types";
-import { PlusIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, CheckIcon, XMarkIcon, ArrowUturnLeftIcon } from "@heroicons/react/24/outline";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 
 interface Props {
   employeeId: string;
+}
+
+function calculateBusinessDays(startDate: string, endDate: string): number {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
+  let count = 0;
+  const curr = new Date(start);
+  while (curr <= end) {
+    const day = curr.getDay();
+    if (day !== 0 && day !== 6) count++;
+    curr.setDate(curr.getDate() + 1);
+  }
+  return count;
 }
 
 export function TimeOffSection({ employeeId }: Props) {
@@ -25,6 +39,11 @@ export function TimeOffSection({ employeeId }: Props) {
     reason: "",
   });
   const [submitting, setSubmitting] = useState(false);
+
+  const autoDays = useMemo(() => {
+    if (!form.startDate || !form.endDate) return 0;
+    return calculateBusinessDays(form.startDate, form.endDate);
+  }, [form.startDate, form.endDate]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -45,7 +64,7 @@ export function TimeOffSection({ employeeId }: Props) {
     setSubmitting(true);
     try {
       const fn = httpsCallable(functions, "saveTimeOffRequest");
-      await fn({ employeeId, ...form });
+      await fn({ employeeId, ...form, daysRequested: autoDays || form.daysRequested });
       setShowForm(false);
       setForm({ type: "vacation", startDate: "", endDate: "", daysRequested: 1, reason: "" });
     } catch (err) {
@@ -61,6 +80,16 @@ export function TimeOffSection({ employeeId }: Props) {
       await fn({ id, approved });
     } catch (err) {
       alert("Error actualizando solicitud");
+    }
+  };
+
+  const handleCancel = async (id: string) => {
+    if (!confirm("¿Cancelar esta solicitud de licencia?")) return;
+    try {
+      const fn = httpsCallable(functions, "cancelTimeOffRequest");
+      await fn({ id });
+    } catch (err) {
+      alert("Error cancelando solicitud");
     }
   };
 
@@ -100,14 +129,10 @@ export function TimeOffSection({ employeeId }: Props) {
                 <option key={k} value={k}>{v}</option>
               ))}
             </select>
-            <input
-              type="number"
-              value={form.daysRequested}
-              onChange={(e) => setForm({ ...form, daysRequested: Number(e.target.value) })}
-              min={1}
-              className="px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white"
-              placeholder="Días"
-            />
+            <div className="flex items-center px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-gray-300">
+              <span className="text-gray-500 mr-2">Días hábiles:</span>
+              <span className="font-medium text-white">{autoDays || "—"}</span>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <input
@@ -154,6 +179,7 @@ export function TimeOffSection({ employeeId }: Props) {
                 <span className={`px-2 py-0.5 text-xs rounded-full ${
                   r.status === "approved" ? "bg-green-500/10 text-green-400" :
                   r.status === "rejected" ? "bg-red-500/10 text-red-400" :
+                  r.status === "cancelled" ? "bg-gray-500/10 text-gray-400" :
                   "bg-yellow-500/10 text-yellow-400"
                 }`}>
                   {r.status}
@@ -163,6 +189,9 @@ export function TimeOffSection({ employeeId }: Props) {
                     <button onClick={() => handleApprove(r.id, true)} className="p-1 text-green-400 hover:bg-green-500/10 rounded" title="Aprobar"><CheckIcon className="w-3.5 h-3.5" /></button>
                     <button onClick={() => handleApprove(r.id, false)} className="p-1 text-red-400 hover:bg-red-500/10 rounded" title="Rechazar"><XMarkIcon className="w-3.5 h-3.5" /></button>
                   </>
+                )}
+                {r.status === "pending" && hasPermission("hr.cancel_timeoff") && (
+                  <button onClick={() => handleCancel(r.id)} className="p-1 text-gray-400 hover:bg-gray-500/10 rounded" title="Cancelar"><ArrowUturnLeftIcon className="w-3.5 h-3.5" /></button>
                 )}
               </div>
             </div>

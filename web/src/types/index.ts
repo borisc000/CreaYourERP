@@ -184,6 +184,10 @@ export type ServiceAction =
   | "crm.edit_lead"
   | "crm.delete_lead"
   | "crm.manage_pipeline"
+  | "hr.manage_contracts"
+  | "hr.manage_terminations"
+  | "hr.verify_accreditation"
+  | "hr.cancel_timeoff"
   | "hr.manage_job_profile_functions"
   | "hr.manage_job_profile_responsibilities"
   | "hr.manage_job_profile_risks"
@@ -555,6 +559,8 @@ export interface TimeOffRequest {
   status: "pending" | "approved" | "rejected" | "cancelled";
   approvedBy?: string;
   approvedAt?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
   createdAt: string;
 }
 
@@ -574,14 +580,19 @@ export interface TerminationRecord {
   companyId: string;
   employeeId: string;
   terminationDate: string;
+  noticeDate?: string | null;
+  cause?: string;
   reason: string;
   noticePeriodDays: number;
   yearsOfService: number;
+  salary?: number;
   severancePay: number;
   pendingVacationPay: number;
   proportionalBonus: number;
   otherSettlements: number;
   totalSettlement: number;
+  rehireEligible?: boolean;
+  contractId?: string | null;
   status: "draft" | "processed" | "paid";
   createdAt: string;
   updatedAt?: string;
@@ -819,9 +830,15 @@ export interface EmployeeAccreditation {
   documentOrigin?: string;
   templateId?: string;
   generatedDocumentId?: string;
+  documentName?: string;
+  documentNumber?: string;
   verificationStatus?: "pending_review" | "approved" | "rejected";
   signatureStatus?: "not_required" | "pending" | "signed";
   signedDocumentUrl?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  serviceOrderId?: string;
+  signatureRequestId?: string;
   sourceModule?: string;
   issuedOn?: string;
   expiresOn?: string;
