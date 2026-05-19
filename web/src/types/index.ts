@@ -725,7 +725,7 @@ export interface SignatureRequest {
   documentUrl?: string;
   generatedDocumentId?: string; // links to Document Center
   storagePath?: string; // source PDF in Storage
-  signaturePositions: Array<{
+  signaturePositions?: Array<{
     page: number;
     x: number;
     y: number;

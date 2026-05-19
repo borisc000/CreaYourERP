@@ -44,6 +44,9 @@ export function SignatureCenter() {
   const [multiSigners, setMultiSigners] = useState<{ name: string; email: string }[]>([
     { name: "", email: "" },
   ]);
+  const [signaturePositions, setSignaturePositions] = useState<
+    Array<{ page: number; x: number; y: number; width: number; height: number; fieldType: string; label: string }>
+  >([]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -89,11 +92,15 @@ export function SignatureCenter() {
       return;
     }
     try {
-      const res = await httpsCallable(functions, "createSignatureRequest")(form);
+      const res = await httpsCallable(functions, "createSignatureRequest")({
+        ...form,
+        signaturePositions: signaturePositions.length > 0 ? signaturePositions : undefined,
+      });
       const data = res.data as any;
       alert(`Solicitud creada: ${data.id}`);
       setShowForm(false);
       setForm({ name: "", description: "", requestToEmail: "", requestToName: "", generatedDocumentId: "", expiresAt: "" });
+      setSignaturePositions([]);
     } catch (err: any) {
       alert(err.message || "Error al crear solicitud");
     }
@@ -111,6 +118,7 @@ export function SignatureCenter() {
         signers: multiSigners,
         generatedDocumentId: form.generatedDocumentId || null,
         expiresAt: form.expiresAt || null,
+        signaturePositions: signaturePositions.length > 0 ? signaturePositions : undefined,
       });
       const data = res.data as any;
       alert(`Solicitud multi-firmante creada: ${data.id}`);
@@ -118,6 +126,7 @@ export function SignatureCenter() {
       setForm({ name: "", description: "", requestToEmail: "", requestToName: "", generatedDocumentId: "", expiresAt: "" });
       setMultiSigners([{ name: "", email: "" }]);
       setIsMultiSigner(false);
+      setSignaturePositions([]);
     } catch (err: any) {
       alert(err.message || "Error al crear solicitud");
     }
@@ -471,6 +480,123 @@ export function SignatureCenter() {
                   value={form.expiresAt}
                   onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
                 />
+              </div>
+
+              {/* Posiciones de firma */}
+              <div className="border-t border-gray-800 pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-gray-500">Posiciones de firma (opcional)</label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSignaturePositions([
+                        ...signaturePositions,
+                        { page: 1, x: 100, y: 100, width: 150, height: 40, fieldType: "signature", label: "Firma" },
+                      ])
+                    }
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    + Agregar campo
+                  </button>
+                </div>
+                {signaturePositions.length === 0 && (
+                  <p className="text-gray-600 text-xs">Sin campos definidos. Se usará posición por defecto.</p>
+                )}
+                {signaturePositions.map((pos, idx) => (
+                  <div key={idx} className="grid grid-cols-7 gap-2 mb-2 items-end">
+                    <div>
+                      <label className="text-[10px] text-gray-600">Pág</label>
+                      <input
+                        type="number"
+                        min={1}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs"
+                        value={pos.page}
+                        onChange={(e) => {
+                          const next = [...signaturePositions];
+                          next[idx].page = Number(e.target.value);
+                          setSignaturePositions(next);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-600">X</label>
+                      <input
+                        type="number"
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs"
+                        value={pos.x}
+                        onChange={(e) => {
+                          const next = [...signaturePositions];
+                          next[idx].x = Number(e.target.value);
+                          setSignaturePositions(next);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-600">Y</label>
+                      <input
+                        type="number"
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs"
+                        value={pos.y}
+                        onChange={(e) => {
+                          const next = [...signaturePositions];
+                          next[idx].y = Number(e.target.value);
+                          setSignaturePositions(next);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-600">W</label>
+                      <input
+                        type="number"
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs"
+                        value={pos.width}
+                        onChange={(e) => {
+                          const next = [...signaturePositions];
+                          next[idx].width = Number(e.target.value);
+                          setSignaturePositions(next);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-600">H</label>
+                      <input
+                        type="number"
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs"
+                        value={pos.height}
+                        onChange={(e) => {
+                          const next = [...signaturePositions];
+                          next[idx].height = Number(e.target.value);
+                          setSignaturePositions(next);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-600">Tipo</label>
+                      <select
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs"
+                        value={pos.fieldType}
+                        onChange={(e) => {
+                          const next = [...signaturePositions];
+                          next[idx].fieldType = e.target.value;
+                          setSignaturePositions(next);
+                        }}
+                      >
+                        <option value="signature">Firma</option>
+                        <option value="date">Fecha</option>
+                        <option value="name">Nombre</option>
+                        <option value="text">Texto</option>
+                        <option value="stamp">Sello</option>
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSignaturePositions(signaturePositions.filter((_, i) => i !== idx))}
+                      className="text-red-400 hover:text-red-300 text-xs pb-1"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t border-gray-800">
