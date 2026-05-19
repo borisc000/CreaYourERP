@@ -184,6 +184,8 @@ export type ServiceAction =
   | "crm.edit_lead"
   | "crm.delete_lead"
   | "crm.manage_pipeline"
+  | "crm.manage_customers"
+  | "crm.manage_mandantes"
   | "hr.manage_contracts"
   | "hr.manage_terminations"
   | "hr.verify_accreditation"

@@ -32,6 +32,8 @@ export const SERVICE_ACTIONS = [
   "crm.edit_lead",
   "crm.delete_lead",
   "crm.manage_pipeline",
+  "crm.manage_customers",
+  "crm.manage_mandantes",
   // Quotes
   "quote.create",
   "quote.edit",
@@ -257,6 +259,8 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "crm.edit_lead": ["crm"],
   "crm.delete_lead": ["crm"],
   "crm.manage_pipeline": ["crm"],
+  "crm.manage_customers": ["crm"],
+  "crm.manage_mandantes": ["crm"],
   "quote.create": ["quotes"],
   "quote.edit": ["quotes"],
   "quote.delete": ["quotes"],

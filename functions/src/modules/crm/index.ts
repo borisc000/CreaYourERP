@@ -22,5 +22,20 @@ export {
   crmGetDocumentDownloadUrl,
   crmUpdateDocumentMirrorFlag,
   crmGetServiceMirror,
+  crmListLeads,
+  crmPublicMirror,
   crmGetCRMStats,
 } from "./crmService";
+
+export {
+  crmListCustomers,
+  crmGetCustomer,
+  crmCreateCustomer,
+  crmUpdateCustomer,
+  crmDeleteCustomer,
+  crmListMandantes,
+  crmGetMandante,
+  crmCreateMandante,
+  crmUpdateMandante,
+  crmDeleteMandante,
+} from "./customerService";

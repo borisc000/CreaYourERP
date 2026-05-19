@@ -61,6 +61,14 @@ function asOptionalString(value: unknown): string | null {
   return text || null;
 }
 
+function generateMirrorToken(): string {
+  return Array.from({ length: 24 }, () =>
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(
+      Math.floor(Math.random() * 62)
+    )
+  ).join("");
+}
+
 function sanitizeFilename(filename: string): string {
   return filename.replace(/[^\w.\-() ]+/g, "_").slice(0, 180) || "documento";
 }
@@ -158,6 +166,7 @@ function buildServicePayload(lead: Record<string, unknown>, existingService?: Re
     },
     operationalControl: existingService?.operationalControl || {},
     mirrorEnabled: existingService?.mirrorEnabled ?? true,
+    mirrorToken: existingService?.mirrorToken || generateMirrorToken(),
     active: existingService?.active ?? true,
   };
 }
@@ -821,6 +830,137 @@ export const crmGetServiceMirror = onCall({ region, cors: crmCors }, async (requ
     serviceType,
     documents,
     activity,
+  };
+});
+
+export const crmListLeads = onCall({ region, cors: crmCors }, async (request) => {
+  const ctx = await assertCRMAction(request, "service.view_internal");
+  const data = (request.data || {}) as Record<string, unknown>;
+
+  const statusFilter = asString(data.status);
+  const priorityFilter = asString(data.priority);
+  const customerId = asString(data.customerId);
+  const assignedTo = asString(data.assignedTo);
+  const stageId = asString(data.stageId);
+  const search = asString(data.search).toLowerCase();
+  const limit = Math.min(1000, Math.max(1, Number(data.limit || 200)));
+
+  let query: FirebaseFirestore.Query = companyRef(ctx.companyId).collection("leads").orderBy("createdAt", "desc").limit(limit);
+
+  if (statusFilter) query = query.where("status", "==", statusFilter);
+  if (priorityFilter) query = query.where("priority", "==", priorityFilter);
+  if (customerId) query = query.where("customerId", "==", customerId);
+  if (assignedTo) query = query.where("assignedTo", "==", assignedTo);
+  if (stageId) query = query.where("stageId", "==", stageId);
+
+  const snap = await query.get();
+  let leads = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+  if (search) {
+    leads = leads.filter((lead: any) =>
+      String(lead.title || "").toLowerCase().includes(search) ||
+      String(lead.projectCode || "").toLowerCase().includes(search) ||
+      String(lead.customerId || "").toLowerCase().includes(search)
+    );
+  }
+
+  // Aggregate stats
+  const total = leads.length;
+  const open = leads.filter((l: any) => l.status === "open").length;
+  const won = leads.filter((l: any) => l.status === "won").length;
+  const pipelineValue = leads
+    .filter((l: any) => l.status === "open")
+    .reduce((sum: number, l: any) => sum + (Number(l.expectedRevenue || 0) * Number(l.probability || 0)) / 100, 0);
+  const wonValue = leads.filter((l: any) => l.status === "won").reduce((sum: number, l: any) => sum + Number(l.expectedRevenue || 0), 0);
+
+  return { leads, stats: { total, open, won, pipelineValue: Math.round(pipelineValue), wonValue: Math.round(wonValue) } };
+});
+
+export const crmPublicMirror = onCall({ region, cors: crmCors }, async (request) => {
+  const data = (request.data || {}) as Record<string, unknown>;
+  const serviceId = asString(data.serviceId || data.id);
+  const mirrorToken = asString(data.mirrorToken);
+  if (!serviceId) throw new HttpsError("invalid-argument", "serviceId requerido");
+  if (!mirrorToken) throw new HttpsError("invalid-argument", "mirrorToken requerido");
+
+  // No auth required — validated by mirrorToken
+  const serviceSnap = await db.collectionGroup("crmServices").where("__name__", "==", serviceId).limit(1).get();
+  if (serviceSnap.empty) throw new HttpsError("not-found", "Servicio no encontrado");
+
+  const serviceDoc = serviceSnap.docs[0];
+  const service: Record<string, unknown> = { id: serviceDoc.id, ...serviceDoc.data() };
+  const companyId = String(service.companyId || "");
+  if (!companyId) throw new HttpsError("failed-precondition", "Servicio sin empresa");
+
+  if (service.mirrorEnabled === false) {
+    throw new HttpsError("permission-denied", "Mirror deshabilitado para este servicio");
+  }
+  if (service.mirrorToken !== mirrorToken) {
+    throw new HttpsError("permission-denied", "Token de mirror inválido");
+  }
+
+  const lead = await getOptionalDoc(companyId, "leads", service.leadId);
+  const customer = await getOptionalDoc(companyId, "customers", service.customerId || lead?.customerId);
+  const mandante = await getOptionalDoc(companyId, "mandantes", service.mandanteId || lead?.mandanteId);
+  const serviceType = await getOptionalDoc(companyId, "serviceTypes", service.serviceTypeId || lead?.serviceTypeId);
+  const activity = lead ? await getCollectionByLead(companyId, "activityLogs", String(lead.id), 50) : [];
+  const documents = (await getDocumentsForRecord(companyId, "Service", serviceId, serviceId, asString(lead?.id))).filter(documentVisibleInMirror);
+
+  return {
+    service: {
+      id: service.id,
+      serviceCode: service.serviceCode,
+      title: service.title,
+      description: service.description,
+      serviceName: service.serviceName,
+      empresaFaena: service.empresaFaena,
+      aprName: service.aprName,
+      supervisorName: service.supervisorName,
+      contractAdminName: service.contractAdminName,
+      commercialStatus: service.commercialStatus,
+      operationalStatus: service.operationalStatus,
+      financialStatus: service.financialStatus,
+      statusSnapshot: service.statusSnapshot,
+      contextSnapshot: service.contextSnapshot,
+      updatedAt: service.updatedAt,
+    },
+    lead: lead
+      ? {
+          id: lead.id,
+          title: lead.title,
+          projectCode: lead.projectCode,
+          expectedRevenue: lead.expectedRevenue,
+          probability: lead.probability,
+          status: lead.status,
+          expectedCloseDate: lead.expectedCloseDate,
+        }
+      : null,
+    customer: customer
+      ? {
+          id: customer.id,
+          name: customer.name,
+          legalName: customer.legalName,
+          taxId: customer.taxId,
+          email: customer.email,
+          phone: customer.phone,
+        }
+      : null,
+    mandante: mandante
+      ? {
+          id: mandante.id,
+          name: mandante.name,
+          email: mandante.email,
+          phone: mandante.phone,
+          position: mandante.position,
+        }
+      : null,
+    serviceType: serviceType ? { id: serviceType.id, name: serviceType.name } : null,
+    documents,
+    activity: activity.map((a: any) => ({
+      type: a.type,
+      message: a.message,
+      createdAt: a.createdAt,
+    })),
   };
 });
 

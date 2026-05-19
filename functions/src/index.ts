@@ -370,7 +370,19 @@ export {
   crmGetDocumentDownloadUrl,
   crmUpdateDocumentMirrorFlag,
   crmGetServiceMirror,
+  crmListLeads,
+  crmPublicMirror,
   crmGetCRMStats,
+  crmListCustomers,
+  crmGetCustomer,
+  crmCreateCustomer,
+  crmUpdateCustomer,
+  crmDeleteCustomer,
+  crmListMandantes,
+  crmGetMandante,
+  crmCreateMandante,
+  crmUpdateMandante,
+  crmDeleteMandante,
 } from "./modules/crm";
 
 // ==========================================
