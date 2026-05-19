@@ -73,6 +73,105 @@ export const approveGeneratedDocument = onCall(
   }
 );
 
+// ---------- reviewGeneratedDocument ----------
+interface ReviewPayload {
+  documentId: string;
+}
+
+export const reviewGeneratedDocument = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.review_document", { companyId });
+
+    const { documentId } = request.data as ReviewPayload;
+    if (!documentId) throw new HttpsError("invalid-argument", "documentId es requerido");
+
+    const ref = companyRef(companyId).collection("generatedDocuments").doc(documentId);
+    const snap = await ref.get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    const data = snap.data()!;
+    if (data.status !== "generated") throw new HttpsError("failed-precondition", "Solo documentos en estado 'generated' pueden pasar a revisión");
+
+    const now = new Date().toISOString();
+    await ref.update({ status: "ready_for_review", reviewedBy: request.auth.uid, reviewedAt: now, updatedAt: now });
+    await companyRef(companyId).collection("documentEventLogs").add({ companyId, documentId, event: "ready_for_review", userId: request.auth.uid, createdAt: now });
+    return { success: true };
+  }
+);
+
+// ---------- sendGeneratedDocumentToSignature ----------
+interface SendToSignaturePayload {
+  documentId: string;
+  signerEmail?: string;
+  signerName?: string;
+  signaturePositions?: any[];
+}
+
+export const sendGeneratedDocumentToSignature = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.send_to_signature", { companyId });
+
+    const { documentId, signerEmail, signerName, signaturePositions } = request.data as SendToSignaturePayload;
+    if (!documentId) throw new HttpsError("invalid-argument", "documentId es requerido");
+
+    const ref = companyRef(companyId).collection("generatedDocuments").doc(documentId);
+    const snap = await ref.get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    const data = snap.data()!;
+    if (data.status !== "approved") throw new HttpsError("failed-precondition", "El documento debe estar aprobado antes de enviar a firma");
+
+    const resolvedSignerEmail = signerEmail || data.recipientEmail || "";
+    const resolvedSignerName = signerName || data.recipientName || "";
+    if (!resolvedSignerEmail) throw new HttpsError("invalid-argument", "No se pudo determinar el email del firmante");
+
+    // Create signature request
+    const now = new Date().toISOString();
+    const token = generateToken();
+    const sigRef = companyRef(companyId).collection("signatureRequests").doc();
+    await sigRef.set({
+      companyId,
+      name: data.name,
+      description: `Documento generado: ${data.templateName}`,
+      requestFrom: request.auth.uid,
+      requestToEmail: resolvedSignerEmail,
+      requestToName: resolvedSignerName,
+      generatedDocumentId: documentId,
+      storagePath: data.storagePath || "",
+      signaturePositions: signaturePositions || [],
+      status: "draft",
+      accessToken: token,
+      expiresAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await ref.update({ status: "signature_pending", signatureRequestId: sigRef.id, updatedAt: now });
+    await companyRef(companyId).collection("documentEventLogs").add({ companyId, documentId, event: "signature_pending", signatureRequestId: sigRef.id, userId: request.auth.uid, createdAt: now });
+
+    return { success: true, signatureRequestId: sigRef.id, token };
+  }
+);
+
+function generateToken(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let token = "";
+  for (let i = 0; i < 32; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+  return token;
+}
+
 // ---------- closeGeneratedDocument ----------
 interface ClosePayload {
   documentId: string;
@@ -105,6 +204,12 @@ export const closeGeneratedDocument = onCall(
       const snap = await ref.get();
       if (!snap.exists) {
         throw new HttpsError("not-found", "Documento no encontrado");
+      }
+
+      const docData = snap.data()!;
+      // Require signed status before closing if signature was required
+      if (docData.requiresSignature && docData.status !== "signed") {
+        throw new HttpsError("failed-precondition", "El documento requiere firma antes de cerrarse");
       }
 
       const now = new Date().toISOString();
