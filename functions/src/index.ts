@@ -399,6 +399,13 @@ export { seedSafetyCatalogs };
 export { generateRiskMatrix };
 export { generateJobProfileMatrix } from "./modules/safety/generateJobProfileMatrix";
 export { refreshFolderMetrics };
+export {
+  saveEquipmentBlock, deleteEquipmentBlock,
+  saveClientSite, deleteClientSite,
+  saveClientArea, deleteClientArea,
+  saveWorkerRestriction, deleteWorkerRestriction,
+  saveGeneratorRule, deleteGeneratorRule,
+} from "./modules/safety/safetyCatalogsService";
 export { linkProcedureToFolder, unlinkProcedureFromFolder } from "./modules/safety/procedureLinkService";
 export { generateIRL, saveIRL, deleteIRL } from "./modules/safety/irlService";
 export { savePPEDelivery, deletePPEDelivery } from "./modules/safety/ppeService";

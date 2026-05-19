@@ -79,6 +79,11 @@ type ServiceAction =
   | "safety.delete_ppe_delivery"
   | "safety.save_talk"
   | "safety.delete_talk"
+  | "safety.manage_equipment"
+  | "safety.manage_sites"
+  | "safety.manage_areas"
+  | "safety.manage_restrictions"
+  | "safety.manage_generator_rules"
   | "safety.seed_catalogs"
   // Recruitment
   | "recruitment.view"
@@ -188,6 +193,11 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "safety.delete_ppe_delivery": ["safety"],
   "safety.save_talk": ["safety"],
   "safety.delete_talk": ["safety"],
+  "safety.manage_equipment": ["safety"],
+  "safety.manage_sites": ["safety"],
+  "safety.manage_areas": ["safety"],
+  "safety.manage_restrictions": ["safety"],
+  "safety.manage_generator_rules": ["safety"],
   "safety.seed_catalogs": ["safety"],
   // Recruitment
   "recruitment.view": ["hr"],

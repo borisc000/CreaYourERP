@@ -82,17 +82,42 @@ export const generateJobProfileMatrix = onCall(
         });
       }
 
+      // Fetch activity links for this job profile
+      const activityLinksSnap = await companyRef(companyId)
+        .collection("jobProfiles")
+        .doc(jobProfileId)
+        .collection("activityLinks")
+        .where("active", "==", true)
+        .get();
+
+      const activityBlockIds = activityLinksSnap.docs.map((d) => d.data().activityBlockId as string).filter(Boolean);
+      let activityBlocks: any[] = [];
+      if (activityBlockIds.length > 0) {
+        // Fetch in chunks of 10 (Firestore "in" limit)
+        for (let i = 0; i < activityBlockIds.length; i += 10) {
+          const chunk = activityBlockIds.slice(i, i + 10);
+          const blocksSnap = await companyRef(companyId)
+            .collection("safetyActivityBlocks")
+            .where("__name__", "in", chunk)
+            .get();
+          activityBlocks.push(...blocksSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        }
+      }
+
       // Write rows
       const batch = db.batch();
       const now = new Date().toISOString();
       let addedCount = 0;
+      const fingerprints = new Set<string>();
 
       for (const risk of relevantRisks) {
         const rowRef = matrixRef.collection("rows").doc();
         const probability = risk.defaultProbability || 1;
         const consequence = risk.defaultConsequence || 1;
         const vep = probability * consequence;
-        const compactMiper = vep; // simplified
+        const compactMiper = vep;
+        const fingerprint = `${jobProfileId}|profile|${risk.code}`;
+        fingerprints.add(fingerprint);
 
         batch.set(rowRef, {
           companyId,
@@ -124,9 +149,49 @@ export const generateJobProfileMatrix = onCall(
         addedCount++;
       }
 
+      // Add rows from activity blocks
+      for (const block of activityBlocks) {
+        const blockProbability = Number(block.probability) || 2;
+        const blockConsequence = Number(block.consequence) || 2;
+        const blockVep = blockProbability * blockConsequence;
+        const fingerprint = `${jobProfileId}|activity|${block.id}`;
+        if (fingerprints.has(fingerprint)) continue;
+        fingerprints.add(fingerprint);
+
+        const rowRef = matrixRef.collection("rows").doc();
+        batch.set(rowRef, {
+          companyId,
+          safetyFolderId,
+          matrixId: safetyFolderId,
+          source: "activity_block",
+          sourceId: block.id,
+          jobProfileName: profile.name || "",
+          process: block.baseProcess || block.defaultProcessName || "Proceso",
+          task: block.baseActivity || block.defaultTaskName || "Tarea",
+          position: block.defaultPositionName || profile.name || "",
+          hazardCategory: block.hazardCategory || "Operacional",
+          hazardName: block.hazardFactor || block.name,
+          riskName: block.name,
+          probableDamage: block.probableDamage || "",
+          legalReference: block.legalReference || "",
+          pe: 1,
+          fe: 1,
+          fo: 1,
+          severity: blockVep,
+          residualProbability: blockProbability,
+          residualConsequence: blockConsequence,
+          residualRisk: blockVep,
+          proposedControls: Array.isArray(block.requiredPpe) ? block.requiredPpe.map((p: string) => `EPP: ${p}`) : [],
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        });
+        addedCount++;
+      }
+
       await batch.commit();
 
-      return { success: true, addedCount, riskLevel };
+      return { success: true, addedCount, riskLevel, activityBlocks: activityBlocks.length };
     } catch (error: any) {
       console.error("[generateJobProfileMatrix] Error:", error);
       if (error instanceof HttpsError) throw error;

@@ -231,6 +231,34 @@ export const seedSafetyCatalogs = onCall(
         });
       }
 
+      // 6. Equipment Blocks
+      const equipRef = db.collection("companies").doc(companyId).collection("safetyEquipmentBlocks");
+      const DEFAULT_EQUIPMENT_BLOCKS = [
+        { code: "EQ-001", name: "Andamios tubulares", description: "Equipo de acceso para trabajo en altura", masterRiskIds: ["A1", "A3", "B5"], requiredPpe: ["CASCO", "ARNES", "COLA"], protocolCodes: ["PTS-001", "PTS-002"], probability: 4, consequence: 4, isActive: true },
+        { code: "EQ-002", name: "Grúa torre", description: "Equipo de izaje de cargas", masterRiskIds: ["B6", "B5"], requiredPpe: ["CASCO", "CHALECO"], protocolCodes: ["PTS-005"], probability: 2, consequence: 4, isActive: true },
+        { code: "EQ-003", name: "Espacio confinado", description: "Trabajo en espacios confinados", masterRiskIds: ["T2", "I1"], requiredPpe: ["CASCO", "RESPIRADOR"], protocolCodes: ["PTS-003"], probability: 2, consequence: 4, isActive: true },
+      ];
+      for (const item of DEFAULT_EQUIPMENT_BLOCKS) {
+        const docRef = equipRef.doc();
+        batch.set(docRef, { companyId, ...item, createdAt: new Date().toISOString() });
+      }
+
+      // 7. Client Sites
+      const siteRef = db.collection("companies").doc(companyId).collection("safetyClientSites");
+      batch.set(siteRef.doc(), { companyId, customerId: "", name: "Faena Principal", address: "Av. Principal 123", comuna: "Santiago", createdAt: new Date().toISOString() });
+      batch.set(siteRef.doc(), { companyId, customerId: "", name: "Faena Secundaria", address: "Calle Secundaria 456", comuna: "Valparaíso", createdAt: new Date().toISOString() });
+
+      // 8. Generator Rules
+      const ruleRef = db.collection("companies").doc(companyId).collection("safetyGeneratorRules");
+      const DEFAULT_RULES = [
+        { name: "Riesgo transversal - Caídas", scopeType: "transversal", processName: "General", taskName: "Tareas habituales", hazardFactor: "Altura", masterRiskId: "A1", probability: 4, consequence: 4, requiredPpe: ["CASCO", "ARNES"], protocolCodes: ["PTS-001"] },
+        { name: "Riesgo específico - Andamios", scopeType: "service_profile", scopeRefId: "", processName: "Montaje", taskName: "Armado de andamio", hazardFactor: "Trabajo en altura", masterRiskId: "A1", probability: 4, consequence: 4, requiredPpe: ["CASCO", "ARNES", "COLA"], protocolCodes: ["PTS-002"] },
+      ];
+      for (const item of DEFAULT_RULES) {
+        const docRef = ruleRef.doc();
+        batch.set(docRef, { companyId, ...item, createdAt: new Date().toISOString() });
+      }
+
       await batch.commit();
 
       return {
@@ -241,6 +269,9 @@ export const seedSafetyCatalogs = onCall(
           serviceProfiles: DEFAULT_SERVICE_PROFILES.length,
           riskMethodologies: 1,
           masterRisks: DEFAULT_MASTER_RISKS.length,
+          equipmentBlocks: DEFAULT_EQUIPMENT_BLOCKS.length,
+          clientSites: 2,
+          generatorRules: DEFAULT_RULES.length,
         },
       };
     } catch (error) {
