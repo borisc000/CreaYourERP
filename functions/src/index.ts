@@ -147,6 +147,7 @@ export { detectGaps };
 export { triggerDocumentGeneration };
 export { bulkAssignCrew };
 export { checkExpiringDocuments };
+export { scheduledCheckExpiringDocuments } from "./modules/accreditation/scheduledCheckExpiring";
 
 export const onCrewAssigned = onDocumentCreated(
   {
