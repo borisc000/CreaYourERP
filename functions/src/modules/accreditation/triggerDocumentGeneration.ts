@@ -92,10 +92,10 @@ export const triggerDocumentGeneration = onCall(
     // 5. Buscar templates
     const templatesSnap = requirementCodes.length > 0
       ? await companyRef(companyId)
-          .collection("documentTemplates")
-          .where("status", "==", "active")
-          .where("accreditationRequirementCode", "in", requirementCodes)
-          .get()
+        .collection("documentTemplates")
+        .where("status", "==", "active")
+        .where("accreditationRequirementCode", "in", requirementCodes)
+        .get()
       : { docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] };
 
     const templatesByCode = new Map<string, Array<{ id: string; name: string; customerId?: string; requiresSignature?: boolean; autoRegisterAccreditation?: boolean }>>();

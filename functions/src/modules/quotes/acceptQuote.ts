@@ -187,15 +187,15 @@ export const acceptQuote = onCall(
       requiresRental,
       rentalContract: rentalContract
         ? {
-            id: rentalContract.id,
-            sourceQuoteId: rentalContract.sourceQuoteId,
-            sourceQuoteNumber: rentalContract.sourceQuoteNumber,
-            leadId: rentalContract.leadId,
-            customerId: rentalContract.customerId,
-            status: rentalContract.status,
-            title: rentalContract.title,
-            contractValue: rentalContract.contractValue,
-          }
+          id: rentalContract.id,
+          sourceQuoteId: rentalContract.sourceQuoteId,
+          sourceQuoteNumber: rentalContract.sourceQuoteNumber,
+          leadId: rentalContract.leadId,
+          customerId: rentalContract.customerId,
+          status: rentalContract.status,
+          title: rentalContract.title,
+          contractValue: rentalContract.contractValue,
+        }
         : null,
     };
   }

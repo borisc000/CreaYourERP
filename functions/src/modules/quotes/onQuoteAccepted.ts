@@ -95,7 +95,7 @@ export const onQuoteAccepted = onDocumentUpdated(
           companyId,
           leadId: after.leadId,
           type: "status_changed",
-          message: `Cotización aceptada. Oportunidad ganada.`,
+          message: "Cotización aceptada. Oportunidad ganada.",
           userId: after.updatedBy || after.createdBy || null,
           metadata: { quoteId, serviceCode, serviceId },
           createdAt: new Date().toISOString(),

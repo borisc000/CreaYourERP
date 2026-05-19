@@ -55,7 +55,7 @@ export const importProcedureToGantt = onCall(
     }
 
     const steps = await companyRef(companyId).collection("safetyProcedureSteps").where("procedureId", "==", procedureId).where("active", "==", true).orderBy("displayOrder").get();
-    let currentDate = new Date();
+    const currentDate = new Date();
     const tasks: any[] = [];
 
     for (const step of steps.docs) {
@@ -90,7 +90,7 @@ export const createGanttTask = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "gantt.create", { companyId });
-    const { companyId: _c, planId, ...data } = request.data;
+    const { companyId: _, planId, ...data } = request.data;
     if (!planId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const plan = await companyRef(companyId).collection("leadGanttPlans").doc(planId).get();
     const ref = await companyRef(companyId).collection("leadGanttTasks").add({
@@ -115,7 +115,7 @@ export const updateGanttTask = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "gantt.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };
     if (data.progressPct !== undefined) {

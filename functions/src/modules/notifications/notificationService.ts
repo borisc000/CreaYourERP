@@ -32,7 +32,7 @@ export const createNotificationTemplate = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, ...data } = request.data;
+    const { companyId: _, ...data } = request.data;
     if (!data.name || !data.bodyTemplate) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("notificationTemplates").add({
       companyId, name: data.name, channel: data.channel || "email",
@@ -53,7 +53,7 @@ export const updateNotificationTemplate = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("notificationTemplates").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
@@ -109,7 +109,7 @@ export const saveNotificationPreference = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, userId, eventType, ...prefs } = request.data;
+    const { companyId: _, userId, eventType, ...prefs } = request.data;
     if (!userId || !eventType) throw new HttpsError("invalid-argument", "Datos incompletos");
     const existing = await companyRef(companyId).collection("notificationPreferences").where("userId", "==", userId).where("eventType", "==", eventType).limit(1).get();
     const data = {

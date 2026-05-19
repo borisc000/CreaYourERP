@@ -45,7 +45,9 @@ export const mergeDocumentTemplate = onCall(
 
     try {
       // Lazy-load docxtemplater to avoid top-level require issues with types
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const Docxtemplater = require("docxtemplater");
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const PizZip = require("pizzip");
 
       // Fetch template
@@ -108,18 +110,18 @@ export const mergeDocumentTemplate = onCall(
         },
         customer: customer
           ? {
-              name: customer.name || "N/A",
-              rut: customer.rut || "",
-              contactName: customer.contactName || "",
-              contactEmail: customer.contactEmail || "",
-            }
+            name: customer.name || "N/A",
+            rut: customer.rut || "",
+            contactName: customer.contactName || "",
+            contactEmail: customer.contactEmail || "",
+          }
           : { name: "", rut: "", contactName: "", contactEmail: "" },
         serviceOrder: serviceOrder
           ? {
-              title: serviceOrder.title || "N/A",
-              code: serviceOrder.code || "",
-              description: serviceOrder.description || "",
-            }
+            title: serviceOrder.title || "N/A",
+            code: serviceOrder.code || "",
+            description: serviceOrder.description || "",
+          }
           : { title: "", code: "", description: "" },
         documentDate: payload.documentDate || new Date().toLocaleDateString("es-CL"),
         effectiveDate: payload.effectiveDate || "",

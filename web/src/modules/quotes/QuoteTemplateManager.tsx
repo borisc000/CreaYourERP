@@ -136,7 +136,7 @@ export function QuoteTemplateManager() {
     }
   };
 
-  const useTemplate = (t: QuoteTemplate) => {
+  const handleUseTemplate = (t: QuoteTemplate) => {
     navigate("/quotes/new", { state: { template: t } });
   };
 
@@ -332,7 +332,7 @@ export function QuoteTemplateManager() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
-                    onClick={() => useTemplate(t)}
+                    onClick={() => handleUseTemplate(t)}
                     className="px-3 py-1.5 bg-blue-900/60 hover:bg-blue-800 text-blue-100 text-xs font-medium rounded-lg transition-colors"
                   >
                     Usar

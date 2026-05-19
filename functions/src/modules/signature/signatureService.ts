@@ -334,7 +334,7 @@ export const signDocument = onCall(
         const pdfDoc = await PDFDocument.create();
         const page = pdfDoc.addPage();
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        page.drawText(`DOCUMENTO FIRMADO DIGITALMENTE`, { x: 50, y: 700, size: 16, font, color: rgb(0.1, 0.1, 0.1) });
+        page.drawText("DOCUMENTO FIRMADO DIGITALMENTE", { x: 50, y: 700, size: 16, font, color: rgb(0.1, 0.1, 0.1) });
         page.drawText(`Documento: ${requestData.name}`, { x: 50, y: 660, size: 12, font });
         page.drawText(`Firmado por: ${signerName} (${signerEmail})`, { x: 50, y: 640, size: 12, font });
         page.drawText(`Fecha: ${new Date().toLocaleDateString("es-CL")}`, { x: 50, y: 620, size: 12, font });

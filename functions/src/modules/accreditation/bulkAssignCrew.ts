@@ -80,7 +80,7 @@ export const bulkAssignCrew = onCall(
           type: "crew.assigned",
           serviceOrderId,
           employeeId,
-          message: `Empleado asignado a cuadrilla (bulk)`,
+          message: "Empleado asignado a cuadrilla (bulk)",
           userId: request.auth!.uid,
           createdAt: now,
         });

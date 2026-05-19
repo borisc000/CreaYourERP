@@ -17,8 +17,8 @@ interface ExportPayload {
 }
 
 function escapeCsv(value: any): string {
-  const str = String(value ?? "").replace(/"/g, '""');
-  if (str.includes(",") || str.includes("\n") || str.includes('"')) {
+  const str = String(value ?? "").replace(/"/g, "\"\"");
+  if (str.includes(",") || str.includes("\n") || str.includes("\"")) {
     return `"${str}"`;
   }
   return str;

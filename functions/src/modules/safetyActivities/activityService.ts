@@ -48,7 +48,7 @@ export const createActivityBlock = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "safety_activities.create", { companyId });
-    const { companyId: _c, ...data } = request.data;
+    const { companyId: _, ...data } = request.data;
     if (!data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
     const count = (await companyRef(companyId).collection("safetyActivityBlocks").count().get()).data().count;
     const code = `BOT-${String(count + 1).padStart(4, "0")}`;
@@ -73,7 +73,7 @@ export const updateActivityBlock = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "safety_activities.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     // Create version snapshot
     const block = await companyRef(companyId).collection("safetyActivityBlocks").doc(id).get();
@@ -97,7 +97,7 @@ export const createActivityHazard = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "safety_activities.create", { companyId });
-    const { companyId: _c, activityBlockId, ...data } = request.data;
+    const { companyId: _, activityBlockId, ...data } = request.data;
     if (!activityBlockId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const risk = calculateRisk(data.probability || 1, data.consequence || 1);
     const ref = await companyRef(companyId).collection("safetyActivityHazards").add({
@@ -125,7 +125,7 @@ export const updateActivityHazard = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "safety_activities.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };
     if (data.probability && data.consequence) {

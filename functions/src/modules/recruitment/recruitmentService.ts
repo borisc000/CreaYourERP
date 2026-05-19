@@ -72,7 +72,7 @@ export const createJobOpening = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "recruitment.create", { companyId });
-    const { companyId: _c, ...data } = request.data;
+    const { companyId: _, ...data } = request.data;
     if (!data.title) throw new HttpsError("invalid-argument", "Datos incompletos");
     const count = (await companyRef(companyId).collection("jobOpenings").count().get()).data().count;
     const code = `JOB-${String(count + 1).padStart(4, "0")}`;
@@ -98,7 +98,7 @@ export const updateJobOpening = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "recruitment.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("jobOpenings").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
@@ -114,7 +114,7 @@ export const createCandidate = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "recruitment.create", { companyId });
-    const { companyId: _c, ...data } = request.data;
+    const { companyId: _, ...data } = request.data;
     if (!data.fullName) throw new HttpsError("invalid-argument", "Nombre requerido");
     // Calculate completion
     const required = [data.nationalId, data.email, data.phone, data.birthDate, data.address, data.city, data.healthSystem, data.afpCode, data.emergencyContactName, data.emergencyContactPhone, data.criminalRecordStatus];
@@ -140,7 +140,7 @@ export const updateCandidate = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "recruitment.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("candidates").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
@@ -183,7 +183,7 @@ export const updateApplication = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "recruitment.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };
     if (data.stageId) {
@@ -383,7 +383,7 @@ export const updateInterview = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "recruitment.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("interviews").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };

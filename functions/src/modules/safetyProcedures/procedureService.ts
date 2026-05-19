@@ -40,7 +40,7 @@ export const createProcedure = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "safety_procedures.create", { companyId });
-    const { companyId: _c, ...data } = request.data;
+    const { companyId: _, ...data } = request.data;
     if (!data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
     const count = (await companyRef(companyId).collection("safetyProcedureTemplates").count().get()).data().count;
     const code = `PTS-${String(count + 1).padStart(4, "0")}`;
@@ -66,7 +66,7 @@ export const updateProcedure = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "safety_procedures.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     const proc = await companyRef(companyId).collection("safetyProcedureTemplates").doc(id).get();
@@ -156,7 +156,7 @@ export const createProcedureStep = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "safety_procedures.create", { companyId });
-    const { companyId: _c, procedureId, ...data } = request.data;
+    const { companyId: _, procedureId, ...data } = request.data;
     if (!procedureId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("safetyProcedureSteps").add({
       companyId, procedureId, phaseName: data.phaseName || "setup", stepTitle: data.stepTitle || "",
@@ -178,7 +178,7 @@ export const updateProcedureStep = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "safety_procedures.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     const step = await companyRef(companyId).collection("safetyProcedureSteps").doc(id).get();

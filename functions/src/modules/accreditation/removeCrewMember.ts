@@ -47,7 +47,7 @@ export const removeCrewMember = onCall(
         type: "crew.removed",
         serviceOrderId: assignment.serviceOrderId,
         employeeId: assignment.employeeId,
-        message: `Empleado removido de cuadrilla`,
+        message: "Empleado removido de cuadrilla",
         userId: request.auth!.uid,
         createdAt: now,
       });

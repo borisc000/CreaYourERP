@@ -34,7 +34,7 @@ export const createGoogleWorkspaceAccount = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "google_workspace.create", { companyId });
-    const { companyId: _c, ...data } = request.data;
+    const { companyId: _, ...data } = request.data;
     if (!data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
       const existing = await companyRef(companyId).collection("googleWorkspaceAccounts").where("isDefault", "==", true).get();
@@ -60,7 +60,7 @@ export const updateGoogleWorkspaceAccount = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "google_workspace.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
       const existing = await companyRef(companyId).collection("googleWorkspaceAccounts").where("isDefault", "==", true).get();

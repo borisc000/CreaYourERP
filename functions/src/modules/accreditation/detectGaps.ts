@@ -86,10 +86,10 @@ export const detectGaps = onCall(
     // 5. Buscar templates activos para esos códigos
     const templatesSnap = requirementCodes.length > 0
       ? await companyRef(companyId)
-          .collection("documentTemplates")
-          .where("status", "==", "active")
-          .where("accreditationRequirementCode", "in", requirementCodes)
-          .get()
+        .collection("documentTemplates")
+        .where("status", "==", "active")
+        .where("accreditationRequirementCode", "in", requirementCodes)
+        .get()
       : { docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] };
 
     // Agrupar templates por código

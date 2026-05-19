@@ -203,7 +203,7 @@ export const generateRiohsDocument = onCall(
       };
 
       // Título
-      drawText(`REGLAMENTO INTERNO DE ORDEN, HIGIENE Y SEGURIDAD (RIOHS)`, { size: 14, bold: true, color: rgb(0.05, 0.3, 0.2) });
+      drawText("REGLAMENTO INTERNO DE ORDEN, HIGIENE Y SEGURIDAD (RIOHS)", { size: 14, bold: true, color: rgb(0.05, 0.3, 0.2) });
       y -= 25;
       drawText(`Empresa: ${cfg.empresaNombre || "-"}`, { size: 11, bold: true });
       y -= 16;

@@ -60,7 +60,7 @@ export const generateSettlementPdf = onCall(
     const pageWidth = 595;
     const pageHeight = 842;
     const margin = 40;
-    let page = pdfDoc.addPage([pageWidth, pageHeight]);
+    const page = pdfDoc.addPage([pageWidth, pageHeight]);
     let y = pageHeight - margin;
 
     const drawText = (text: string, x: number, size: number, bold = false, color = rgb(0.1, 0.1, 0.1)) => {

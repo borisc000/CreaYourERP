@@ -41,7 +41,7 @@ export const createCorrespondence = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "cross_correspondence.create", { companyId });
-    const { companyId: _c, ...data } = request.data;
+    const { companyId: _, ...data } = request.data;
     if (!data.contractId || !data.subject) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("crossCorrespondences").add({
       companyId, contractId: data.contractId, employeeId: data.employeeId || "", leadId: data.leadId || "",
@@ -63,7 +63,7 @@ export const updateCorrespondence = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "cross_correspondence.edit", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("crossCorrespondences").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };

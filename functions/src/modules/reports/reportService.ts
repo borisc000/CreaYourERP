@@ -40,7 +40,7 @@ export const createReport = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "reports.create_report", { companyId });
-    const { companyId: _c, leadId, ...data } = request.data;
+    const { companyId: _, leadId, ...data } = request.data;
     if (!leadId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("reports").add({
       companyId, leadId, status: "abierto", publicToken: randomToken(),
@@ -70,7 +70,7 @@ export const updateReport = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "reports.edit_report", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("reports").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
@@ -104,7 +104,7 @@ export const createCheckpoint = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "reports.create_checkpoint", { companyId });
-    const { companyId: _c, reportId, ...data } = request.data;
+    const { companyId: _, reportId, ...data } = request.data;
     if (!reportId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("reportCheckpoints").add({
       companyId, reportId, checkpointType: data.checkpointType || "control",
@@ -125,7 +125,7 @@ export const updateCheckpoint = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "reports.edit_checkpoint", { companyId });
-    const { companyId: _c, id, ...data } = request.data;
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };
     if (data.completed === true) {
@@ -146,7 +146,7 @@ export const addReportPhoto = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "reports.add_photo", { companyId });
-    const { companyId: _c, reportId, checkpointId, photoUrl, ...data } = request.data;
+    const { companyId: _, reportId, checkpointId, photoUrl, ...data } = request.data;
     if (!reportId || !checkpointId || !photoUrl) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("reportPhotos").add({
       companyId, reportId, checkpointId, photoUrl,

@@ -73,7 +73,7 @@ export const assignCrewMember = onCall(
         type: "crew.assigned",
         serviceOrderId,
         employeeId,
-        message: `Empleado asignado a cuadrilla`,
+        message: "Empleado asignado a cuadrilla",
         userId: request.auth!.uid,
         createdAt: now,
       });

@@ -108,6 +108,7 @@ export const generateReportPdf = onCall(
 
       // === CHECKPOINTS ===
       if (checkpoints.length > 0) {
+        // eslint-disable-next-line prefer-const
         let { page, width, height } = addPageWithHeader();
         let y = height - 60;
         page.drawText("CHECKPOINTS", { x: 40, y, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
@@ -142,6 +143,7 @@ export const generateReportPdf = onCall(
 
       // === PHOTOS ===
       if (photos.length > 0) {
+        // eslint-disable-next-line prefer-const
         let { page, height } = addPageWithHeader();
         let y = height - 60;
         page.drawText("FOTOS", { x: 40, y, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.1) });

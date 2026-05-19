@@ -141,7 +141,7 @@ export const generateIRL = onCall(
         riskItems,
         complementMaterials: [],
         observations: "",
-        introText: `Por medio de la presente se informa a usted, en cumplimiento de lo dispuesto en el artículo 14 del D.S. N° 44, sobre los riesgos laborales a que estará expuesto en el desarrollo de sus labores.`,
+        introText: "Por medio de la presente se informa a usted, en cumplimiento de lo dispuesto en el artículo 14 del D.S. N° 44, sobre los riesgos laborales a que estará expuesto en el desarrollo de sus labores.",
         themeColor: "#0F4C81",
         signedByEmployee: false,
         createdAt: now,

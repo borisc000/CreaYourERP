@@ -46,8 +46,11 @@ export const extractTemplatePlaceholders = onCall(
     }
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const Docxtemplater = require("docxtemplater");
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const InspectModule = require("docxtemplater/js/inspect-module").default;
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const PizZip = require("pizzip");
 
       const bucket = storage.bucket();

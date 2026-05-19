@@ -54,44 +54,44 @@ export async function simulateSiiSubmission(
   let glosa = "";
 
   switch (profile) {
-    case "auto_accept":
+  case "auto_accept":
+    siiStatus = "accepted";
+    status = "issued";
+    glosa = "Documento aceptado por el SII (simulación auto-aceptar)";
+    break;
+  case "observed_then_accept": {
+    const docSnap = await docRef.get();
+    const currentSii = docSnap.exists ? (docSnap.data() as any).siiStatus : "not_sent";
+    if (currentSii === "observed") {
       siiStatus = "accepted";
       status = "issued";
-      glosa = "Documento aceptado por el SII (simulación auto-aceptar)";
-      break;
-    case "observed_then_accept": {
-      const docSnap = await docRef.get();
-      const currentSii = docSnap.exists ? (docSnap.data() as any).siiStatus : "not_sent";
-      if (currentSii === "observed") {
-        siiStatus = "accepted";
-        status = "issued";
-        glosa = "Observación resuelta; documento aceptado por el SII";
-      } else {
-        siiStatus = "observed";
-        status = "observed";
-        glosa = "El SII observó el documento; requiere corrección antes de reenvío";
-      }
-      break;
+      glosa = "Observación resuelta; documento aceptado por el SII";
+    } else {
+      siiStatus = "observed";
+      status = "observed";
+      glosa = "El SII observó el documento; requiere corrección antes de reenvío";
     }
-    case "rejected_then_accept": {
-      const docSnap = await docRef.get();
-      const currentSii = docSnap.exists ? (docSnap.data() as any).siiStatus : "not_sent";
-      if (currentSii === "rejected") {
-        siiStatus = "accepted";
-        status = "issued";
-        glosa = "Rechazo corregido; documento aceptado por el SII";
-      } else {
-        siiStatus = "rejected";
-        status = "rejected";
-        glosa = "El SII rechazó el documento; edítalo y reenvía";
-      }
-      break;
+    break;
+  }
+  case "rejected_then_accept": {
+    const docSnap = await docRef.get();
+    const currentSii = docSnap.exists ? (docSnap.data() as any).siiStatus : "not_sent";
+    if (currentSii === "rejected") {
+      siiStatus = "accepted";
+      status = "issued";
+      glosa = "Rechazo corregido; documento aceptado por el SII";
+    } else {
+      siiStatus = "rejected";
+      status = "rejected";
+      glosa = "El SII rechazó el documento; edítalo y reenvía";
     }
-    case "manual":
-      siiStatus = "queued";
-      status = "draft";
-      glosa = "Documento puesto en cola de envío al SII (procesamiento manual)";
-      break;
+    break;
+  }
+  case "manual":
+    siiStatus = "queued";
+    status = "draft";
+    glosa = "Documento puesto en cola de envío al SII (procesamiento manual)";
+    break;
   }
 
   // Update document
