@@ -6,6 +6,12 @@ const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-er
 function nowIso() { return new Date().toISOString(); }
 function companyRef(companyId: string) { return db.collection("companies").doc(companyId); }
 
+// Workflow status constants
+const PERIOD_STATUSES = ["draft", "calculated", "approved", "closed"];
+const SETTLEMENT_STATUSES = ["draft", "calculated", "approved", "signature_pending", "signed", "closed", "error"];
+function isValidPeriodStatus(s: string): s is typeof PERIOD_STATUSES[number] { return PERIOD_STATUSES.includes(s as any); }
+function isValidSettlementStatus(s: string): s is typeof SETTLEMENT_STATUSES[number] { return SETTLEMENT_STATUSES.includes(s as any); }
+
 function calculateWorkedDays(contractStart: string, contractEnd: string | null | undefined, periodStart: string, periodEnd: string): number {
   const start = new Date(contractStart);
   const end = contractEnd ? new Date(contractEnd) : new Date(periodEnd);
@@ -156,12 +162,16 @@ export const calculatePeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    await assertAction(request, "payroll.edit", { companyId });
+    await assertAction(request, "payroll.calculate", { companyId });
     const { periodId } = request.data;
     if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     const period = await companyRef(companyId).collection("payrollPeriods").doc(periodId).get();
     if (!period.exists) throw new HttpsError("not-found", "Período no encontrado");
+    const periodData = period.data() || {};
+    if (!isValidPeriodStatus(periodData.status) || periodData.status === "approved" || periodData.status === "closed") {
+      throw new HttpsError("failed-precondition", "No se puede recalcular un período aprobado o cerrado");
+    }
 
     // Get legal params
     const paramsSnap = await companyRef(companyId).collection("payrollLegalParameters").get();
@@ -185,7 +195,6 @@ export const calculatePeriod = onCall(
     const contractMap: Record<string, any> = {};
     contractsSnap.docs.forEach((d) => { contractMap[d.data().employeeId] = d.data(); });
 
-    const periodData = period.data() || {};
     const periodStart = periodData.startDate || "";
     const periodEnd = periodData.endDate || "";
 
@@ -320,6 +329,15 @@ export const calculatePeriod = onCall(
     }
 
     await companyRef(companyId).collection("payrollPeriods").doc(periodId).update({ status: "calculated", updatedAt: nowIso() });
+    await companyRef(companyId).collection("activityLogs").add({
+      companyId,
+      type: "payroll.calculated",
+      periodId,
+      message: `Período calculado: ${settlements.length} liquidaciones`,
+      userId: request.auth?.uid || "",
+      metadata: { settlementsCount: settlements.length },
+      createdAt: nowIso(),
+    });
     return { calculated: true, settlementsCount: settlements.length, settlements };
   }
 );
@@ -332,14 +350,40 @@ export const approvePeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    await assertAction(request, "payroll.edit", { companyId });
+    await assertAction(request, "payroll.approve", { companyId });
     const { periodId } = request.data;
     if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
-    const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
-    for (const d of settlements.docs) {
-      await d.ref.update({ status: "approved", approvedBy: request.auth?.uid || "", approvedAt: nowIso(), updatedAt: nowIso() });
+
+    const periodRef = companyRef(companyId).collection("payrollPeriods").doc(periodId);
+    const periodSnap = await periodRef.get();
+    if (!periodSnap.exists) throw new HttpsError("not-found", "Período no encontrado");
+    const periodData = periodSnap.data() || {};
+    if (!isValidPeriodStatus(periodData.status) || periodData.status !== "calculated") {
+      throw new HttpsError("failed-precondition", "Solo períodos calculados pueden ser aprobados");
     }
-    await companyRef(companyId).collection("payrollPeriods").doc(periodId).update({ status: "approved", updatedAt: nowIso() });
+
+    const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
+    const batch = db.batch();
+    for (const d of settlements.docs) {
+      batch.update(d.ref, { status: "approved", approvedBy: request.auth?.uid || "", approvedAt: nowIso(), updatedAt: nowIso() });
+    }
+    batch.update(periodRef, {
+      status: "approved",
+      approvedBy: request.auth?.uid || "",
+      approvedAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    const logRef = companyRef(companyId).collection("activityLogs").doc();
+    batch.set(logRef, {
+      companyId,
+      type: "payroll.approved",
+      periodId,
+      message: "Período aprobado",
+      userId: request.auth?.uid || "",
+      metadata: { settlementsCount: settlements.size },
+      createdAt: nowIso(),
+    });
+    await batch.commit();
     return { approved: true };
   }
 );
@@ -352,14 +396,48 @@ export const closePeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    await assertAction(request, "payroll.edit", { companyId });
+    await assertAction(request, "payroll.close", { companyId });
     const { periodId } = request.data;
     if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
-    const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
-    for (const d of settlements.docs) {
-      await d.ref.update({ status: "closed", closedAt: nowIso(), updatedAt: nowIso() });
+
+    const periodRef = companyRef(companyId).collection("payrollPeriods").doc(periodId);
+    const periodSnap = await periodRef.get();
+    if (!periodSnap.exists) throw new HttpsError("not-found", "Período no encontrado");
+    const periodData = periodSnap.data() || {};
+    if (!isValidPeriodStatus(periodData.status) || periodData.status !== "approved") {
+      throw new HttpsError("failed-precondition", "Solo períodos aprobados pueden ser cerrados");
     }
-    await companyRef(companyId).collection("payrollPeriods").doc(periodId).update({ status: "closed", updatedAt: nowIso() });
+
+    const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
+    const notReady = settlements.docs.filter((d) => {
+      const s = d.data();
+      return !isValidSettlementStatus(s.status) || (s.status !== "approved" && s.status !== "signed" && s.status !== "closed");
+    });
+    if (notReady.length > 0) {
+      throw new HttpsError("failed-precondition", `Hay ${notReady.length} liquidaciones no aprobadas/firmadas`);
+    }
+
+    const batch = db.batch();
+    for (const d of settlements.docs) {
+      batch.update(d.ref, { status: "closed", closedBy: request.auth?.uid || "", closedAt: nowIso(), updatedAt: nowIso() });
+    }
+    batch.update(periodRef, {
+      status: "closed",
+      closedBy: request.auth?.uid || "",
+      closedAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    const logRef = companyRef(companyId).collection("activityLogs").doc();
+    batch.set(logRef, {
+      companyId,
+      type: "payroll.closed",
+      periodId,
+      message: "Período cerrado",
+      userId: request.auth?.uid || "",
+      metadata: { settlementsCount: settlements.size },
+      createdAt: nowIso(),
+    });
+    await batch.commit();
     return { closed: true };
   }
 );

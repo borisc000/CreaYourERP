@@ -82,6 +82,15 @@ type ServiceAction =
   | "recruitment.create"
   | "recruitment.edit"
   | "recruitment.hire"
+  // Payroll
+  | "payroll.view"
+  | "payroll.create"
+  | "payroll.edit"
+  | "payroll.calculate"
+  | "payroll.approve"
+  | "payroll.close"
+  | "payroll.generate_pdf"
+  | "payroll.send_signature"
   // Document Center
   | "document_center.save_template"
   | "document_center.delete_template"
@@ -167,6 +176,15 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "safety.seed_catalogs": ["safety"],
   // Recruitment
   "recruitment.view": ["hr"],
+  // Payroll
+  "payroll.view": ["payroll"],
+  "payroll.create": ["payroll"],
+  "payroll.edit": ["payroll"],
+  "payroll.calculate": ["payroll"],
+  "payroll.approve": ["payroll"],
+  "payroll.close": ["payroll"],
+  "payroll.generate_pdf": ["payroll"],
+  "payroll.send_signature": ["payroll"],
   "recruitment.create": ["hr"],
   "recruitment.edit": ["hr"],
   "recruitment.hire": ["hr"],
