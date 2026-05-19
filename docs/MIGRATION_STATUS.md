@@ -2,7 +2,7 @@
 
 > **Ultima actualizacion:** 2026-05-15  
 > **Rama revisada:** `staging`  
-> **Ultimo commit funcional documentado:** `b4d4d77` (`feat(rbac): P0.2 RBAC transversal para Quotes, HR y Accreditation`)
+> **Ultimo commit funcional documentado:** `547d5bb` (`Wave M — Job Profiles completo`)
 
 ## Resumen General (Legacy vs Staging)
 
@@ -32,12 +32,12 @@
 | Document Center | Parcial avanzado | Templates + generated docs | Generation/lifecycle services | Falta motor DOCX real, batch generation, firma integrada con layouts | [GAP_ANALYSIS_DOCUMENT_CENTER.md](./GAP_ANALYSIS_DOCUMENT_CENTER.md) |
 | Signature | Parcial | Signature center | Signature service inicial | Falta layout designer, flujo publico robusto, sellado criptografico | [GAP_ANALYSIS_SIGNATURE.md](./GAP_ANALYSIS_SIGNATURE.md) |
 | Billing | Parcial avanzado | Billing documents, dashboard, **bridge quote→billing** | Billing service, plan limits, **createBillingDocumentFromQuote**, SII simulator hardening | Falta integracion SII real (ambos simuladores), atomicidad completa | [GAP_ANALYSIS_BILLING.md](./GAP_ANALYSIS_BILLING.md) |
-| Rentals | Parcial | Rentals UI | Rental service | Falta bridge automatico desde quote aceptada, matriz de transiciones, workflow aprobatorio | [GAP_ANALYSIS_RENTALS.md](./GAP_ANALYSIS_RENTALS.md) |
+| Rentals | Parcial avanzado | Rentals UI | Rental service + garantias + timeline + state matrix + snapshots | Falta bridge automatico completo desde quote, workflow aprobatorio formal | [GAP_ANALYSIS_RENTALS.md](./GAP_ANALYSIS_RENTALS.md) |
 | Reports | Parcial avanzado | Reportes, checkpoints, fotos, **espejo público** | CRUD + Storage, **publishReportMirror** | Falta exportacion PDF nativa, listener post-firma robusto | [GAP_ANALYSIS_REPORTS.md](./GAP_ANALYSIS_REPORTS.md) |
 | Expenses | Parcial avanzado | Gastos, dashboard, respaldos | CRUD + normalizacion | Falta workflow aprobacion formal, audit log, precision monetaria (float) | [GAP_ANALYSIS_EXPENSES.md](./GAP_ANALYSIS_EXPENSES.md) |
-| Payroll | Parcial avanzado | Planillas, liquidaciones, perfiles | Calculos chilenos completos | Falta workflow cierre/aprobacion, validacion legal 2026, firma liquidaciones | [GAP_ANALYSIS_PAYROLL.md](./GAP_ANALYSIS_PAYROLL.md) |
-| Inventory | Parcial avanzado | Items, movimientos, dashboard | CRUD + batched writes | Falta bodegas/ubicaciones, cierre por periodo, conciliacion fisica | [GAP_ANALYSIS_INVENTORY.md](./GAP_ANALYSIS_INVENTORY.md) |
-| Attendance | Parcial avanzado | Registro diario, politicas | CRUD + hash cadena | Falta correcciones con aprobacion, cierre mensual, integracion payroll | [GAP_ANALYSIS_ATTENDANCE_TASKS_ASSETS.md](./GAP_ANALYSIS_ATTENDANCE_TASKS_ASSETS.md) |
+| Payroll | Parcial avanzado | Planillas, liquidaciones, perfiles | Calculos chilenos completos, PDF, firma | Falta workflow cierre/aprobacion formal, validacion legal 2026 | [GAP_ANALYSIS_PAYROLL.md](./GAP_ANALYSIS_PAYROLL.md) |
+| Inventory | Parcial avanzado | Items, movimientos, dashboard | CRUD + batched writes + race condition corregida | Falta bodegas/ubicaciones, cierre por periodo, conciliacion fisica | [GAP_ANALYSIS_INVENTORY.md](./GAP_ANALYSIS_INVENTORY.md) |
+| Attendance | Parcial avanzado | Registro diario, politicas, compliance | CRUD + hash cadena SHA-256 + evidence + compliance engine | Falta correcciones con aprobacion, cierre mensual, integracion payroll directa | [GAP_ANALYSIS_ATTENDANCE_TASKS_ASSETS.md](./GAP_ANALYSIS_ATTENDANCE_TASKS_ASSETS.md) |
 | Tasks | Parcial avanzado | Kanban, CRUD tareas | CRUD | Falta vinculo generico a entidad origen, comentarios, notificaciones | [GAP_ANALYSIS_ATTENDANCE_TASKS_ASSETS.md](./GAP_ANALYSIS_ATTENDANCE_TASKS_ASSETS.md) |
 | Assets | Parcial avanzado | Activos, mantenciones | CRUD | Falta registro combustible, flujo asignacion/devolucion formal | [GAP_ANALYSIS_ATTENDANCE_TASKS_ASSETS.md](./GAP_ANALYSIS_ATTENDANCE_TASKS_ASSETS.md) |
 | Recruitment | Parcial avanzado | Ofertas, candidatos, entrevistas | CRUD + `hireApplication` | Falta scoring, creacion automatica de contrato al contratar | STAGING_VS_LEGACY_COMPLETE_ANALYSIS.md |
@@ -186,6 +186,59 @@ Extensión del patrón RBAC existente de CRM a **todos los módulos críticos**.
 
 ---
 
+### Waves H-M — Cierre de Brechas Post-P0.2 (2026-05-10 a 2026-05-15)
+
+#### Wave H1 — Notifications + Event Bus (`d490d04`)
+- `sendNotification` callable, `NotificationBell` con badge, dark theme dashboard.
+- Auto-triggers: `onSignatureRequestCreated`, `onBillingDocumentSiiAccepted`, `onSafetyMatrixGenerated`.
+
+#### Wave H2 — Attendance + Time Tracking RBAC (`4233ce3`)
+- 4 acciones RBAC nuevas para attendance, `assertAction` en todos los callables.
+
+#### Wave H3 — Expenses + Approvals RBAC (`dbca196`)
+- 5 acciones RBAC nuevas para expenses, `assertAction` en todos los callables.
+
+#### Wave I — RBAC Hardening (`ee562bd`)
+- `assertAction` aplicado a **17 módulos** adicionales.
+- 53 nuevas acciones en `SERVICE_ACTIONS`.
+- Módulos protegidos: `ai`, `assets`, `inventory`, `suppliers`, `tasks`, `payroll`, `recruitment`, `rentals`, `planning`, `safety`, `gantt`, `googleWorkspace`, `crossCorrespondence`, `pdfWorkspace`, `mail`, `riohs`.
+
+#### Wave J — Workflows Cruzados Críticos (`53a3594`)
+1. **Hiring cascade**: `hireApplication` → employee + contract + payroll profile + auth invite.
+2. **Asset maintenance 3-way write**: mantención escribe en `assets`, `inventory`, `expenses`.
+3. **Safety procedure freeze**: aprobar procedimiento congela documento y vincula a carpetas.
+
+#### Wave K — Payroll Chileno Completo (`0ea88b9`)
+- `workedDays` reales, 11 `accountingLines` por liquidación.
+- `generateSettlementPdf` (pdf-lib), `sendSettlementToSignature`.
+- Frontend: `PayrollProfileForm`, `SettlementDetail` con desglose línea por línea.
+
+#### Wave L1 — Attendance Legal Completo (`651be80`)
+- **SHA-256 hash chain** en `registerPunch`.
+- **Evidence payload**: IP, geo, fingerprint, declaración jurada.
+- **Compliance engine**: 7 flags de cumplimiento legal chileno.
+- Trigger `onAttendanceEventCreated` + `getAttendanceComplianceReport`.
+
+#### Wave L2 — Rentals Completo (`459e2a8`)
+- Guarantees CRUD, event timeline + CRM integration.
+- Backup snapshots SHA-256, `recomputeAssetAllocations`.
+- State transition matrix, lead-change side effects.
+- Frontend: `RentalContractDetail` con 4 tabs, `RentalAssetForm`.
+
+#### Wave M1 — Inventory Completo (`0840df6`)
+- Race condition corregida en movimientos, dashboard con KPIs.
+
+#### Wave M2 — Job Profiles Completo (`547d5bb`)
+- `saveJobProfile` refactor: `objective`, `scope`, `functions[]`, `responsibilities[]` inline.
+- `jobProfileRiskService.ts`: 5 funciones (risks + riskLinks + `getJobProfileComplete`).
+- VEP auto-calculado (`probability * severity * 4`).
+- Frontend: `JobProfileDetail` 5 tabs, `JobProfileRiskForm`, `JobProfileRiskLinkForm`.
+- 4 acciones RBAC nuevas: `hr.manage_job_profile_functions`, `hr.manage_job_profile_responsibilities`, `hr.manage_job_profile_risks`, `hr.view_job_profile_matrix`.
+
+**Build status post-Wave M:** `functions/` y `web/` compilan sin errores (`tsc --noEmit`).
+
+---
+
 ## Arquitectura multi-tenant
 
 Cada empresa vive bajo `/companies/{companyId}`. Los modulos usan colecciones hijas por empresa:
@@ -243,10 +296,10 @@ Cada empresa vive bajo `/companies/{companyId}`. Los modulos usan colecciones hi
 ### P0 — Critico (bloqueante para produccion real)
 
 1. Corregir o aislar CI/lint para que `staging` tenga senal confiable.
-2. Cerrar Quotes P0: CRUD server-side, send/accept/delete con validaciones y ActivityLog.
-3. Cerrar HR P0: validacion RUT, auto-codigo `EMP-{seq}`, sincronizacion de estado, **contratos CRUD + triggers**, licencias, desvinculaciones.
+2. ~~Cerrar Quotes P0~~ — **Completado**: CRUD server-side (6 callables), send/accept/reject/cancel/delete con validaciones.
+3. Cerrar HR P0: validacion RUT server-side completa (falta en `updateEmployee`), auto-codigo `EMP-{seq}`, **contratos CRUD + triggers** (completado), licencias (completado), desvinculaciones (completado).
 4. ~~Cerrar Accreditation P0~~ — **P0.1+P0.2 completados**: `compute_check` real con Level A/B, vencimiento, `DocumentGenerationRequest`, triggers post-firma, selector de requisitos UI, recompute automático post-cambio/eliminación de documento.
-5. ~~Extender RBAC transversal~~ — **P0.2 completado** para Quotes, HR, Accreditation, Billing, Reports, Safety, Document Center.
+5. ~~Extender RBAC transversal~~ — **P0.2 + Wave I completados**: 103+ acciones, 17 módulos con `assertAction`.
 
 ### P1 — Alto (funcionalidad core incompleta)
 
@@ -261,11 +314,13 @@ Cada empresa vive bajo `/companies/{companyId}`. Los modulos usan colecciones hi
 
 ### P2 — Medio (UX, completitud, integraciones)
 
-14. Agregar Kanban y stats en CRM.
+14. ~~Agregar Kanban y stats en CRM~~ — **Parcial**: Kanban básico en `E1`, stats en dashboard.
 15. Implementar layout designer en Signature.
 16. Implementar workflow de aprobacion en Safety, Payroll, Document Center.
 17. Implementar tests de emuladores: multi-tenancy, permisos, side effects.
 18. Activar integraciones externas: Email real, SII, AI, Google Workspace.
+19. **Job Profiles: activity links** — Vincular con `safetyActivityBlocks` (deferred a Safety Activities wave).
+20. **Job Profiles: versionado + aprobacion** — Estados draft → active → archived con workflow.
 
 ---
 

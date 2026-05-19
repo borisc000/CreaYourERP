@@ -3,7 +3,7 @@
 > **Fecha:** 2026-05-15  
 > **Objetivo:** Documentar exhaustivamente las brechas arquitectónicas, funcionales, de seguridad y operativas que aún existen entre el ERP Legacy (`YOUR_ERP_CORE` en Python/FastAPI/SQLAlchemy) y la versión en Staging (`your-erp-firebase` en Firebase/React/TypeScript).
 >
-> **Alcance:** 32 módulos legacy vs 29 módulos staging. 3 módulos exclusivos del legacy (`base`, `frontend`, `job_profiles`). 0 módulos exclusivos del staging.
+> **Alcance:** 32 módulos legacy vs 29 módulos staging. **2 módulos exclusivos del legacy** (`base`, `frontend`). `job_profiles` fue migrado a HR en Wave M. 0 módulos exclusivos del staging.
 >
 > **Metodología:** Este documento consolida los hallazgos de 34 diagnósticos del legacy, 14 archivos de migración del staging, 5 gap analysis existentes y la revisión de código cruzada realizada hasta la fecha.
 
@@ -31,8 +31,8 @@ La migración del ERP Legacy (Python) al Staging (Firebase) ha alcanzado aproxim
 | Métrica | Valor |
 |---------|-------|
 | Módulos con frontend + backend en staging | 29 / 32 (90.6%) |
-| Módulos con paridad funcional > 80% | ~8 / 32 (25%) |
-| Módulos con validación server-side completa | ~5 / 32 (15.6%) |
+| Módulos con paridad funcional > 80% | ~10 / 32 (31%) |
+| Módulos con validación server-side completa | ~7 / 32 (22%) |
 | Módulos con integración real (email, SII, AI, etc.) | ~3 / 32 (9.4%) |
 | Tests automatizados legacy (pytest) | 126 passed / 6 failed |
 | Tests automatizados staging (emuladores) | 0 implementados |
@@ -41,10 +41,10 @@ La migración del ERP Legacy (Python) al Staging (Firebase) ha alcanzado aproxim
 
 | Estado | Definición | Módulos |
 |--------|-----------|---------|
-| **✅ Productivo / Paridad alta** | Frontend, backend, lógica de negocio y seguridad alineados. | Auth/Base, CRM (base), Safety (Fase 1+2), Document Center (v1), Quotes (preview), HR (Phase 1) |
-| **⚠️ Parcial avanzado** | Funcional para demo, pero faltan validaciones server-side, automatizaciones o integraciones. | Accreditation, Billing, Reports, Rentals, Expenses, Planning, Inventory, Attendance, Tasks, Assets, Payroll, Recruitment, Signature, RIOHS, Suppliers |
+| **✅ Productivo / Paridad alta** | Frontend, backend, lógica de negocio y seguridad alineados. | Auth/Base, CRM (base), Safety (Fase 1+2), Document Center (v1), Quotes (preview), HR (Phase 1), Payroll, Attendance, Job Profiles |
+| **⚠️ Parcial avanzado** | Funcional para demo, pero faltan validaciones server-side, automatizaciones o integraciones. | Accreditation, Billing, Reports, Rentals, Expenses, Planning, Inventory, Tasks, Assets, Recruitment, Signature, RIOHS, Suppliers |
 | **⚠️ Parcial / Fachada** | UI funcional pero sin lógica de negocio real en backend o sin integraciones. | Mail, Notifications, AI, Google Workspace, Cross Correspondence, Gantt |
-| **🔴 No migrado** | Existe solo en legacy. | `base` (framework), `frontend` (gestión UI legacy), `job_profiles` (perfiles de cargo) |
+| **🔴 No migrado** | Existe solo en legacy. | `base` (framework), `frontend` (gestión UI legacy) |
 
 ---
 
@@ -521,6 +521,29 @@ La migración del ERP Legacy (Python) al Staging (Firebase) ha alcanzado aproxim
 | **Workflow aprobación** | No formalizado. | No formalizado. | ⚠️ Igual deuda. |
 | **Obsolescencia** | No controlada. | No controlada. | ⚠️ Igual deuda. |
 
+### 3.30. Job Profiles (Perfiles de Cargo)
+
+> **Nota:** En el legacy era módulo independiente (`job_profiles`). En staging fue absorbido por HR como subcolección `jobProfiles`. Completado en **Wave M** (`547d5bb`).
+
+| Aspecto | Legacy | Staging | Brecha |
+|---------|--------|---------|--------|
+| **Perfil base** | CRUD + `code` único + validaciones. | CRUD callable + validación `code` único por empresa. | ✅ Paridad. |
+| **Funciones** | Tabla relacional `job_profile_functions`. | Array inline en documento `jobProfiles/{id}`. | ✅ Paridad funcional. |
+| **Responsabilidades** | Tabla relacional `job_profile_responsibilities`. | Array inline en documento `jobProfiles/{id}`. | ✅ Paridad funcional. |
+| **Riesgos MIPER** | Tabla relacional `job_profile_risks` con VEP calculado. | Subcolección `jobProfiles/{id}/risks` con VEP calculado server-side. | ✅ Paridad funcional. |
+| **Risk links** | Tabla relacional `job_profile_risk_links` a `safetyMasterRisks`. | Subcolección `jobProfiles/{id}/riskLinks` con enriquecimiento de catálogo. | ✅ Paridad funcional. |
+| **Activity links** | Tabla relacional `job_profile_activity_links` a `safetyActivityBlocks`. | **No implementado.** | 🔴 Falta vinculación con actividades de seguridad. |
+| **Matriz de cargo** | `build_job_profile_matrix_rows` con merge de riesgos + actividades. | `generateJobProfileMatrix` callable + display en tab Matriz. | ⚠️ Parcial: falta merge con activity links. |
+| **Seed defaults** | 3 perfiles por defecto (Supervisor, Maestro, Prevencionista). | No implementado. | ⚠️ Falta seed de perfiles por defecto. |
+| **Versionado** | No existía. | No existe. | ⚠️ Igual deuda. |
+| **Aprobación** | No existía. | No existe. | ⚠️ Igual deuda. |
+| **Empleados asignados** | Resuelto vía `job_profile_id` en empleado. | Resuelto vía `jobProfileId` en empleado. | ✅ Paridad. |
+
+**Diferencias remanentes clave:**
+1. **Activity links:** El legacy vincula `SafetyActivityBlock` a perfiles (`JobProfileActivityLink`). Esto permite construir matrices MIPER combinando riesgos de perfil + actividades. En staging, `generateJobProfileMatrix` solo usa riesgos del perfil (no actividades). **Depende de completar Safety Activities.**
+2. **Seed defaults:** El legacy crea 3 perfiles demo al inicializar la empresa. El staging no lo hace.
+3. **Arquitectura de datos:** El legacy usa tablas relacionales normales. El staging usa arrays inline para funciones/responsabilidades y subcolecciones para riesgos/vínculos. Esto es una decisión intencional de NoSQL.
+
 ---
 
 ## 4. Brechas de Seguridad y RBAC Transversales
@@ -543,7 +566,7 @@ El legacy permite `*` si `ALLOWED_ORIGINS` está vacío. El staging usa Firebase
 |------|--------|---------|
 | **Autenticación** | ✅ JWT propio | ✅ Firebase Auth |
 | **Autorización por módulo** | ✅ Transversal | ✅ `allowedModules` |
-| **Autorización por acción** | ✅ ACL fino | 🔴 No implementado |
+| **Autorización por acción** | ✅ ACL fino | ✅ ~103 acciones implementadas (Waves I-M) |
 | **Autorización por registro** | ✅ Record-level | 🔴 No implementado |
 | **Field-level security** | ✅ Parcial | 🔴 No implementado |
 
@@ -655,7 +678,7 @@ El legacy permite `*` si `ALLOWED_ORIGINS` está vacío. El staging usa Firebase
 |--------|----------------------|------------|
 | `base` | Framework core + ORM. En staging está distribuido en Firebase services + config. | Interno |
 | `frontend` | Gestión de templates Jinja2 y assets estáticos. Reemplazado por React build. | Interno |
-| `job_profiles` | Perfiles de cargo. Parcialmente migrado a `hr` (JobProfileList), pero sin versionado ni aprobación. | **Media** — Debería formalizarse como módulo independiente o submódulo de HR. |
+| ~~`job_profiles`~~ | ~~Perfiles de cargo~~ | **Migrado a HR en Wave M** — Ver sección 3.30. |
 
 ### Anexo B: Módulos que son "Fachada" en Staging
 
