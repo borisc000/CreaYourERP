@@ -104,7 +104,13 @@ type ServiceAction =
   | "document_center.send_to_signature"
   | "document_center.close_document"
   | "document_center.delete_document"
-  | "document_center.view_stats";
+  | "document_center.view_stats"
+  // Cross Correspondence
+  | "cross_correspondence.view"
+  | "cross_correspondence.create"
+  | "cross_correspondence.edit"
+  | "cross_correspondence.send_for_signature"
+  | "cross_correspondence.deliver";
 
 const moduleMap: Record<ServiceAction, string[]> = {
   "service.view_internal": ["crm", "reports", "finance", "expenses", "safety", "accreditation", "document_center"],
@@ -208,6 +214,11 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "document_center.close_document": ["document_center"],
   "document_center.delete_document": ["document_center"],
   "document_center.view_stats": ["document_center"],
+  "cross_correspondence.view": ["document_center"],
+  "cross_correspondence.create": ["document_center"],
+  "cross_correspondence.edit": ["document_center"],
+  "cross_correspondence.send_for_signature": ["document_center"],
+  "cross_correspondence.deliver": ["document_center"],
 };
 
 function fallbackModulesForRole(role: string | null): string[] {

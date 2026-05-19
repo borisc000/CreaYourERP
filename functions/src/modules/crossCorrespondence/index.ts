@@ -1,1 +1,1 @@
-export { getCorrespondenceDashboard, createCorrespondence, updateCorrespondence, approveCorrespondence, sendCorrespondenceForSignature } from "./crossCorrespondenceService";
+export { getCorrespondenceDashboard, createCorrespondence, updateCorrespondence, approveCorrespondence, sendCorrespondenceForSignature, deliverCorrespondence } from "./crossCorrespondenceService";

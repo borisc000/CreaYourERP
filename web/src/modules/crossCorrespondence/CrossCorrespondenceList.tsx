@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { usePermission } from "../../hooks/usePermission";
 import { useFirestoreCollection } from "../../hooks/useFirestore";
 import { CrossCorrespondence } from "../../types";
 import { httpsCallable } from "firebase/functions";
@@ -8,6 +9,7 @@ import { functions } from "../../firebase/config";
 
 export default function CrossCorrespondenceList() {
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -27,11 +29,18 @@ export default function CrossCorrespondenceList() {
     await httpsCallable(functions, "sendCorrespondenceForSignature")({ companyId: companyId, id });
   };
 
+  const handleDeliver = async (id: string) => {
+    if (!companyId) return;
+    await httpsCallable(functions, "deliverCorrespondence")({ companyId: companyId, id });
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Correspondencia Cruzada</h1>
-        <button onClick={() => navigate("/cross-correspondence/new")} className="erp-btn-primary">+ Nueva Correspondencia</button>
+        {hasPermission("cross_correspondence.create") && (
+          <button onClick={() => navigate("/cross-correspondence/new")} className="erp-btn-primary">+ Nueva Correspondencia</button>
+        )}
       </div>
 
       <div className="flex gap-4 mb-6">
@@ -74,11 +83,17 @@ export default function CrossCorrespondenceList() {
                   </td>
                   <td className="px-4 py-3">{c.contractId.substring(0, 8)}...</td>
                   <td className="px-4 py-3 text-right space-x-2">
-                    {c.status === "draft" && (
+                    {c.status === "draft" && hasPermission("cross_correspondence.edit") && (
                       <button onClick={() => handleApprove(c.id)} className="text-blue-600 hover:text-blue-800 text-sm">Aprobar</button>
                     )}
-                    {c.status === "approved" && (
-                      <button onClick={() => handleSendForSignature(c.id)} className="text-blue-600 hover:text-blue-800 text-sm">Enviar a firma</button>
+                    {c.status === "approved" && hasPermission("cross_correspondence.send_for_signature") && (
+                      <button onClick={() => handleSendForSignature(c.id)} className="text-purple-600 hover:text-purple-800 text-sm">Enviar a firma</button>
+                    )}
+                    {c.status === "sent_for_signature" && c.signatureRequestId && (
+                      <button onClick={() => navigate(`/signature/${c.signatureRequestId}`)} className="text-yellow-600 hover:text-yellow-800 text-sm">Ver firma</button>
+                    )}
+                    {c.status === "signed" && hasPermission("cross_correspondence.deliver") && (
+                      <button onClick={() => handleDeliver(c.id)} className="text-green-600 hover:text-green-800 text-sm">Entregar</button>
                     )}
                     <button onClick={() => navigate(`/cross-correspondence/${c.id}`)} className="text-gray-600 hover:text-gray-800 text-sm">Ver</button>
                   </td>

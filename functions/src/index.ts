@@ -558,7 +558,7 @@ export { getPdfWorkspace, savePdfWorkspace } from "./modules/pdfWorkspace";
 // CROSS CORRESPONDENCE MODULE
 // ==========================================
 
-export { getCorrespondenceDashboard, createCorrespondence, updateCorrespondence, approveCorrespondence, sendCorrespondenceForSignature } from "./modules/crossCorrespondence";
+export { getCorrespondenceDashboard, createCorrespondence, updateCorrespondence, approveCorrespondence, sendCorrespondenceForSignature, deliverCorrespondence } from "./modules/crossCorrespondence";
 
 // ==========================================
 // UTILIDADES

@@ -140,6 +140,8 @@ export const SERVICE_ACTIONS = [
   "cross_correspondence.view",
   "cross_correspondence.create",
   "cross_correspondence.edit",
+  "cross_correspondence.send_for_signature",
+  "cross_correspondence.deliver",
   // Gantt
   "gantt.view",
   "gantt.create",
@@ -355,6 +357,8 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "cross_correspondence.view": ["document_center"],
   "cross_correspondence.create": ["document_center"],
   "cross_correspondence.edit": ["document_center"],
+  "cross_correspondence.send_for_signature": ["document_center"],
+  "cross_correspondence.deliver": ["document_center"],
   // Gantt
   "gantt.view": ["planning"],
   "gantt.create": ["planning"],
