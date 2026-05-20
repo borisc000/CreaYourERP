@@ -63,6 +63,7 @@ export const SERVICE_ACTIONS = [
   "accreditation.create_service_order",
   "accreditation.edit_service_order",
   "accreditation.delete_service_order",
+  "accreditation.delete_crew_assignment",
   "accreditation.assign_crew",
   "accreditation.remove_crew",
   "accreditation.authorize_crew",
@@ -70,6 +71,7 @@ export const SERVICE_ACTIONS = [
   "accreditation.recompute_checks",
   "accreditation.view_compliance",
   // Billing
+  "billing.view",
   "billing.view_dashboard",
   "billing.create_document",
   "billing.edit_document",
@@ -77,6 +79,7 @@ export const SERVICE_ACTIONS = [
   "billing.simulate_sii",
   "billing.register_payment",
   "billing.send_document",
+  "billing.duplicate_document",
   "billing.manage_caf",
   // Reports
   "reports.view_dashboard",
@@ -174,6 +177,7 @@ export const SERVICE_ACTIONS = [
   "payroll.view",
   "payroll.create",
   "payroll.edit",
+  "payroll.delete",
   "payroll.calculate",
   "payroll.approve",
   "payroll.close",
@@ -295,6 +299,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "accreditation.create_service_order": ["accreditation"],
   "accreditation.edit_service_order": ["accreditation"],
   "accreditation.delete_service_order": ["accreditation"],
+  "accreditation.delete_crew_assignment": ["accreditation"],
   "accreditation.assign_crew": ["accreditation"],
   "accreditation.remove_crew": ["accreditation"],
   "accreditation.authorize_crew": ["accreditation"],
@@ -302,6 +307,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "accreditation.recompute_checks": ["accreditation"],
   "accreditation.view_compliance": ["accreditation"],
   // Billing
+  "billing.view": ["finance"],
   "billing.view_dashboard": ["finance"],
   "billing.create_document": ["finance"],
   "billing.edit_document": ["finance"],
@@ -309,6 +315,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "billing.simulate_sii": ["finance"],
   "billing.register_payment": ["finance"],
   "billing.send_document": ["finance"],
+  "billing.duplicate_document": ["finance"],
   "billing.manage_caf": ["finance"],
   // Reports
   "reports.view_dashboard": ["reports"],
@@ -406,6 +413,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "payroll.view": ["payroll"],
   "payroll.create": ["payroll"],
   "payroll.edit": ["payroll"],
+  "payroll.delete": ["payroll"],
   "payroll.calculate": ["payroll"],
   "payroll.approve": ["payroll"],
   "payroll.close": ["payroll"],

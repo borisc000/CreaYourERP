@@ -7,4 +7,10 @@ export {
   registerPayment,
   sendDocumentToCustomer,
 } from "./billingService";
+export {
+  listBillingDocuments,
+  getBillingDocument,
+  duplicateBillingDocument,
+  getBillingReferenceData,
+} from "./billingReadService";
 export { uploadCafRange, getNextFolio } from "./cafService";

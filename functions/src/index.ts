@@ -149,6 +149,17 @@ export { triggerDocumentGeneration };
 export { bulkAssignCrew };
 export { checkExpiringDocuments };
 export { scheduledCheckExpiringDocuments } from "./modules/accreditation/scheduledCheckExpiring";
+export {
+  listServiceOrders,
+  getServiceOrder,
+  deleteServiceOrder,
+  listCrewAssignments,
+  getCrewAssignment,
+  deleteCrewAssignment,
+  getAccreditationCheckMatrix,
+  listDocumentGenerationRequests,
+  generateAllMissingDocuments,
+} from "./modules/accreditation/accreditationReadService";
 
 export const onCrewAssigned = onDocumentCreated(
   {
@@ -491,7 +502,7 @@ export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs } from "./modul
 // BILLING MODULE
 // ==========================================
 
-export { getBillingDashboard, createBillingDocument, updateBillingDocument, deleteBillingDocument, simulateSii, registerPayment, sendDocumentToCustomer, uploadCafRange, getNextFolio } from "./modules/billing";
+export { getBillingDashboard, createBillingDocument, updateBillingDocument, deleteBillingDocument, simulateSii, registerPayment, sendDocumentToCustomer, uploadCafRange, getNextFolio, listBillingDocuments, getBillingDocument, duplicateBillingDocument, getBillingReferenceData } from "./modules/billing";
 
 // ==========================================
 // EXPENSES MODULE
@@ -529,7 +540,7 @@ export {
 // PAYROLL MODULE
 // ==========================================
 
-export { seedPayrollParameters, getPayrollDashboard, createPayrollPeriod, calculatePeriod, approvePeriod, closePeriod, savePayrollProfile, generateSettlementPdf, sendSettlementToSignature } from "./modules/payroll";
+export { seedPayrollParameters, getPayrollDashboard, createPayrollPeriod, calculatePeriod, approvePeriod, closePeriod, savePayrollProfile, generateSettlementPdf, sendSettlementToSignature, listPayrollPeriods, getPayrollPeriod, deletePayrollPeriod, listPayrollProfiles, getPayrollProfile, deletePayrollProfile, listSettlements, getSettlement, updateSettlement, approveSettlement, closeSettlement, getSettlementHistory, createLegalParameter, updateLegalParameter, deleteLegalParameter, createTaxBracket, updateTaxBracket, deleteTaxBracket } from "./modules/payroll";
 
 // ==========================================
 // SAFETY PROCEDURES MODULE
