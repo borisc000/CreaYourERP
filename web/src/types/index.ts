@@ -198,7 +198,12 @@ export type ServiceAction =
   | "recruitment.create"
   | "recruitment.edit"
   | "recruitment.hire"
-  | "recruitment.calculate_score";
+  | "recruitment.delete_job"
+  | "recruitment.delete_candidate"
+  | "recruitment.delete_application"
+  | "recruitment.delete_interview"
+  | "recruitment.calculate_score"
+  | "recruitment.calculate_readiness";
 
 export interface ServicePermissionContext {
   uid: string;

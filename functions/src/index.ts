@@ -515,7 +515,15 @@ export { getPlanningDashboard, createPlanningBudget, updatePlanningBudget, creat
 // RECRUITMENT MODULE
 // ==========================================
 
-export { seedRecruitmentStages, getRecruitmentStats, createJobOpening, updateJobOpening, createCandidate, updateCandidate, createApplication, updateApplication, hireApplication, createInterview, updateInterview, calculateCandidateScore, getCandidateRanking } from "./modules/recruitment";
+export {
+  seedRecruitmentStages, getRecruitmentStats,
+  createJobOpening, updateJobOpening, listJobOpenings, getJobOpening, deleteJobOpening,
+  createCandidate, updateCandidate, listCandidates, getCandidate, deleteCandidate,
+  createApplication, updateApplication, listApplications, getApplication, deleteApplication, calculateApplicationReadiness,
+  hireApplication,
+  createInterview, updateInterview, listInterviews, getInterview, deleteInterview,
+  calculateCandidateScore, getCandidateRanking,
+} from "./modules/recruitment";
 
 // ==========================================
 // PAYROLL MODULE

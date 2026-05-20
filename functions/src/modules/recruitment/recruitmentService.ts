@@ -550,3 +550,367 @@ export const getCandidateRanking = onCall(
     return { jobOpeningId, candidates: ranked, total: ranked.length };
   }
 );
+
+// ==========================================
+// LIST / GET / DELETE — JobOpenings
+// ==========================================
+
+export const listJobOpenings = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.view", { companyId });
+
+    const data = request.data || {};
+    const status = cleanString(data.status);
+    const search = cleanString(data.search).toLowerCase();
+    const limit = Math.min(500, Math.max(1, Number(data.limit || 200)));
+
+    let query: FirebaseFirestore.Query = companyRef(companyId).collection("jobOpenings").orderBy("createdAt", "desc").limit(limit);
+    if (status) query = query.where("status", "==", status);
+
+    const snap = await query.get();
+    let jobs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    if (search) {
+      jobs = jobs.filter((j: any) =>
+        String(j.title || "").toLowerCase().includes(search) ||
+        String(j.code || "").toLowerCase().includes(search)
+      );
+    }
+    return { jobs };
+  }
+);
+
+export const getJobOpening = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.view", { companyId });
+
+    const id = cleanString(request.data?.id || request.data?.jobOpeningId);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await companyRef(companyId).collection("jobOpenings").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Vacante no encontrada");
+    return { job: { id: snap.id, ...snap.data() } };
+  }
+);
+
+export const deleteJobOpening = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.delete_job", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const ref = companyRef(companyId);
+    // Cascade: delete applications
+    const appsSnap = await ref.collection("jobApplications").where("jobId", "==", id).limit(300).get();
+    const batch = db.batch();
+    for (const doc of appsSnap.docs) batch.delete(doc.ref);
+    batch.delete(ref.collection("jobOpenings").doc(id));
+    await batch.commit();
+
+    return { deleted: true, cascade: { applications: appsSnap.size } };
+  }
+);
+
+// ==========================================
+// LIST / GET / DELETE — Candidates
+// ==========================================
+
+export const listCandidates = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.view", { companyId });
+
+    const data = request.data || {};
+    const search = cleanString(data.search).toLowerCase();
+    const limit = Math.min(500, Math.max(1, Number(data.limit || 200)));
+
+    const snap = await companyRef(companyId).collection("candidates").orderBy("createdAt", "desc").limit(limit).get();
+    let candidates = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    if (search) {
+      candidates = candidates.filter((c: any) =>
+        String(c.fullName || "").toLowerCase().includes(search) ||
+        String(c.email || "").toLowerCase().includes(search) ||
+        String(c.nationalId || "").includes(search)
+      );
+    }
+    return { candidates };
+  }
+);
+
+export const getCandidate = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.view", { companyId });
+
+    const id = cleanString(request.data?.id || request.data?.candidateId);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await companyRef(companyId).collection("candidates").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Candidato no encontrado");
+    return { candidate: { id: snap.id, ...snap.data() } };
+  }
+);
+
+export const deleteCandidate = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.delete_candidate", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const ref = companyRef(companyId);
+    // Cascade: delete applications and their interviews
+    const appsSnap = await ref.collection("jobApplications").where("candidateId", "==", id).limit(300).get();
+    const batch = db.batch();
+    for (const appDoc of appsSnap.docs) {
+      const interviewsSnap = await ref.collection("interviews").where("applicationId", "==", appDoc.id).limit(100).get();
+      for (const intDoc of interviewsSnap.docs) batch.delete(intDoc.ref);
+      batch.delete(appDoc.ref);
+    }
+    batch.delete(ref.collection("candidates").doc(id));
+    await batch.commit();
+
+    return { deleted: true, cascade: { applications: appsSnap.size } };
+  }
+);
+
+// ==========================================
+// LIST / GET / DELETE — Applications
+// ==========================================
+
+export const listApplications = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.view", { companyId });
+
+    const data = request.data || {};
+    const jobId = cleanString(data.jobId);
+    const candidateId = cleanString(data.candidateId);
+    const status = cleanString(data.status);
+    const limit = Math.min(500, Math.max(1, Number(data.limit || 200)));
+
+    let query: FirebaseFirestore.Query = companyRef(companyId).collection("jobApplications").orderBy("createdAt", "desc").limit(limit);
+    if (jobId) query = query.where("jobId", "==", jobId);
+    if (candidateId) query = query.where("candidateId", "==", candidateId);
+    if (status) query = query.where("status", "==", status);
+
+    const snap = await query.get();
+    return { applications: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
+  }
+);
+
+export const getApplication = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.view", { companyId });
+
+    const id = cleanString(request.data?.id || request.data?.applicationId);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await companyRef(companyId).collection("jobApplications").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Postulación no encontrada");
+    return { application: { id: snap.id, ...snap.data() } };
+  }
+);
+
+export const deleteApplication = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.delete_application", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const ref = companyRef(companyId);
+    const interviewsSnap = await ref.collection("interviews").where("applicationId", "==", id).limit(100).get();
+    const batch = db.batch();
+    for (const doc of interviewsSnap.docs) batch.delete(doc.ref);
+    batch.delete(ref.collection("jobApplications").doc(id));
+    await batch.commit();
+
+    return { deleted: true, cascade: { interviews: interviewsSnap.size } };
+  }
+);
+
+// ==========================================
+// LIST / GET / DELETE — Interviews
+// ==========================================
+
+export const listInterviews = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.view", { companyId });
+
+    const data = request.data || {};
+    const applicationId = cleanString(data.applicationId);
+    const limit = Math.min(500, Math.max(1, Number(data.limit || 200)));
+
+    let query: FirebaseFirestore.Query = companyRef(companyId).collection("interviews").orderBy("createdAt", "desc").limit(limit);
+    if (applicationId) query = query.where("applicationId", "==", applicationId);
+
+    const snap = await query.get();
+    return { interviews: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
+  }
+);
+
+export const getInterview = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.view", { companyId });
+
+    const id = cleanString(request.data?.id || request.data?.interviewId);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await companyRef(companyId).collection("interviews").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Entrevista no encontrada");
+    return { interview: { id: snap.id, ...snap.data() } };
+  }
+);
+
+export const deleteInterview = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.delete_interview", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    await companyRef(companyId).collection("interviews").doc(id).delete();
+    return { deleted: true };
+  }
+);
+
+// ==========================================
+// READINESS CALCULATION
+// ==========================================
+
+export const calculateApplicationReadiness = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "recruitment.calculate_readiness", { companyId });
+
+    const applicationId = cleanString(request.data?.applicationId);
+    if (!applicationId) throw new HttpsError("invalid-argument", "applicationId requerido");
+
+    const appRef = companyRef(companyId).collection("jobApplications").doc(applicationId);
+    const appSnap = await appRef.get();
+    if (!appSnap.exists) throw new HttpsError("not-found", "Postulación no encontrada");
+    const appData = appSnap.data()!;
+
+    const candidateId = cleanString(appData.candidateId);
+    const jobId = cleanString(appData.jobId);
+
+    const candidateSnap = candidateId ? await companyRef(companyId).collection("candidates").doc(candidateId).get() : null;
+    const candidateData = candidateSnap?.exists ? candidateSnap.data()! : {};
+
+    const jobSnap = jobId ? await companyRef(companyId).collection("jobOpenings").doc(jobId).get() : null;
+    const jobData = jobSnap?.exists ? jobSnap.data()! : {};
+
+    const jobProfileId = cleanString(jobData.jobProfileId);
+    const profileSnap = jobProfileId ? await companyRef(companyId).collection("jobProfiles").doc(jobProfileId).get() : null;
+    const profileData = profileSnap?.exists ? profileSnap.data()! : {};
+
+    // Interviews
+    const interviewsSnap = await companyRef(companyId).collection("interviews").where("applicationId", "==", applicationId).get();
+    const interviewScores = interviewsSnap.docs
+      .map((d) => Number(d.data().overallScore))
+      .filter((s) => !isNaN(s) && s > 0);
+    const interviewAvg = interviewScores.length > 0
+      ? interviewScores.reduce((a, b) => a + b, 0) / interviewScores.length
+      : 0;
+
+    // Checks
+    const checks: Record<string, { pass: boolean; value: string | number }> = {};
+
+    const completionPct = Number(candidateData.completionPct) || 0;
+    checks.profileComplete = { pass: completionPct >= 80, value: `${completionPct}%` };
+
+    checks.hasEmail = { pass: Boolean(candidateData.email), value: candidateData.email || "—" };
+    checks.hasPhone = { pass: Boolean(candidateData.phone), value: candidateData.phone || "—" };
+    checks.hasNationalId = { pass: Boolean(candidateData.nationalId), value: candidateData.nationalId || "—" };
+
+    checks.interviewScore = { pass: interviewAvg >= 60, value: Math.round(interviewAvg * 10) / 10 };
+
+    const requiredCourseIds: string[] = profileData.requiredCourseIds || [];
+    checks.requiredCourses = { pass: requiredCourseIds.length === 0, value: `${requiredCourseIds.length} requeridos` };
+
+    const requiredRequirementIds: string[] = profileData.requiredRequirementIds || [];
+    checks.requiredRequirements = { pass: requiredRequirementIds.length === 0, value: `${requiredRequirementIds.length} requeridos` };
+
+    const passCount = Object.values(checks).filter((c) => c.pass).length;
+    const totalChecks = Object.keys(checks).length;
+    const readinessPct = Math.round((passCount / totalChecks) * 100);
+
+    let readinessStatus: "ready" | "attention" | "incomplete" = "incomplete";
+    if (readinessPct >= 90 && checks.profileComplete.pass && checks.interviewScore.pass) {
+      readinessStatus = "ready";
+    } else if (readinessPct >= 60) {
+      readinessStatus = "attention";
+    }
+
+    const now = nowIso();
+    await appRef.update({
+      readinessStatus,
+      readinessChecks: checks,
+      readinessPct,
+      readinessUpdatedAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      applicationId,
+      readinessStatus,
+      readinessPct,
+      checks,
+      stats: {
+        passCount,
+        totalChecks,
+        interviewAvg: Math.round(interviewAvg * 10) / 10,
+        completionPct,
+      },
+    };
+  }
+);
