@@ -104,6 +104,7 @@ type ServiceAction =
   | "attendance.compliance_report"
   | "attendance.delete_policy"
   | "attendance.delete_record"
+  | "attendance.edit_record"
   // Gantt
   | "gantt.view"
   | "gantt.create"
@@ -129,6 +130,18 @@ type ServiceAction =
   | "safety.manage_restrictions"
   | "safety.manage_generator_rules"
   | "safety.seed_catalogs"
+  | "safety.create_folder"
+  | "safety.edit_folder"
+  | "safety.delete_folder"
+  | "safety.approve_matrix"
+  | "safety_procedures.view"
+  | "safety_procedures.create"
+  | "safety_procedures.edit"
+  | "safety_procedures.delete"
+  | "safety_activities.view"
+  | "safety_activities.create"
+  | "safety_activities.edit"
+  | "safety_activities.delete"
   // Recruitment
   | "recruitment.view"
   | "recruitment.create"
@@ -269,6 +282,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "attendance.compliance_report": ["hr"],
   "attendance.delete_policy": ["hr"],
   "attendance.delete_record": ["hr"],
+  "attendance.edit_record": ["hr"],
   "gantt.view": ["planning"],
   "gantt.create": ["planning"],
   "gantt.edit": ["planning"],
@@ -292,6 +306,18 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "safety.manage_restrictions": ["safety"],
   "safety.manage_generator_rules": ["safety"],
   "safety.seed_catalogs": ["safety"],
+  "safety.create_folder": ["safety"],
+  "safety.edit_folder": ["safety"],
+  "safety.delete_folder": ["safety"],
+  "safety.approve_matrix": ["safety"],
+  "safety_procedures.view": ["safety"],
+  "safety_procedures.create": ["safety"],
+  "safety_procedures.edit": ["safety"],
+  "safety_procedures.delete": ["safety"],
+  "safety_activities.view": ["safety"],
+  "safety_activities.create": ["safety"],
+  "safety_activities.edit": ["safety"],
+  "safety_activities.delete": ["safety"],
   // Recruitment
   "recruitment.view": ["hr"],
   // Payroll

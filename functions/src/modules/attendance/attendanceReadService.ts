@@ -171,3 +171,134 @@ export const getAttendanceReferenceData = onCall(
     };
   }
 );
+
+// ==========================================
+// DASHBOARD
+// ==========================================
+
+export const getAttendanceDashboard = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "attendance.view", { companyId });
+
+    const today = new Date().toISOString().split("T")[0];
+    const cref = companyRef(companyId);
+
+    const [recordsSnap, policiesSnap, employeesSnap] = await Promise.all([
+      cref.collection("attendanceRecords").where("date", "==", today).limit(500).get(),
+      cref.collection("attendancePolicies").where("isActive", "==", true).limit(1).get(),
+      cref.collection("employees").where("status", "in", ["active", "on_leave"]).limit(500).get(),
+    ]);
+
+    const records = recordsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const totalEmployees = employeesSnap.size;
+    const presentCount = records.filter((r: any) => r.checkIn).length;
+    const absentCount = totalEmployees - presentCount;
+    const lateCount = records.filter((r: any) => (r.flags || []).includes("late_arrival")).length;
+    const earlyExitCount = records.filter((r: any) => (r.flags || []).includes("early_exit")).length;
+    const overtimeCount = records.filter((r: any) => (r.flags || []).includes("overtime")).length;
+
+    return {
+      today,
+      totalEmployees,
+      presentCount,
+      absentCount,
+      lateCount,
+      earlyExitCount,
+      overtimeCount,
+      records: records.slice(0, 50),
+      policy: policiesSnap.empty ? null : { id: policiesSnap.docs[0].id, ...policiesSnap.docs[0].data() },
+    };
+  }
+);
+
+// ==========================================
+// EVENTS (AUDIT TRAIL)
+// ==========================================
+
+export const listAttendanceEvents = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "attendance.view_records", { companyId });
+
+    const data = request.data || {};
+    const employeeId = cleanString(data.employeeId);
+    const dateFrom = cleanString(data.dateFrom);
+    const dateTo = cleanString(data.dateTo);
+    const limit = Math.min(500, Math.max(1, Number(data.limit || 200)));
+
+    let q: FirebaseFirestore.Query = companyRef(companyId).collection("attendanceEvents").orderBy("timestamp", "desc").limit(limit);
+    if (employeeId) q = q.where("employeeId", "==", employeeId);
+    if (dateFrom) q = q.where("timestamp", ">=", dateFrom);
+    if (dateTo) q = q.where("timestamp", "<=", dateTo);
+
+    const snap = await q.get();
+    return { events: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
+  }
+);
+
+export const getAttendanceEvent = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "attendance.view_records", { companyId });
+
+    const id = cleanString(request.data?.id || request.data?.eventId);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await companyRef(companyId).collection("attendanceEvents").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Evento no encontrado");
+    return { event: { id: snap.id, ...snap.data() } };
+  }
+);
+
+export const deleteAttendanceEvent = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "attendance.delete_record", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    await companyRef(companyId).collection("attendanceEvents").doc(id).delete();
+    return { deleted: true };
+  }
+);
+
+// ==========================================
+// RECORD MANUAL CORRECTION
+// ==========================================
+
+export const updateAttendanceRecord = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "attendance.edit_record", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const { id: _, ...updateData } = request.data;
+    await companyRef(companyId).collection("attendanceRecords").doc(id).update({
+      ...updateData,
+      manuallyCorrected: true,
+      correctedBy: request.auth?.uid || "",
+      correctedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    return { updated: true };
+  }
+);

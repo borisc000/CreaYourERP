@@ -11,6 +11,8 @@ export { linkProcedureToFolder, unlinkProcedureFromFolder } from "./procedureLin
 export { refreshFolderMetrics } from "./refreshFolderMetrics";
 export { saveEquipmentBlock, deleteEquipmentBlock, saveClientSite, deleteClientSite, saveClientArea, deleteClientArea, saveWorkerRestriction, deleteWorkerRestriction, saveGeneratorRule, deleteGeneratorRule } from "./safetyCatalogsService";
 export { seedSafetyCatalogs } from "./seedSafety";
+export { createSafetyFolder, updateSafetyFolder, deleteSafetyFolder } from "./folderService";
+export { approveRiskMatrix } from "./matrixApproval";
 export {
   listSafetyChecklists,
   getSafetyChecklist,

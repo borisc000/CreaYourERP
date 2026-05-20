@@ -115,6 +115,10 @@ export const SERVICE_ACTIONS = [
   "safety.seed_catalogs",
   "safety.link_procedure",
   "safety.unlink_procedure",
+  "safety.create_folder",
+  "safety.edit_folder",
+  "safety.delete_folder",
+  "safety.approve_matrix",
   // Document Center
   "document_center.save_template",
   "document_center.delete_template",
@@ -143,6 +147,7 @@ export const SERVICE_ACTIONS = [
   "attendance.compliance_report",
   "attendance.delete_policy",
   "attendance.delete_record",
+  "attendance.edit_record",
   // Expenses
   "expenses.view",
   "expenses.view_dashboard",
@@ -239,10 +244,12 @@ export const SERVICE_ACTIONS = [
   "safety_activities.view",
   "safety_activities.create",
   "safety_activities.edit",
+  "safety_activities.delete",
   // Safety Procedures
   "safety_procedures.view",
   "safety_procedures.create",
   "safety_procedures.edit",
+  "safety_procedures.delete",
   // Suppliers
   "suppliers.view",
   "suppliers.create",
@@ -371,6 +378,10 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "safety.seed_catalogs": ["safety"],
   "safety.link_procedure": ["safety"],
   "safety.unlink_procedure": ["safety"],
+  "safety.create_folder": ["safety"],
+  "safety.edit_folder": ["safety"],
+  "safety.delete_folder": ["safety"],
+  "safety.approve_matrix": ["safety"],
   // Document Center
   "document_center.save_template": ["document_center"],
   "document_center.delete_template": ["document_center"],
@@ -399,6 +410,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "attendance.compliance_report": ["hr"],
   "attendance.delete_policy": ["hr"],
   "attendance.delete_record": ["hr"],
+  "attendance.edit_record": ["hr"],
   // Expenses
   "expenses.view": ["finance", "expenses"],
   "expenses.view_dashboard": ["finance", "expenses"],
@@ -495,10 +507,12 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "safety_activities.view": ["safety"],
   "safety_activities.create": ["safety"],
   "safety_activities.edit": ["safety"],
+  "safety_activities.delete": ["safety"],
   // Safety Procedures
   "safety_procedures.view": ["safety"],
   "safety_procedures.create": ["safety"],
   "safety_procedures.edit": ["safety"],
+  "safety_procedures.delete": ["safety"],
   // Suppliers
   "suppliers.view": ["suppliers"],
   "suppliers.create": ["suppliers"],

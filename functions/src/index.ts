@@ -435,6 +435,8 @@ export { savePPEDelivery, deletePPEDelivery } from "./modules/safety/ppeService"
 export { saveTalk, deleteTalk } from "./modules/safety/talkService";
 export { saveChecklist, deleteChecklist } from "./modules/safety/checklistService";
 export { exportMIPER } from "./modules/safety/exportService";
+export { createSafetyFolder, updateSafetyFolder, deleteSafetyFolder } from "./modules/safety/folderService";
+export { approveRiskMatrix } from "./modules/safety/matrixApproval";
 export {
   listSafetyChecklists,
   getSafetyChecklist,
@@ -498,7 +500,7 @@ export { saveRiohsConfig, getRiohsConfig, generateRiohsDocument } from "./module
 // ATTENDANCE MODULE
 // ==========================================
 
-export { saveAttendancePolicy, registerCheckIn, registerCheckOut, registerPunch, getAttendanceRecords, approveAttendanceRecord, getAttendanceComplianceReport, listAttendancePolicies, getAttendancePolicy, deleteAttendancePolicy, listAttendanceRecords, getAttendanceRecord, deleteAttendanceRecord, getAttendanceReferenceData } from "./modules/attendance";
+export { saveAttendancePolicy, registerCheckIn, registerCheckOut, registerPunch, getAttendanceRecords, approveAttendanceRecord, getAttendanceComplianceReport, listAttendancePolicies, getAttendancePolicy, deleteAttendancePolicy, listAttendanceRecords, getAttendanceRecord, deleteAttendanceRecord, getAttendanceReferenceData, getAttendanceDashboard, listAttendanceEvents, getAttendanceEvent, deleteAttendanceEvent, updateAttendanceRecord } from "./modules/attendance";
 export { onAttendanceEventCreated } from "./modules/attendance";
 
 // ==========================================
@@ -567,19 +569,19 @@ export { seedPayrollParameters, getPayrollDashboard, createPayrollPeriod, calcul
 // SAFETY PROCEDURES MODULE
 // ==========================================
 
-export { getProcedureDashboard, createProcedure, updateProcedure, approveProcedure, createProcedureStep, updateProcedureStep } from "./modules/safetyProcedures";
+export { getProcedureDashboard, createProcedure, updateProcedure, approveProcedure, createProcedureStep, updateProcedureStep, listSafetyProcedures, getSafetyProcedure, deleteSafetyProcedure, listSafetyProcedureSteps, getSafetyProcedureStep, deleteSafetyProcedureStep } from "./modules/safetyProcedures";
 
 // ==========================================
 // SAFETY ACTIVITIES MODULE
 // ==========================================
 
-export { getActivityDashboard, createActivityBlock, updateActivityBlock, createActivityHazard, updateActivityHazard } from "./modules/safetyActivities";
+export { getActivityDashboard, createActivityBlock, updateActivityBlock, createActivityHazard, updateActivityHazard, listSafetyActivityBlocks, getSafetyActivityBlock, deleteSafetyActivityBlock, listSafetyActivityHazards, getSafetyActivityHazard, deleteSafetyActivityHazard } from "./modules/safetyActivities";
 
 // ==========================================
 // GANTT MODULE
 // ==========================================
 
-export { getOrCreateGanttPlan, importProcedureToGantt, createGanttTask, updateGanttTask, listGanttPlans, getGanttPlan, deleteGanttPlan, listGanttTasks, getGanttTask, deleteGanttTask, getGanttReferenceData } from "./modules/gantt";
+export { getOrCreateGanttPlan, importProcedureToGantt, createGanttTask, updateGanttTask, updateGanttPlan, listGanttPlans, getGanttPlan, deleteGanttPlan, listGanttTasks, getGanttTask, deleteGanttTask, getGanttReferenceData } from "./modules/gantt";
 
 // ==========================================
 // REPORTS MODULE

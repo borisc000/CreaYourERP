@@ -15,6 +15,11 @@ export {
   getAttendanceRecord,
   deleteAttendanceRecord,
   getAttendanceReferenceData,
+  getAttendanceDashboard,
+  listAttendanceEvents,
+  getAttendanceEvent,
+  deleteAttendanceEvent,
+  updateAttendanceRecord,
 } from "./attendanceReadService";
 
 export { onAttendanceEventCreated } from "./attendanceTrigger";

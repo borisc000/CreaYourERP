@@ -125,3 +125,19 @@ export const updateGanttTask = onCall(
     return { updated: true };
   }
 );
+
+export const updateGanttPlan = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "gantt.edit", { companyId });
+    const { companyId: _, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    await companyRef(companyId).collection("leadGanttPlans").doc(id).update({ ...data, updatedAt: nowIso() });
+    return { updated: true };
+  }
+);
