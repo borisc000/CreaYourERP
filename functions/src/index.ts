@@ -490,7 +490,7 @@ export { createTask, updateTask, completeTask, deleteTask } from "./modules/task
 // ASSETS MODULE
 // ==========================================
 
-export { getAssetDashboard, createAsset, updateAsset, deleteAsset, createAssetMaintenance } from "./modules/assets";
+export { getAssetDashboard, createAsset, updateAsset, deleteAsset, createAssetMaintenance, listAssets, getAsset, listAssetMaintenance, getAssetMaintenance, updateAssetMaintenance, deleteAssetMaintenance, getAssetReferenceData } from "./modules/assets";
 
 // ==========================================
 // MAIL MODULE
@@ -508,7 +508,7 @@ export { getBillingDashboard, createBillingDocument, updateBillingDocument, dele
 // EXPENSES MODULE
 // ==========================================
 
-export { getExpenseDashboard, createExpenseRecord, updateExpenseRecord, deleteExpenseRecord, createExpenseBackup } from "./modules/expenses";
+export { getExpenseDashboard, createExpenseRecord, updateExpenseRecord, deleteExpenseRecord, createExpenseBackup, listExpenseRecords, getExpenseRecord, listExpenseBackups, getExpenseBackup, deleteExpenseBackup, getExpenseReferenceData } from "./modules/expenses";
 
 // ==========================================
 // RENTALS MODULE
@@ -564,7 +564,7 @@ export { getOrCreateGanttPlan, importProcedureToGantt, createGanttTask, updateGa
 // REPORTS MODULE
 // ==========================================
 
-export { getReportDashboard, createReport, updateReport, closeReport, createCheckpoint, updateCheckpoint, addReportPhoto } from "./modules/reports";
+export { getReportDashboard, createReport, updateReport, closeReport, createCheckpoint, updateCheckpoint, addReportPhoto, listReports, getReport, deleteReport, listCheckpoints, getCheckpoint, deleteCheckpoint, listReportPhotos } from "./modules/reports";
 
 // ==========================================
 // NOTIFICATIONS MODULE

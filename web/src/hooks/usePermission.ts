@@ -63,13 +63,35 @@ type ServiceAction =
   | "billing.send_document"
   | "billing.duplicate_document"
   // Reports
+  | "reports.view"
   | "reports.view_dashboard"
   | "reports.create_report"
   | "reports.edit_report"
+  | "reports.delete_report"
   | "reports.close_report"
   | "reports.create_checkpoint"
   | "reports.edit_checkpoint"
+  | "reports.delete_checkpoint"
   | "reports.add_photo"
+  | "reports.view_photos"
+  // Expenses
+  | "expenses.view"
+  | "expenses.view_dashboard"
+  | "expenses.create_expense"
+  | "expenses.edit_expense"
+  | "expenses.delete_expense"
+  | "expenses.create_backup"
+  | "expenses.delete_backup"
+  | "expenses.view_reference"
+  // Assets
+  | "assets.view"
+  | "assets.create"
+  | "assets.edit"
+  | "assets.delete"
+  | "assets.view_maintenance"
+  | "assets.edit_maintenance"
+  | "assets.delete_maintenance"
+  | "assets.view_reference"
   // Safety
   | "safety.save_checklist"
   | "safety.delete_checklist"
@@ -189,13 +211,33 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "billing.send_document": ["finance"],
   "billing.duplicate_document": ["finance"],
   // Reports
+  "reports.view": ["reports"],
   "reports.view_dashboard": ["reports"],
   "reports.create_report": ["reports"],
   "reports.edit_report": ["reports"],
+  "reports.delete_report": ["reports"],
   "reports.close_report": ["reports"],
   "reports.create_checkpoint": ["reports"],
   "reports.edit_checkpoint": ["reports"],
+  "reports.delete_checkpoint": ["reports"],
   "reports.add_photo": ["reports"],
+  "reports.view_photos": ["reports"],
+  "expenses.view": ["finance", "expenses"],
+  "expenses.view_dashboard": ["finance", "expenses"],
+  "expenses.create_expense": ["finance", "expenses"],
+  "expenses.edit_expense": ["finance", "expenses"],
+  "expenses.delete_expense": ["finance", "expenses"],
+  "expenses.create_backup": ["finance", "expenses"],
+  "expenses.delete_backup": ["finance", "expenses"],
+  "expenses.view_reference": ["finance", "expenses"],
+  "assets.view": ["assets"],
+  "assets.create": ["assets"],
+  "assets.edit": ["assets"],
+  "assets.delete": ["assets"],
+  "assets.view_maintenance": ["assets"],
+  "assets.edit_maintenance": ["assets"],
+  "assets.delete_maintenance": ["assets"],
+  "assets.view_reference": ["assets"],
   // Safety
   "safety.save_checklist": ["safety"],
   "safety.delete_checklist": ["safety"],
