@@ -7,4 +7,13 @@ export {
   updateAssetMaintenance,
   deleteAssetMaintenance,
   getAssetReferenceData,
+  listAssetFuelLogs,
+  getAssetFuelLog,
+  createAssetFuelLog,
+  updateAssetFuelLog,
+  deleteAssetFuelLog,
+  listAssetDocuments,
+  getAssetDocument,
+  createAssetDocument,
+  deleteAssetDocument,
 } from "./assetsReadService";

@@ -135,6 +135,71 @@ export const deleteExpenseBackup = onCall(
   }
 );
 
+export const updateExpenseBackup = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "expenses.edit_backup", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const { id: _, ...updateData } = request.data;
+    await companyRef(companyId).collection("expenseBackups").doc(id).update({ ...updateData, updatedAt: new Date().toISOString() });
+    return { updated: true };
+  }
+);
+
+export const restoreExpenseBackup = onCall(
+  { region: "us-central1", cors, memory: "1GiB" },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "expenses.restore_backup", { companyId });
+
+    const id = cleanString(request.data?.id || request.data?.backupId);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await companyRef(companyId).collection("expenseBackups").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Backup no encontrado");
+
+    const backup = snap.data() || {};
+    const snapshot: any[] = backup.snapshot || [];
+    if (!Array.isArray(snapshot) || snapshot.length === 0) {
+      throw new HttpsError("failed-precondition", "Backup vacío o corrupto");
+    }
+
+    // Optional: clear existing expenses first
+    const clearExisting = Boolean(request.data?.clearExisting);
+    const expensesRef = companyRef(companyId).collection("expenses");
+    const batch = db.batch();
+
+    if (clearExisting) {
+      const existingSnap = await expensesRef.limit(500).get();
+      for (const doc of existingSnap.docs) batch.delete(doc.ref);
+    }
+
+    for (const item of snapshot) {
+      const newRef = expensesRef.doc();
+      const { id: originalId, createdAt, updatedAt, ...rest } = item;
+      batch.set(newRef, {
+        ...rest,
+        companyId,
+        restoredFromBackupId: id,
+        restoredAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    await batch.commit();
+    return { restored: true, count: snapshot.length, clearExisting };
+  }
+);
+
 // ==========================================
 // REFERENCE DATA
 // ==========================================

@@ -7,4 +7,8 @@ export {
   getCheckpoint,
   deleteCheckpoint,
   listReportPhotos,
+  getReportPhoto,
+  updateReportPhoto,
+  deleteReportPhoto,
+  getPublicReportMirror,
 } from "./reportsReadService";

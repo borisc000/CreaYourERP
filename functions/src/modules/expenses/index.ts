@@ -11,5 +11,7 @@ export {
   listExpenseBackups,
   getExpenseBackup,
   deleteExpenseBackup,
+  updateExpenseBackup,
+  restoreExpenseBackup,
   getExpenseReferenceData,
 } from "./expensesReadService";

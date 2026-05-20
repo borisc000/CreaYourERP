@@ -176,3 +176,176 @@ export const getAssetReferenceData = onCall(
     };
   }
 );
+
+// ==========================================
+// ASSET FUEL LOGS
+// ==========================================
+
+export const listAssetFuelLogs = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.view", { companyId });
+
+    const data = request.data || {};
+    const assetId = cleanString(data.assetId);
+    const limit = Math.min(500, Math.max(1, Number(data.limit || 200)));
+
+    let q: FirebaseFirestore.Query = db.collection("companies").doc(companyId).collection("assetFuelLogs").orderBy("date", "desc").limit(limit);
+    if (assetId) q = q.where("assetId", "==", assetId);
+
+    const snap = await q.get();
+    return { fuelLogs: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
+  }
+);
+
+export const getAssetFuelLog = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.view", { companyId });
+
+    const id = cleanString(request.data?.id || request.data?.fuelLogId);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await db.collection("companies").doc(companyId).collection("assetFuelLogs").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Registro de combustible no encontrado");
+    return { fuelLog: { id: snap.id, ...snap.data() } };
+  }
+);
+
+export const createAssetFuelLog = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.edit", { companyId });
+
+    const { assetId, date, liters, cost, odometer, operatorId, operatorName, station, notes } = request.data;
+    if (!assetId || !date || liters === undefined) throw new HttpsError("invalid-argument", "assetId, date y liters son requeridos");
+
+    const ref = await db.collection("companies").doc(companyId).collection("assetFuelLogs").add({
+      companyId, assetId, date, liters: Number(liters) || 0, cost: Number(cost) || 0,
+      odometer: Number(odometer) || 0, operatorId: operatorId || "", operatorName: operatorName || "",
+      station: station || "", notes: notes || "", createdAt: nowIso(), updatedAt: nowIso(),
+    });
+    return { id: ref.id };
+  }
+);
+
+export const updateAssetFuelLog = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.edit", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const { id: _, ...updateData } = request.data;
+    await db.collection("companies").doc(companyId).collection("assetFuelLogs").doc(id).update({ ...updateData, updatedAt: nowIso() });
+    return { updated: true };
+  }
+);
+
+export const deleteAssetFuelLog = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.delete", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    await db.collection("companies").doc(companyId).collection("assetFuelLogs").doc(id).delete();
+    return { deleted: true };
+  }
+);
+
+// ==========================================
+// ASSET DOCUMENTS
+// ==========================================
+
+export const listAssetDocuments = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.view", { companyId });
+
+    const data = request.data || {};
+    const assetId = cleanString(data.assetId);
+    const docType = cleanString(data.docType);
+    const limit = Math.min(500, Math.max(1, Number(data.limit || 200)));
+
+    let q: FirebaseFirestore.Query = db.collection("companies").doc(companyId).collection("assetDocuments").orderBy("createdAt", "desc").limit(limit);
+    if (assetId) q = q.where("assetId", "==", assetId);
+    if (docType) q = q.where("docType", "==", docType);
+
+    const snap = await q.get();
+    return { documents: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
+  }
+);
+
+export const getAssetDocument = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.view", { companyId });
+
+    const id = cleanString(request.data?.id || request.data?.documentId);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await db.collection("companies").doc(companyId).collection("assetDocuments").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    return { document: { id: snap.id, ...snap.data() } };
+  }
+);
+
+export const createAssetDocument = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.edit", { companyId });
+
+    const { assetId, docType, name, fileUrl, fileName, notes, validFrom, validUntil } = request.data;
+    if (!assetId || !docType || !name) throw new HttpsError("invalid-argument", "assetId, docType y name son requeridos");
+
+    const ref = await db.collection("companies").doc(companyId).collection("assetDocuments").add({
+      companyId, assetId, docType, name, fileUrl: fileUrl || "", fileName: fileName || "",
+      notes: notes || "", validFrom: validFrom || "", validUntil: validUntil || "",
+      createdAt: nowIso(), updatedAt: nowIso(),
+    });
+    return { id: ref.id };
+  }
+);
+
+export const deleteAssetDocument = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "assets.delete", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    await db.collection("companies").doc(companyId).collection("assetDocuments").doc(id).delete();
+    return { deleted: true };
+  }
+);

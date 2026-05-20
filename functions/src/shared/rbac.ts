@@ -93,6 +93,7 @@ export const SERVICE_ACTIONS = [
   "reports.delete_checkpoint",
   "reports.add_photo",
   "reports.view_photos",
+  "reports.delete_photo",
   // Safety
   "safety.view",
   "safety.save_checklist",
@@ -150,6 +151,8 @@ export const SERVICE_ACTIONS = [
   "expenses.delete_expense",
   "expenses.create_backup",
   "expenses.delete_backup",
+  "expenses.edit_backup",
+  "expenses.restore_backup",
   "expenses.view_reference",
   // AI
   "ai.view",
@@ -346,6 +349,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "reports.delete_checkpoint": ["reports"],
   "reports.add_photo": ["reports"],
   "reports.view_photos": ["reports"],
+  "reports.delete_photo": ["reports"],
   // Safety
   "safety.view": ["safety"],
   "safety.save_checklist": ["safety"],
@@ -403,6 +407,8 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "expenses.delete_expense": ["finance", "expenses"],
   "expenses.create_backup": ["finance", "expenses"],
   "expenses.delete_backup": ["finance", "expenses"],
+  "expenses.edit_backup": ["finance", "expenses"],
+  "expenses.restore_backup": ["finance", "expenses"],
   "expenses.view_reference": ["finance", "expenses"],
   // AI
   "ai.view": ["ai"],

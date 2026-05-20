@@ -74,6 +74,7 @@ type ServiceAction =
   | "reports.delete_checkpoint"
   | "reports.add_photo"
   | "reports.view_photos"
+  | "reports.delete_photo"
   // Expenses
   | "expenses.view"
   | "expenses.view_dashboard"
@@ -82,6 +83,8 @@ type ServiceAction =
   | "expenses.delete_expense"
   | "expenses.create_backup"
   | "expenses.delete_backup"
+  | "expenses.edit_backup"
+  | "expenses.restore_backup"
   | "expenses.view_reference"
   // Assets
   | "assets.view"
@@ -238,6 +241,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "reports.delete_checkpoint": ["reports"],
   "reports.add_photo": ["reports"],
   "reports.view_photos": ["reports"],
+  "reports.delete_photo": ["reports"],
   "expenses.view": ["finance", "expenses"],
   "expenses.view_dashboard": ["finance", "expenses"],
   "expenses.create_expense": ["finance", "expenses"],
@@ -245,6 +249,8 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "expenses.delete_expense": ["finance", "expenses"],
   "expenses.create_backup": ["finance", "expenses"],
   "expenses.delete_backup": ["finance", "expenses"],
+  "expenses.edit_backup": ["finance", "expenses"],
+  "expenses.restore_backup": ["finance", "expenses"],
   "expenses.view_reference": ["finance", "expenses"],
   "assets.view": ["assets"],
   "assets.create": ["assets"],

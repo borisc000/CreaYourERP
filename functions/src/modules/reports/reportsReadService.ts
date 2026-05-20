@@ -187,3 +187,71 @@ export const listReportPhotos = onCall(
     return { photos: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
   }
 );
+
+export const getReportPhoto = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "reports.view_photos", { companyId });
+
+    const id = cleanString(request.data?.id || request.data?.photoId);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await companyRef(companyId).collection("reportPhotos").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Foto no encontrada");
+    return { photo: { id: snap.id, ...snap.data() } };
+  }
+);
+
+export const updateReportPhoto = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "reports.edit_checkpoint", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const { id: _, ...updateData } = request.data;
+    await companyRef(companyId).collection("reportPhotos").doc(id).update({ ...updateData, updatedAt: new Date().toISOString() });
+    return { updated: true };
+  }
+);
+
+export const deleteReportPhoto = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "reports.delete_photo", { companyId });
+
+    const id = cleanString(request.data?.id);
+    if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    await companyRef(companyId).collection("reportPhotos").doc(id).delete();
+    return { deleted: true };
+  }
+);
+
+// ==========================================
+// PUBLIC MIRROR
+// ==========================================
+
+export const getPublicReportMirror = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    // No auth required — public mirror
+    const token = cleanString(request.data?.token);
+    if (!token) throw new HttpsError("invalid-argument", "token requerido");
+
+    const snap = await db.collection("publicMirrors").doc(token).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Espejo público no encontrado");
+
+    return { mirror: { id: snap.id, ...snap.data() } };
+  }
+);
