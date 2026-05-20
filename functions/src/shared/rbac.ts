@@ -115,7 +115,10 @@ export const SERVICE_ACTIONS = [
   "document_center.send_to_signature",
   "document_center.close_document",
   "document_center.delete_document",
+  "document_center.view",
   "document_center.view_stats",
+  "document_center.preview_document",
+  "document_center.duplicate_document",
   // Signature
   "signature.create_request",
   "signature.send_request",
@@ -344,7 +347,10 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "document_center.send_to_signature": ["document_center"],
   "document_center.close_document": ["document_center"],
   "document_center.delete_document": ["document_center"],
+  "document_center.view": ["document_center"],
   "document_center.view_stats": ["document_center"],
+  "document_center.preview_document": ["document_center"],
+  "document_center.duplicate_document": ["document_center"],
   // Signature
   "signature.create_request": ["signature"],
   "signature.send_request": ["signature"],

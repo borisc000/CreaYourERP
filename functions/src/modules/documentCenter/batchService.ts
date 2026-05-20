@@ -15,7 +15,12 @@ const cors = [
 
 interface BatchPayload {
   templateId: string;
-  employeeIds: string[];
+  employeeIds?: string[];
+  // Optional filters (if employeeIds not provided)
+  departmentId?: string;
+  jobProfileId?: string;
+  status?: string;
+  customerId?: string;
 }
 
 async function generateForEmployee(
@@ -161,9 +166,25 @@ export const generateDocumentBatch = onCall(
 
     await assertAction(request, "document_center.generate_document", { companyId });
 
-    const { templateId, employeeIds } = request.data as BatchPayload;
-    if (!templateId || !Array.isArray(employeeIds) || employeeIds.length === 0) {
-      throw new HttpsError("invalid-argument", "templateId y employeeIds[] son requeridos");
+    const payload = request.data as BatchPayload;
+    const templateId = payload.templateId;
+    if (!templateId) throw new HttpsError("invalid-argument", "templateId es requerido");
+
+    let employeeIds: string[] = Array.isArray(payload.employeeIds) ? payload.employeeIds : [];
+
+    // Resolve employees from filters if no explicit list provided
+    if (employeeIds.length === 0 && (payload.departmentId || payload.jobProfileId || payload.status || payload.customerId)) {
+      let empQuery: FirebaseFirestore.Query = companyRef(companyId).collection("employees").limit(200);
+      if (payload.departmentId) empQuery = empQuery.where("departmentId", "==", payload.departmentId);
+      if (payload.jobProfileId) empQuery = empQuery.where("jobProfileId", "==", payload.jobProfileId);
+      if (payload.status) empQuery = empQuery.where("status", "==", payload.status);
+      // customerId filter on employees is via assignedCustomerIds array; skip for simplicity
+      const empSnap = await empQuery.get();
+      employeeIds = empSnap.docs.map((d) => d.id);
+    }
+
+    if (employeeIds.length === 0) {
+      throw new HttpsError("invalid-argument", "Debes proporcionar employeeIds[] o al menos un filtro (departmentId, jobProfileId, status)");
     }
     if (employeeIds.length > 100) {
       throw new HttpsError("invalid-argument", "Máximo 100 empleados por lote");
@@ -213,5 +234,44 @@ export const generateDocumentBatch = onCall(
       failedCount,
       documents: results.filter((r) => r.success),
     };
+  }
+);
+
+export const listDocumentBatches = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string | undefined;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.view", { companyId });
+
+    const data = request.data || {};
+    const status = (data.status || "").trim();
+    const templateId = (data.templateId || "").trim();
+    const limit = Math.min(200, Math.max(1, Number(data.limit || 100)));
+
+    let q: FirebaseFirestore.Query = companyRef(companyId).collection("documentBatches").orderBy("createdAt", "desc").limit(limit);
+    if (status) q = q.where("status", "==", status);
+    if (templateId) q = q.where("templateId", "==", templateId);
+
+    const snap = await q.get();
+    return { batches: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
+  }
+);
+
+export const getDocumentBatch = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string | undefined;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.view", { companyId });
+
+    const id = (request.data?.id || request.data?.batchId || "").trim();
+    if (!id) throw new HttpsError("invalid-argument", "id es requerido");
+
+    const snap = await companyRef(companyId).collection("documentBatches").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Lote no encontrado");
+    return { batch: { id: snap.id, ...snap.data() } };
   }
 );

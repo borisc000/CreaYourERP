@@ -286,6 +286,157 @@ export const deleteGeneratedDocument = onCall(
   }
 );
 
+// ---------- listGeneratedDocuments ----------
+export const listGeneratedDocuments = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.view", { companyId });
+
+    const data = request.data || {};
+    const status = (data.status || "").trim();
+    const templateId = (data.templateId || "").trim();
+    const employeeId = (data.employeeId || "").trim();
+    const search = (data.search || "").trim().toLowerCase();
+    const limit = Math.min(500, Math.max(1, Number(data.limit || 200)));
+
+    let q: FirebaseFirestore.Query = companyRef(companyId).collection("generatedDocuments").orderBy("createdAt", "desc").limit(limit);
+    if (status) q = q.where("status", "==", status);
+    if (templateId) q = q.where("templateId", "==", templateId);
+    if (employeeId) q = q.where("employeeId", "==", employeeId);
+
+    const snap = await q.get();
+    let docs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    if (search) {
+      docs = docs.filter((d: any) =>
+        String(d.name || "").toLowerCase().includes(search) ||
+        String(d.recipientName || "").toLowerCase().includes(search)
+      );
+    }
+    return { documents: docs };
+  }
+);
+
+// ---------- getGeneratedDocument ----------
+export const getGeneratedDocument = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.view", { companyId });
+
+    const id = (request.data?.id || request.data?.documentId || "").trim();
+    if (!id) throw new HttpsError("invalid-argument", "id es requerido");
+
+    const snap = await companyRef(companyId).collection("generatedDocuments").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    return { document: { id: snap.id, ...snap.data() } };
+  }
+);
+
+// ---------- previewGeneratedDocument ----------
+export const previewGeneratedDocument = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.preview_document", { companyId });
+
+    const id = (request.data?.id || request.data?.documentId || "").trim();
+    if (!id) throw new HttpsError("invalid-argument", "id es requerido");
+
+    const snap = await companyRef(companyId).collection("generatedDocuments").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    const data = snap.data()!;
+    const storagePath = data.storagePath || "";
+    if (!storagePath) throw new HttpsError("failed-precondition", "Documento sin archivo");
+
+    const [url] = await storage.bucket().file(storagePath).getSignedUrl({
+      action: "read",
+      expires: Date.now() + 15 * 60 * 1000,
+    });
+
+    return { url, contentType: data.outputFormat === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+  }
+);
+
+// ---------- duplicateGeneratedDocument ----------
+export const duplicateGeneratedDocument = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.duplicate_document", { companyId });
+
+    const id = (request.data?.id || request.data?.documentId || "").trim();
+    if (!id) throw new HttpsError("invalid-argument", "id es requerido");
+
+    const snap = await companyRef(companyId).collection("generatedDocuments").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    const original = snap.data()!;
+
+    const now = new Date().toISOString();
+    let newStoragePath: string | null = null;
+
+    if (original.storagePath) {
+      try {
+        const bucket = storage.bucket();
+        const ext = original.storagePath.split(".").pop() || "pdf";
+        const newFileName = `copy_${Date.now()}_${original.outputFilename || `document.${ext}`}`;
+        newStoragePath = `companies/${companyId}/generated/${newFileName}`;
+        await bucket.file(original.storagePath).copy(newStoragePath);
+      } catch (e) {
+        console.warn("[duplicateGeneratedDocument] Could not copy file:", e);
+      }
+    }
+
+    const newRef = companyRef(companyId).collection("generatedDocuments").doc();
+    await newRef.set({
+      companyId,
+      templateId: original.templateId || null,
+      templateName: original.templateName || "",
+      name: `${original.name || "Documento"} (copia)`,
+      outputFilename: newStoragePath ? newStoragePath.split("/").pop() : original.outputFilename || "",
+      outputFormat: original.outputFormat || "pdf",
+      recipientName: original.recipientName || "",
+      recipientEmail: original.recipientEmail || "",
+      employeeId: original.employeeId || null,
+      customerId: original.customerId || null,
+      serviceOrderId: original.serviceOrderId || null,
+      targetModule: original.targetModule || "general",
+      sourceModule: "document_center",
+      sourceLabel: `${original.recipientName || "Copia"} / ${original.templateName || "Documento"}`,
+      storagePath: newStoragePath,
+      availableFormats: original.availableFormats || [original.outputFormat || "pdf"],
+      status: "generated",
+      requiresSignature: !!original.requiresSignature,
+      tags: [],
+      duplicatedFrom: id,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { success: true, documentId: newRef.id, storagePath: newStoragePath };
+  }
+);
+
 // ---------- getDocumentCenterStats ----------
 export const getDocumentCenterStats = onCall(
   {

@@ -90,7 +90,12 @@ type ServiceAction =
   | "recruitment.create"
   | "recruitment.edit"
   | "recruitment.hire"
+  | "recruitment.delete_job"
+  | "recruitment.delete_candidate"
+  | "recruitment.delete_application"
+  | "recruitment.delete_interview"
   | "recruitment.calculate_score"
+  | "recruitment.calculate_readiness"
   // Payroll
   | "payroll.view"
   | "payroll.create"
@@ -109,7 +114,10 @@ type ServiceAction =
   | "document_center.send_to_signature"
   | "document_center.close_document"
   | "document_center.delete_document"
+  | "document_center.view"
   | "document_center.view_stats"
+  | "document_center.preview_document"
+  | "document_center.duplicate_document"
   // Cross Correspondence
   | "cross_correspondence.view"
   | "cross_correspondence.create"
@@ -213,7 +221,12 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "recruitment.create": ["hr"],
   "recruitment.edit": ["hr"],
   "recruitment.hire": ["hr"],
+  "recruitment.delete_job": ["hr"],
+  "recruitment.delete_candidate": ["hr"],
+  "recruitment.delete_application": ["hr"],
+  "recruitment.delete_interview": ["hr"],
   "recruitment.calculate_score": ["hr"],
+  "recruitment.calculate_readiness": ["hr"],
   // Document Center
   "document_center.save_template": ["document_center"],
   "document_center.delete_template": ["document_center"],
@@ -223,7 +236,10 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "document_center.send_to_signature": ["document_center"],
   "document_center.close_document": ["document_center"],
   "document_center.delete_document": ["document_center"],
+  "document_center.view": ["document_center"],
   "document_center.view_stats": ["document_center"],
+  "document_center.preview_document": ["document_center"],
+  "document_center.duplicate_document": ["document_center"],
   "cross_correspondence.view": ["document_center"],
   "cross_correspondence.create": ["document_center"],
   "cross_correspondence.edit": ["document_center"],

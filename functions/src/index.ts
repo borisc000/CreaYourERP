@@ -429,10 +429,10 @@ export { exportMIPER } from "./modules/safety/exportService";
 // DOCUMENT CENTER MODULE
 // ==========================================
 
-export { saveDocumentTemplate, deleteDocumentTemplate } from "./modules/documentCenter/templateService";
+export { saveDocumentTemplate, deleteDocumentTemplate, listDocumentTemplates, getDocumentTemplate } from "./modules/documentCenter/templateService";
 export { generateWorkerDocument } from "./modules/documentCenter/generationService";
-export { generateDocumentBatch } from "./modules/documentCenter/batchService";
-export { approveGeneratedDocument, reviewGeneratedDocument, sendGeneratedDocumentToSignature, closeGeneratedDocument, deleteGeneratedDocument, getDocumentCenterStats } from "./modules/documentCenter/lifecycleService";
+export { generateDocumentBatch, listDocumentBatches, getDocumentBatch } from "./modules/documentCenter/batchService";
+export { approveGeneratedDocument, reviewGeneratedDocument, sendGeneratedDocumentToSignature, closeGeneratedDocument, deleteGeneratedDocument, getDocumentCenterStats, listGeneratedDocuments, getGeneratedDocument, previewGeneratedDocument, duplicateGeneratedDocument } from "./modules/documentCenter/lifecycleService";
 export { mergeDocumentTemplate } from "./modules/documentCenter/mergeTemplate";
 export { onSignatureRequestUpdated } from "./modules/documentCenter/syncSignature";
 export { extractTemplatePlaceholders } from "./modules/documentCenter/extractPlaceholders";
