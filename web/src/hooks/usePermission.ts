@@ -92,7 +92,23 @@ type ServiceAction =
   | "assets.edit_maintenance"
   | "assets.delete_maintenance"
   | "assets.view_reference"
+  // Attendance
+  | "attendance.view"
+  | "attendance.manage_policies"
+  | "attendance.register_check"
+  | "attendance.view_records"
+  | "attendance.approve_records"
+  | "attendance.compliance_report"
+  | "attendance.delete_policy"
+  | "attendance.delete_record"
+  // Gantt
+  | "gantt.view"
+  | "gantt.create"
+  | "gantt.edit"
+  | "gantt.delete"
+  | "gantt.view_reference"
   // Safety
+  | "safety.view"
   | "safety.save_checklist"
   | "safety.delete_checklist"
   | "safety.export_miper"
@@ -239,6 +255,20 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "assets.delete_maintenance": ["assets"],
   "assets.view_reference": ["assets"],
   // Safety
+  "attendance.view": ["hr"],
+  "attendance.manage_policies": ["hr"],
+  "attendance.register_check": ["hr"],
+  "attendance.view_records": ["hr"],
+  "attendance.approve_records": ["hr"],
+  "attendance.compliance_report": ["hr"],
+  "attendance.delete_policy": ["hr"],
+  "attendance.delete_record": ["hr"],
+  "gantt.view": ["planning"],
+  "gantt.create": ["planning"],
+  "gantt.edit": ["planning"],
+  "gantt.delete": ["planning"],
+  "gantt.view_reference": ["planning"],
+  "safety.view": ["safety"],
   "safety.save_checklist": ["safety"],
   "safety.delete_checklist": ["safety"],
   "safety.export_miper": ["safety"],

@@ -94,6 +94,7 @@ export const SERVICE_ACTIONS = [
   "reports.add_photo",
   "reports.view_photos",
   // Safety
+  "safety.view",
   "safety.save_checklist",
   "safety.delete_checklist",
   "safety.export_miper",
@@ -133,11 +134,14 @@ export const SERVICE_ACTIONS = [
   "notifications.view",
   "notifications.manage",
   // Attendance
+  "attendance.view",
   "attendance.manage_policies",
   "attendance.register_check",
   "attendance.view_records",
   "attendance.approve_records",
   "attendance.compliance_report",
+  "attendance.delete_policy",
+  "attendance.delete_record",
   // Expenses
   "expenses.view",
   "expenses.view_dashboard",
@@ -170,6 +174,8 @@ export const SERVICE_ACTIONS = [
   "gantt.view",
   "gantt.create",
   "gantt.edit",
+  "gantt.delete",
+  "gantt.view_reference",
   // Google Workspace
   "google_workspace.view",
   "google_workspace.create",
@@ -341,6 +347,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "reports.add_photo": ["reports"],
   "reports.view_photos": ["reports"],
   // Safety
+  "safety.view": ["safety"],
   "safety.save_checklist": ["safety"],
   "safety.delete_checklist": ["safety"],
   "safety.export_miper": ["safety"],
@@ -380,11 +387,14 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "notifications.view": ["system"],
   "notifications.manage": ["system"],
   // Attendance
+  "attendance.view": ["hr"],
   "attendance.manage_policies": ["hr"],
   "attendance.register_check": ["hr"],
   "attendance.view_records": ["hr"],
   "attendance.approve_records": ["hr"],
   "attendance.compliance_report": ["hr"],
+  "attendance.delete_policy": ["hr"],
+  "attendance.delete_record": ["hr"],
   // Expenses
   "expenses.view": ["finance", "expenses"],
   "expenses.view_dashboard": ["finance", "expenses"],
@@ -417,6 +427,8 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "gantt.view": ["planning"],
   "gantt.create": ["planning"],
   "gantt.edit": ["planning"],
+  "gantt.delete": ["planning"],
+  "gantt.view_reference": ["planning"],
   // Google Workspace
   "google_workspace.view": ["google_workspace"],
   "google_workspace.create": ["google_workspace"],

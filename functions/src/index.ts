@@ -435,6 +435,27 @@ export { savePPEDelivery, deletePPEDelivery } from "./modules/safety/ppeService"
 export { saveTalk, deleteTalk } from "./modules/safety/talkService";
 export { saveChecklist, deleteChecklist } from "./modules/safety/checklistService";
 export { exportMIPER } from "./modules/safety/exportService";
+export {
+  listSafetyChecklists,
+  getSafetyChecklist,
+  listSafetyIRLs,
+  getSafetyIRL,
+  listSafetyPPEDeliveries,
+  getSafetyPPEDelivery,
+  listSafetyTalks,
+  getSafetyTalk,
+  listEquipmentBlocks,
+  getEquipmentBlock,
+  listClientSites,
+  getClientSite,
+  listClientAreas,
+  getClientArea,
+  listWorkerRestrictions,
+  getWorkerRestriction,
+  listGeneratorRules,
+  getGeneratorRule,
+  getSafetyReferenceData,
+} from "./modules/safety";
 
 // ==========================================
 // DOCUMENT CENTER MODULE
@@ -477,7 +498,7 @@ export { saveRiohsConfig, getRiohsConfig, generateRiohsDocument } from "./module
 // ATTENDANCE MODULE
 // ==========================================
 
-export { saveAttendancePolicy, registerCheckIn, registerCheckOut, registerPunch, getAttendanceRecords, approveAttendanceRecord, getAttendanceComplianceReport } from "./modules/attendance";
+export { saveAttendancePolicy, registerCheckIn, registerCheckOut, registerPunch, getAttendanceRecords, approveAttendanceRecord, getAttendanceComplianceReport, listAttendancePolicies, getAttendancePolicy, deleteAttendancePolicy, listAttendanceRecords, getAttendanceRecord, deleteAttendanceRecord, getAttendanceReferenceData } from "./modules/attendance";
 export { onAttendanceEventCreated } from "./modules/attendance";
 
 // ==========================================
@@ -558,7 +579,7 @@ export { getActivityDashboard, createActivityBlock, updateActivityBlock, createA
 // GANTT MODULE
 // ==========================================
 
-export { getOrCreateGanttPlan, importProcedureToGantt, createGanttTask, updateGanttTask } from "./modules/gantt";
+export { getOrCreateGanttPlan, importProcedureToGantt, createGanttTask, updateGanttTask, listGanttPlans, getGanttPlan, deleteGanttPlan, listGanttTasks, getGanttTask, deleteGanttTask, getGanttReferenceData } from "./modules/gantt";
 
 // ==========================================
 // REPORTS MODULE
