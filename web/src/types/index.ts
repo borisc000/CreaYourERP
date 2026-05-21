@@ -206,7 +206,11 @@ export type ServiceAction =
   | "recruitment.calculate_readiness"
   | "storage.upload"
   | "storage.download"
-  | "storage.delete";
+  | "storage.delete"
+  | "mail.resend"
+  | "notifications.retry"
+  | "notifications.view_status"
+  | "payroll.send_email";
 
 export interface ServicePermissionContext {
   uid: string;

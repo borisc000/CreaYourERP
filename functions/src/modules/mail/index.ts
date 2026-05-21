@@ -1,4 +1,4 @@
-export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs } from "./mailService";
+export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs, resendEmail } from "./mailService";
 export {
   listMailAccounts,
   getMailAccount,

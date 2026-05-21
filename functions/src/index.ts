@@ -525,7 +525,7 @@ export { getAssetDashboard, createAsset, updateAsset, deleteAsset, createAssetMa
 // MAIL MODULE
 // ==========================================
 
-export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs, listMailAccounts, getMailAccount, deleteMailAccount, getEmailLog, deleteEmailLog, testMailConnection } from "./modules/mail";
+export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs, listMailAccounts, getMailAccount, deleteMailAccount, getEmailLog, deleteEmailLog, testMailConnection, resendEmail } from "./modules/mail";
 
 // ==========================================
 // BILLING MODULE
@@ -569,7 +569,7 @@ export {
 // PAYROLL MODULE
 // ==========================================
 
-export { seedPayrollParameters, getPayrollDashboard, createPayrollPeriod, calculatePeriod, approvePeriod, closePeriod, savePayrollProfile, generateSettlementPdf, sendSettlementToSignature, listPayrollPeriods, getPayrollPeriod, deletePayrollPeriod, listPayrollProfiles, getPayrollProfile, deletePayrollProfile, listSettlements, getSettlement, updateSettlement, approveSettlement, closeSettlement, getSettlementHistory, createLegalParameter, updateLegalParameter, deleteLegalParameter, createTaxBracket, updateTaxBracket, deleteTaxBracket } from "./modules/payroll";
+export { seedPayrollParameters, getPayrollDashboard, createPayrollPeriod, calculatePeriod, approvePeriod, closePeriod, savePayrollProfile, generateSettlementPdf, sendSettlementToSignature, sendSettlementToEmail, listPayrollPeriods, getPayrollPeriod, deletePayrollPeriod, listPayrollProfiles, getPayrollProfile, deletePayrollProfile, listSettlements, getSettlement, updateSettlement, approveSettlement, closeSettlement, getSettlementHistory, createLegalParameter, updateLegalParameter, deleteLegalParameter, createTaxBracket, updateTaxBracket, deleteTaxBracket } from "./modules/payroll";
 
 // ==========================================
 // SAFETY PROCEDURES MODULE
@@ -602,6 +602,7 @@ export { getReportDashboard, createReport, updateReport, closeReport, createChec
 export { getNotificationDashboard, createNotificationTemplate, updateNotificationTemplate, sendNotification, saveNotificationPreference } from "./modules/notifications";
 export { markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, getUnreadNotificationCount } from "./modules/notifications";
 export { onSignatureRequestCreated, onBillingDocumentSiiAccepted, onSafetyMatrixGenerated } from "./modules/notifications";
+export { processNotificationQueue, retryNotification, getNotificationDeliveryStatus } from "./modules/notifications";
 export { listNotificationTemplates, getNotificationTemplate, deleteNotificationTemplate, listNotificationLogs, getNotificationLog, listNotifications, getNotification, listNotificationPreferences, getNotificationPreference, deleteNotificationPreference } from "./modules/notifications";
 
 // ==========================================

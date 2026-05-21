@@ -138,6 +138,8 @@ export const SERVICE_ACTIONS = [
   // Notifications
   "notifications.view",
   "notifications.manage",
+  "notifications.retry",
+  "notifications.view_status",
   // Attendance
   "attendance.view",
   "attendance.manage_policies",
@@ -198,6 +200,7 @@ export const SERVICE_ACTIONS = [
   "mail.view",
   "mail.create",
   "mail.edit",
+  "mail.resend",
   // Payroll
   "payroll.view",
   "payroll.create",
@@ -208,6 +211,7 @@ export const SERVICE_ACTIONS = [
   "payroll.close",
   "payroll.generate_pdf",
   "payroll.send_signature",
+  "payroll.send_email",
   // PDF Workspace
   "pdf_workspace.view",
   "pdf_workspace.edit",
@@ -406,6 +410,8 @@ const moduleMap: Record<ServiceAction, string[]> = {
   // Notifications
   "notifications.view": ["system"],
   "notifications.manage": ["system"],
+  "notifications.retry": ["system"],
+  "notifications.view_status": ["system"],
   // Attendance
   "attendance.view": ["hr"],
   "attendance.manage_policies": ["hr"],
@@ -466,6 +472,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "mail.view": ["mail"],
   "mail.create": ["mail"],
   "mail.edit": ["mail"],
+  "mail.resend": ["mail"],
   // Payroll
   "payroll.view": ["payroll"],
   "payroll.create": ["payroll"],
@@ -476,6 +483,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "payroll.close": ["payroll"],
   "payroll.generate_pdf": ["payroll"],
   "payroll.send_signature": ["payroll"],
+  "payroll.send_email": ["payroll"],
   // PDF Workspace
   "pdf_workspace.view": ["document_center"],
   "pdf_workspace.edit": ["document_center"],

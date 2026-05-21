@@ -163,6 +163,7 @@ type ServiceAction =
   | "payroll.close"
   | "payroll.generate_pdf"
   | "payroll.send_signature"
+  | "payroll.send_email"
   // Document Center
   | "document_center.save_template"
   | "document_center.delete_template"
@@ -191,9 +192,12 @@ type ServiceAction =
   | "mail.view"
   | "mail.edit"
   | "mail.create"
+  | "mail.resend"
   // Notifications
   | "notifications.view"
   | "notifications.manage"
+  | "notifications.retry"
+  | "notifications.view_status"
   // Riohs
   | "riohs.view"
   | "riohs.create"
@@ -372,9 +376,12 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "mail.view": ["mail"],
   "mail.edit": ["mail"],
   "mail.create": ["mail"],
+  "mail.resend": ["mail"],
   // Notifications
   "notifications.view": ["system"],
   "notifications.manage": ["system"],
+  "notifications.retry": ["system"],
+  "notifications.view_status": ["system"],
   // Riohs
   "riohs.view": ["safety"],
   "riohs.create": ["safety"],
@@ -416,6 +423,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "payroll.close": ["payroll"],
   "payroll.generate_pdf": ["payroll"],
   "payroll.send_signature": ["payroll"],
+  "payroll.send_email": ["payroll"],
   "recruitment.create": ["hr"],
   "recruitment.edit": ["hr"],
   "recruitment.hire": ["hr"],

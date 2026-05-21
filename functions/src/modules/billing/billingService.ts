@@ -15,6 +15,7 @@ import { assertAction } from "../../shared/rbac";
 import { toCents, taxFromSubtotalCents } from "../../shared/money";
 import { simulateSiiSubmission } from "./siiProviderService";
 import { deleteStorageObject } from "../../shared/storageService";
+import { sendEmailViaSmtp, downloadAttachmentFromStorage } from "../../shared/mailSender";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -731,17 +732,42 @@ export const sendDocumentToCustomer = onCall(
       if (!snap.exists) {
         throw new HttpsError("not-found", "Documento no encontrado");
       }
+      const doc = snap.data() as any;
+
+      // Ensure PDF exists
+      if (!doc.pdfStoragePath) {
+        throw new HttpsError("failed-precondition", "El documento no tiene PDF generado. Genérelo primero.");
+      }
+
+      if (!doc.customerEmail) {
+        throw new HttpsError("failed-precondition", "El documento no tiene email de cliente registrado");
+      }
+
+      const { buffer, filename, contentType } = await downloadAttachmentFromStorage(doc.pdfStoragePath);
+
+      // Send email
+      const emailResult = await sendEmailViaSmtp(companyId, {
+        to: [doc.customerEmail],
+        subject: `Documento ${doc.documentNumber || ""} - ${doc.customerName || ""}`,
+        text: `Estimado/a ${doc.customerName || ""},\n\nAdjuntamos el documento ${doc.documentNumber || ""}.\n\nSaludos,\nYourERP`,
+        attachments: [{ filename, content: buffer, contentType }],
+      });
+
+      if (!emailResult.success) {
+        throw new HttpsError("internal", emailResult.error || "Error al enviar email al cliente");
+      }
 
       const now = nowIso();
       await docRef.update({
         sentToCustomerAt: now,
         deliveryStatus: "sent",
+        customerEmailMessageId: emailResult.messageId,
         updatedAt: now,
       });
 
-      await addBillingEvent(companyId, documentId, "sent_to_customer", "Enviado al cliente", "El documento fue enviado al cliente", request.auth.token.name || "");
+      await addBillingEvent(companyId, documentId, "sent_to_customer", "Enviado al cliente", `Documento enviado por email a ${doc.customerEmail}`, request.auth.token.name || "");
 
-      return { success: true, sentAt: now };
+      return { success: true, sentAt: now, messageId: emailResult.messageId };
     } catch (error: any) {
       console.error("[sendDocumentToCustomer] Error:", error);
       if (error instanceof HttpsError) throw error;

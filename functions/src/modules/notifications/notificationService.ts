@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { sendEmailViaSmtp } from "../../shared/mailSender";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function nowIso() { return new Date().toISOString(); }
@@ -68,7 +69,7 @@ export const sendNotification = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { templateId, recipient, variables } = request.data;
+    const { templateId, recipient, variables, channel: requestedChannel, subject: requestedSubject, body: requestedBody } = request.data;
     if (!recipient) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     let template: any = null;
@@ -77,9 +78,9 @@ export const sendNotification = onCall(
       if (t.exists) template = t.data();
     }
 
-    const channel = template?.channel || "email";
-    const subject = template?.subjectTemplate || "Notificación";
-    let body = template?.bodyTemplate || variables?.body || "";
+    const channel = requestedChannel || template?.channel || "email";
+    const subject = requestedSubject || template?.subjectTemplate || "Notificación";
+    let body = requestedBody || template?.bodyTemplate || variables?.body || "";
 
     // Simple variable replacement
     if (variables && typeof variables === "object") {
@@ -88,16 +89,31 @@ export const sendNotification = onCall(
       }
     }
 
-    const ref = await companyRef(companyId).collection("notificationLogs").add({
+    const logRef = await companyRef(companyId).collection("notificationLogs").add({
       companyId, templateId: templateId || null, recipient, channel, subject,
-      bodyPreview: body.substring(0, 200), status: "sent",
-      sentAt: nowIso(), createdAt: nowIso(),
+      body, bodyPreview: body.substring(0, 200), status: "sending",
+      createdAt: nowIso(),
     });
 
-    // TODO: Integrate with real SMTP/SMS provider
-    console.log(`[NOTIFICATION] ${channel} to ${recipient}: ${subject}`);
+    // Deliver immediately for email channel
+    if (channel === "email") {
+      const result = await sendEmailViaSmtp(
+        companyId,
+        { to: [recipient], subject, text: body, html: template?.htmlBody ? body : undefined },
+        logRef
+      );
 
-    return { id: ref.id, status: "sent" };
+      if (!result.success) {
+        throw new HttpsError("internal", result.error || "Error al enviar notificación");
+      }
+
+      return { id: logRef.id, status: "sent", messageId: result.messageId };
+    }
+
+    // SMS / Push: mark as pending for queue processor
+    await logRef.update({ status: "pending", scheduledAt: nowIso() });
+
+    return { id: logRef.id, status: "pending", message: "Notificación encolada para envío" };
   }
 );
 

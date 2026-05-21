@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
+import { sendEmailViaSmtp, downloadAttachmentFromStorage } from "../../shared/mailSender";
 
 const cors = [
   "http://localhost:5173",
@@ -85,22 +86,50 @@ export const sendEmail = onCall(
     if (!recipients?.length || !subject) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     // Validate attachment paths belong to company
-    const attachments: string[] = [];
+    const storagePaths: string[] = [];
     if (Array.isArray(attachmentStoragePaths)) {
       for (const path of attachmentStoragePaths) {
         if (typeof path === "string" && path.startsWith(`companies/${companyId}/`)) {
-          attachments.push(path);
+          storagePaths.push(path);
         }
       }
     }
 
     const logRef = await db.collection("companies").doc(companyId).collection("emailLogs").add({
       companyId, accountId: accountId || "", recipients, subject, bodyText: bodyText || "", bodyHtml: bodyHtml || "",
-      attachmentStoragePaths: attachments,
-      status: "queued", createdAt: nowIso(),
+      attachmentStoragePaths: storagePaths,
+      status: "sending", createdAt: nowIso(),
     });
 
-    return { queued: true, logId: logRef.id, message: "Email encolado para envío", attachmentCount: attachments.length };
+    // Download attachments from Storage
+    const attachments = [];
+    for (const path of storagePaths) {
+      try {
+        const att = await downloadAttachmentFromStorage(path);
+        attachments.push({ filename: att.filename, content: att.buffer, contentType: att.contentType });
+      } catch (e) {
+        console.warn("[sendEmail] Failed to download attachment:", path, e);
+      }
+    }
+
+    // Send via SMTP
+    const result = await sendEmailViaSmtp(
+      companyId,
+      {
+        to: recipients,
+        subject,
+        text: bodyText || "",
+        html: bodyHtml || undefined,
+        attachments,
+      },
+      logRef
+    );
+
+    if (!result.success) {
+      throw new HttpsError("internal", result.error || "Error al enviar email");
+    }
+
+    return { sent: true, logId: logRef.id, messageId: result.messageId };
   }
 );
 
@@ -117,5 +146,58 @@ export const getEmailLogs = onCall(
 
     const snap = await db.collection("companies").doc(companyId).collection("emailLogs").orderBy("createdAt", "desc").limit(limit).get();
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }
+);
+
+export const resendEmail = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "mail.create", { companyId });
+
+    const logId = request.data?.logId;
+    if (!logId) throw new HttpsError("invalid-argument", "logId requerido");
+
+    const logSnap = await db.collection("companies").doc(companyId).collection("emailLogs").doc(logId).get();
+    if (!logSnap.exists) throw new HttpsError("not-found", "Log no encontrado");
+    const logData = logSnap.data() || {};
+
+    const attachments = [];
+    if (Array.isArray(logData.attachmentStoragePaths)) {
+      for (const path of logData.attachmentStoragePaths) {
+        try {
+          const att = await downloadAttachmentFromStorage(path);
+          attachments.push({ filename: att.filename, content: att.buffer, contentType: att.contentType });
+        } catch (e) {
+          console.warn("[resendEmail] Failed to download attachment:", path, e);
+        }
+      }
+    }
+
+    const result = await sendEmailViaSmtp(
+      companyId,
+      {
+        to: logData.recipients,
+        subject: logData.subject,
+        text: logData.bodyText || "",
+        html: logData.bodyHtml || undefined,
+        attachments,
+      }
+    );
+
+    await logSnap.ref.update({
+      resentAt: nowIso(),
+      resentMessageId: result.messageId || null,
+      resentError: result.error || null,
+      resentSuccess: result.success,
+    });
+
+    if (!result.success) {
+      throw new HttpsError("internal", result.error || "Error al reenviar email");
+    }
+
+    return { resent: true, messageId: result.messageId };
   }
 );

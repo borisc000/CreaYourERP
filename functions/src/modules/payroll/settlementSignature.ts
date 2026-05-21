@@ -3,6 +3,7 @@ import { assertAction } from "../../shared/rbac";
 import { db, storage } from "../../config";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as crypto from "crypto";
+import { sendEmailViaSmtp, downloadAttachmentFromStorage } from "../../shared/mailSender";
 
 const cors = [
   "http://localhost:5173",
@@ -135,5 +136,53 @@ export const sendSettlementToSignature = onCall(
     });
 
     return { sent: true, signatureRequestId: signatureRef.id, publicToken: signatureRef.id };
+  }
+);
+
+export const sendSettlementToEmail = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.edit", { companyId });
+
+    const { settlementId } = request.data;
+    if (!settlementId) throw new HttpsError("invalid-argument", "settlementId requerido");
+
+    const settleSnap = await companyRef(companyId).collection("payrollSettlements").doc(settlementId).get();
+    if (!settleSnap.exists) throw new HttpsError("not-found", "Liquidación no encontrada");
+    const settle = settleSnap.data()!;
+
+    const empSnap = await companyRef(companyId).collection("employees").doc(settle.employeeId).get();
+    const emp = empSnap.exists ? empSnap.data()! : {};
+    const employeeEmail = emp.email || emp.personalEmail || emp.workEmail || "";
+    if (!employeeEmail) {
+      throw new HttpsError("failed-precondition", "El empleado no tiene email registrado");
+    }
+
+    // Ensure PDF exists
+    const { storagePath } = await ensureSettlementPdf(companyId, settlementId, settle);
+    const { buffer, filename, contentType } = await downloadAttachmentFromStorage(storagePath);
+
+    // Send email
+    const result = await sendEmailViaSmtp(companyId, {
+      to: [employeeEmail],
+      subject: `Liquidación de sueldo - ${settle.employeeName || ""}`,
+      text: `Adjuntamos su liquidación de sueldo correspondiente al período ${settle.periodId || ""}.\n\nSaludos,\nYourERP`,
+      attachments: [{ filename, content: buffer, contentType }],
+    });
+
+    if (!result.success) {
+      throw new HttpsError("internal", result.error || "Error al enviar liquidación por email");
+    }
+
+    await settleSnap.ref.update({
+      sentByEmailAt: nowIso(),
+      sentByEmailTo: employeeEmail,
+      updatedAt: nowIso(),
+    });
+
+    return { sent: true, messageId: result.messageId, to: employeeEmail };
   }
 );

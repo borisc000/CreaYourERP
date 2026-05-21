@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
+import { testSmtpConnection } from "../../shared/mailSender";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function companyRef(companyId: string) { return db.collection("companies").doc(companyId); }
@@ -122,8 +123,22 @@ export const testMailConnection = onCall(
       throw new HttpsError("failed-precondition", `Faltan campos: ${missing.join(", ")}`);
     }
 
-    // Simulate test (real SMTP test would require nodemailer or similar)
-    await snap.ref.update({ lastTestedAt: nowIso(), lastTestStatus: "ok", lastTestError: "" });
-    return { tested: true, status: "ok", message: "Configuración válida (simulado)" };
+    const result = await testSmtpConnection({
+      smtpHost: account.smtpHost,
+      smtpPort: Number(account.smtpPort) || 587,
+      smtpUser: account.smtpUser,
+      smtpPassword: account.smtpPassword,
+      defaultFromEmail: account.defaultFromEmail || account.smtpUser,
+      defaultFromName: account.defaultFromName || "YourERP",
+      useTls: account.useTls !== false,
+    });
+
+    await snap.ref.update({
+      lastTestedAt: nowIso(),
+      lastTestStatus: result.success ? "ok" : "error",
+      lastTestError: result.success ? "" : result.message,
+    });
+
+    return { tested: true, status: result.success ? "ok" : "error", message: result.message };
   }
 );

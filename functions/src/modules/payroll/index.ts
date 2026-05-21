@@ -20,4 +20,4 @@ export {
   deleteTaxBracket,
 } from "./payrollReadService";
 export { generateSettlementPdf } from "./settlementPdf";
-export { sendSettlementToSignature } from "./settlementSignature";
+export { sendSettlementToSignature, sendSettlementToEmail } from "./settlementSignature";
