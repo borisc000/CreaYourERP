@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
+import { calculateChileanOvertime } from "./overtimeCalculator";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function nowIso() { return new Date().toISOString(); }
@@ -198,6 +199,20 @@ export const calculatePeriod = onCall(
     const periodStart = periodData.startDate || "";
     const periodEnd = periodData.endDate || "";
 
+    // Pre-fetch attendance records for the period range
+    const attendanceSnap = await companyRef(companyId)
+      .collection("attendanceRecords")
+      .where("date", ">=", periodStart)
+      .where("date", "<=", periodEnd)
+      .get();
+    const attendanceMap: Record<string, Array<{ date: string; overtimeMinutes: number }>> = {};
+    attendanceSnap.docs.forEach((d) => {
+      const a = d.data();
+      if (!a.employeeId || !(a.overtimeMinutes as number > 0)) return;
+      if (!attendanceMap[a.employeeId]) attendanceMap[a.employeeId] = [];
+      attendanceMap[a.employeeId].push({ date: a.date as string, overtimeMinutes: a.overtimeMinutes as number });
+    });
+
     const settlements: any[] = [];
 
     for (const profDoc of profilesSnap.docs) {
@@ -216,20 +231,15 @@ export const calculatePeriod = onCall(
 
       const taxableIncome = Math.round(baseSalary * (workedDays / 30));
 
-      // AFP
-      const afpRate = AFP_RATES[prof.afpCode || "habitat"] || { pension: 10.34, commission: 1.34 };
-      const topeAfpUf = params.TOPE_AFP || 90;
-      const topeAfp = topeAfpUf * (params.UF || 39790);
-      const afpBase = Math.min(taxableIncome, topeAfp);
-      const pensionAmount = Math.round(afpBase * (afpRate.pension / 100));
-      const afpCommissionAmount = Math.round(afpBase * (afpRate.commission / 100));
-
-      // Health
-      const topeHealth = (params.TOPE_SALUD || 90) * (params.UF || 39790);
-      const healthBase = Math.min(taxableIncome, topeHealth);
-      const healthAmount = prof.healthSystem === "isapre"
-        ? Math.round(prof.healthPlanClp || healthBase * 0.07)
-        : Math.round(healthBase * 0.07);
+      // Overtime calculation from attendance records
+      const dailyHours = contract?.dailyHours || 8;
+      const empAttendance = attendanceMap[prof.employeeId] || [];
+      const overtimeEvents = empAttendance.map((a) => ({
+        date: a.date,
+        hours: Math.round((a.overtimeMinutes / 60) * 100) / 100,
+      }));
+      const overtimeResult = calculateChileanOvertime(baseSalary, dailyHours, overtimeEvents);
+      const overtimeAmount = overtimeResult.overtimeAmount;
 
       // Gratification
       let legalGratificationAmount = 0;
@@ -240,8 +250,23 @@ export const calculatePeriod = onCall(
         legalGratificationAmount = prof.manualGratificationAmount || 0;
       }
 
-      // Taxable total
-      const taxableTotal = taxableIncome + legalGratificationAmount + (prof.recurringTaxableBonus || 0);
+      // Taxable total (renta imponible)
+      const taxableTotal = taxableIncome + overtimeAmount + legalGratificationAmount + (prof.recurringTaxableBonus || 0);
+
+      // AFP
+      const afpRate = AFP_RATES[prof.afpCode || "habitat"] || { pension: 10.34, commission: 1.34 };
+      const topeAfpUf = params.TOPE_AFP || 90;
+      const topeAfp = topeAfpUf * (params.UF || 39790);
+      const afpBase = Math.min(taxableTotal, topeAfp);
+      const pensionAmount = Math.round(afpBase * (afpRate.pension / 100));
+      const afpCommissionAmount = Math.round(afpBase * (afpRate.commission / 100));
+
+      // Health
+      const topeHealth = (params.TOPE_SALUD || 90) * (params.UF || 39790);
+      const healthBase = Math.min(taxableTotal, topeHealth);
+      const healthAmount = prof.healthSystem === "isapre"
+        ? Math.round(prof.healthPlanClp || healthBase * 0.07)
+        : Math.round(healthBase * 0.07);
 
       // Tax (impuesto única 2da categoría)
       const utm = params.UTM || 69889;
@@ -258,7 +283,7 @@ export const calculatePeriod = onCall(
       // AFC employee
       let afcEmployeeAmount = 0;
       const topeAfc = (params.TOPE_AFC || 135.2) * (params.UF || 39790);
-      const afcBase = Math.min(taxableIncome, topeAfc);
+      const afcBase = Math.min(taxableTotal, topeAfc);
       if (emp.contractType === "indefinite") afcEmployeeAmount = Math.round(afcBase * 0.006);
 
       // Family allowance
@@ -287,6 +312,7 @@ export const calculatePeriod = onCall(
 
       const lineItems = [
         { type: "earning", concept: "Sueldo base", amount: taxableIncome },
+        { type: "earning", concept: "Horas extras", amount: overtimeAmount },
         { type: "earning", concept: "Gratificación legal", amount: legalGratificationAmount },
         { type: "earning", concept: "Asignación familiar", amount: familyAllowanceAmount },
         { type: "earning", concept: "Bono imponible recurrente", amount: prof.recurringTaxableBonus || 0 },
@@ -309,7 +335,9 @@ export const calculatePeriod = onCall(
       const settlementData: any = {
         companyId, periodId, employeeId: prof.employeeId, employeeName: emp.fullName || "",
         payrollProfileId: profDoc.id, contractId: contract?.id || "",
-        status: "calculated", workedDays, overtimeHours: 0,
+        status: "calculated", workedDays, overtimeHours: overtimeResult.overtimeHours,
+        overtimeAmount, overtimeHourValue: overtimeResult.ordinaryHourValue,
+        overtimeDetails: overtimeResult.details,
         baseSalary, taxableIncome, nonTaxableIncome, totalEarnings, totalDeductions, netPay,
         taxBase: taxableTotal, taxAmount, legalGratificationAmount, familyAllowanceAmount,
         pensionAmount, afpCommissionAmount, healthAmount, afcEmployeeAmount,

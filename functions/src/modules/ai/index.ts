@@ -1,1 +1,1 @@
-export { getAIDashboard, createAIProvider, updateAIProvider, createAIPromptTemplate, updateAIPromptTemplate, createAIAgent, updateAIAgent, planAIExecution } from "./aiService";
+export { getAIDashboard, createAIProvider, updateAIProvider, createAIPromptTemplate, updateAIPromptTemplate, createAIAgent, updateAIAgent, planAIExecution, executeAI } from "./aiService";

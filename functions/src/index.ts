@@ -616,7 +616,7 @@ export { getGoogleWorkspaceDashboard, createGoogleWorkspaceAccount, updateGoogle
 // AI MODULE
 // ==========================================
 
-export { getAIDashboard, createAIProvider, updateAIProvider, createAIPromptTemplate, updateAIPromptTemplate, createAIAgent, updateAIAgent, planAIExecution } from "./modules/ai";
+export { getAIDashboard, createAIProvider, updateAIProvider, createAIPromptTemplate, updateAIPromptTemplate, createAIAgent, updateAIAgent, planAIExecution, executeAI } from "./modules/ai";
 
 // ==========================================
 // PDF WORKSPACE MODULE

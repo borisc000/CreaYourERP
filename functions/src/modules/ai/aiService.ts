@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
+import { callLLM } from "./llmCaller";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function nowIso() { return new Date().toISOString(); }
@@ -190,5 +191,101 @@ export const planAIExecution = onCall(
     });
 
     return { id: ref.id, status: "planned", renderedSystemPrompt: renderedSystem, renderedUserPrompt: renderedUser };
+  }
+);
+
+export const executeAI = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "ai.create", { companyId });
+    const { executionId } = request.data;
+    if (!executionId) throw new HttpsError("invalid-argument", "executionId requerido");
+
+    const execRef = companyRef(companyId).collection("aiExecutions").doc(executionId);
+    const execSnap = await execRef.get();
+    if (!execSnap.exists) throw new HttpsError("not-found", "Ejecución no encontrada");
+    const exec = execSnap.data()!;
+
+    if (exec.executionStatus === "running") {
+      throw new HttpsError("failed-precondition", "La ejecución ya está en curso");
+    }
+    if (exec.executionStatus === "completed") {
+      return { id: executionId, status: "completed", result: exec.resultText || "" };
+    }
+
+    // Determine provider
+    let providerId = exec.providerId;
+    if (!providerId) {
+      const defaults = await companyRef(companyId).collection("aiProviders").where("isDefault", "==", true).where("isActive", "==", true).limit(1).get();
+      if (!defaults.empty) providerId = defaults.docs[0].id;
+    }
+    if (!providerId) throw new HttpsError("failed-precondition", "No hay proveedor AI configurado");
+
+    const providerSnap = await companyRef(companyId).collection("aiProviders").doc(providerId).get();
+    if (!providerSnap.exists) throw new HttpsError("not-found", "Proveedor AI no encontrado");
+    const provider = providerSnap.data()!;
+    if (!provider.apiKey) throw new HttpsError("failed-precondition", "Proveedor AI sin API key configurada");
+
+    // Determine prompt parameters
+    let temperature = 0.7;
+    let maxTokens = 1024;
+    if (exec.promptTemplateId) {
+      const ptSnap = await companyRef(companyId).collection("aiPromptTemplates").doc(exec.promptTemplateId).get();
+      if (ptSnap.exists) {
+        const pt = ptSnap.data()!;
+        temperature = pt.temperature ?? temperature;
+        maxTokens = pt.maxTokens ?? maxTokens;
+      }
+    }
+
+    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [];
+    if (exec.renderedSystemPrompt) {
+      messages.push({ role: "system", content: exec.renderedSystemPrompt });
+    }
+    if (exec.renderedUserPrompt) {
+      messages.push({ role: "user", content: exec.renderedUserPrompt });
+    }
+    if (messages.length === 0) {
+      throw new HttpsError("failed-precondition", "No hay prompts renderizados para ejecutar");
+    }
+
+    // Update status to running
+    await execRef.update({ executionStatus: "running", startedAt: nowIso(), updatedAt: nowIso() });
+
+    const result = await callLLM(
+      {
+        providerType: provider.providerType,
+        apiKey: provider.apiKey,
+        apiBaseUrl: provider.apiBaseUrl || undefined,
+        defaultModel: provider.defaultModel || undefined,
+        timeoutSeconds: provider.timeoutSeconds || 30,
+      },
+      messages,
+      { temperature, maxTokens }
+    );
+
+    if (result.ok) {
+      await execRef.update({
+        executionStatus: "completed",
+        resultText: result.text,
+        usage: result.usage || null,
+        completedAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+      return { id: executionId, status: "completed", result: result.text, usage: result.usage };
+    } else {
+      await execRef.update({
+        executionStatus: "failed",
+        errorMessage: result.error || "Unknown error",
+        completedAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+      throw new HttpsError("internal", result.error || "Error ejecutando LLM");
+    }
   }
 );
