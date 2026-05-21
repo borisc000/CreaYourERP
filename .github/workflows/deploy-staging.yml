@@ -35,6 +35,14 @@ jobs:
           cd web && npm run build
           cd ../functions && npm run build
 
+      - name: Delete conflicting functions (trigger type changed)
+        uses: w9jds/firebase-action@master
+        with:
+          args: functions:delete onSignatureRequestCreated onBillingDocumentSiiAccepted onSafetyMatrixGenerated --project staging --force
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}
+        continue-on-error: true
+
       - name: Deploy to Firebase Staging
         uses: w9jds/firebase-action@master
         with:
