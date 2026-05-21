@@ -582,6 +582,7 @@ export { getProcedureDashboard, createProcedure, updateProcedure, approveProcedu
 // ==========================================
 
 export { getActivityDashboard, createActivityBlock, updateActivityBlock, createActivityHazard, updateActivityHazard, listSafetyActivityBlocks, getSafetyActivityBlock, deleteSafetyActivityBlock, listSafetyActivityHazards, getSafetyActivityHazard, deleteSafetyActivityHazard } from "./modules/safetyActivities";
+export { createIncident, updateIncident, investigateIncident, createCorrectiveAction, updateCorrectiveAction, closeCorrectiveAction, listSafetyIncidents, getSafetyIncident, deleteSafetyIncident, listCorrectiveActions, getCorrectiveAction, deleteCorrectiveAction, getSafetyIncidentDashboard, getIncidentStatsByArea, getIncidentTrends } from "./modules/safetyIncidents";
 
 // ==========================================
 // GANTT MODULE

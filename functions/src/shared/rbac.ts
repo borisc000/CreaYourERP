@@ -265,6 +265,13 @@ export const SERVICE_ACTIONS = [
   "tasks.create",
   "tasks.edit",
   "tasks.delete",
+  // Safety Incidents
+  "safety_incidents.view",
+  "safety_incidents.create",
+  "safety_incidents.edit",
+  "safety_incidents.delete",
+  "safety_incidents.investigate",
+  "safety_incidents.manage_capa",
   // Storage
   "storage.upload",
   "storage.download",
@@ -537,6 +544,13 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "tasks.create": ["tasks"],
   "tasks.edit": ["tasks"],
   "tasks.delete": ["tasks"],
+  // Safety Incidents
+  "safety_incidents.view": ["safety"],
+  "safety_incidents.create": ["safety"],
+  "safety_incidents.edit": ["safety"],
+  "safety_incidents.delete": ["safety"],
+  "safety_incidents.investigate": ["safety"],
+  "safety_incidents.manage_capa": ["safety"],
   // Storage
   "storage.upload": ["system"],
   "storage.download": ["system"],

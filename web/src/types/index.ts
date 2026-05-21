@@ -210,7 +210,13 @@ export type ServiceAction =
   | "mail.resend"
   | "notifications.retry"
   | "notifications.view_status"
-  | "payroll.send_email";
+  | "payroll.send_email"
+  | "safety_incidents.view"
+  | "safety_incidents.create"
+  | "safety_incidents.edit"
+  | "safety_incidents.delete"
+  | "safety_incidents.investigate"
+  | "safety_incidents.manage_capa";
 
 export interface ServicePermissionContext {
   uid: string;
