@@ -203,7 +203,10 @@ export type ServiceAction =
   | "recruitment.delete_application"
   | "recruitment.delete_interview"
   | "recruitment.calculate_score"
-  | "recruitment.calculate_readiness";
+  | "recruitment.calculate_readiness"
+  | "storage.upload"
+  | "storage.download"
+  | "storage.delete";
 
 export interface ServicePermissionContext {
   uid: string;

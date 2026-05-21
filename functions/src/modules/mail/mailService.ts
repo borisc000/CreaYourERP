@@ -81,15 +81,26 @@ export const sendEmail = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "mail.create", { companyId });
-    const { accountId, recipients, subject, bodyText, bodyHtml } = request.data;
+    const { accountId, recipients, subject, bodyText, bodyHtml, attachmentStoragePaths } = request.data;
     if (!recipients?.length || !subject) throw new HttpsError("invalid-argument", "Datos incompletos");
+
+    // Validate attachment paths belong to company
+    const attachments: string[] = [];
+    if (Array.isArray(attachmentStoragePaths)) {
+      for (const path of attachmentStoragePaths) {
+        if (typeof path === "string" && path.startsWith(`companies/${companyId}/`)) {
+          attachments.push(path);
+        }
+      }
+    }
 
     const logRef = await db.collection("companies").doc(companyId).collection("emailLogs").add({
       companyId, accountId: accountId || "", recipients, subject, bodyText: bodyText || "", bodyHtml: bodyHtml || "",
+      attachmentStoragePaths: attachments,
       status: "queued", createdAt: nowIso(),
     });
 
-    return { queued: true, logId: logRef.id, message: "Email encolado para envío" };
+    return { queued: true, logId: logRef.id, message: "Email encolado para envío", attachmentCount: attachments.length };
   }
 );
 

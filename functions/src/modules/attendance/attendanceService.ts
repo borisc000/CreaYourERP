@@ -11,6 +11,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
 import { assertAction } from "../../shared/rbac";
+import { uploadBase64ToStorage } from "../../shared/storageService";
 import {
   buildEvidencePayload,
   calculateChainHash,
@@ -236,6 +237,26 @@ async function executePunch(
     previousHash,
   });
 
+  // Handle photo upload to Storage if base64 provided
+  let photoUrl = evidence.photoBase64 || "";
+  let photoStoragePath = "";
+  if (photoUrl && !photoUrl.startsWith("http") && photoUrl.length > 100) {
+    // Likely base64 — upload to Storage
+    try {
+      const contentType = "image/jpeg";
+      const uploadResult = await uploadBase64ToStorage(
+        companyId,
+        photoUrl,
+        `attendance/${employeeId}/${date}/${eventType}_${Date.now()}.jpg`,
+        contentType
+      );
+      photoUrl = uploadResult.downloadUrl;
+      photoStoragePath = uploadResult.storagePath;
+    } catch (e) {
+      console.warn("[executePunch] Failed to upload photo to storage:", e);
+    }
+  }
+
   // Save event
   const eventRef = companyRef(companyId).collection("attendanceEvents").doc();
   await eventRef.set({
@@ -247,7 +268,8 @@ async function executePunch(
     date,
     latitude: evidence.geoLatitude ?? null,
     longitude: evidence.geoLongitude ?? null,
-    photoUrl: evidence.photoBase64 || "",
+    photoUrl,
+    photoStoragePath,
     notes: evidence.notes || "",
     createdBy: request.auth?.uid || "",
     createdAt: nowIso(),
@@ -265,14 +287,16 @@ async function executePunch(
     if (evidence.geoLatitude && evidence.geoLongitude) {
       recordUpdates.checkInLocation = `${evidence.geoLatitude},${evidence.geoLongitude}`;
     }
-    if (evidence.photoBase64) recordUpdates.checkInPhoto = evidence.photoBase64;
+    if (photoUrl) recordUpdates.checkInPhoto = photoUrl;
+    if (photoStoragePath) recordUpdates.checkInPhotoStoragePath = photoStoragePath;
   }
   if (eventType === "exit") {
     recordUpdates.checkOut = evIso;
     if (evidence.geoLatitude && evidence.geoLongitude) {
       recordUpdates.checkOutLocation = `${evidence.geoLatitude},${evidence.geoLongitude}`;
     }
-    if (evidence.photoBase64) recordUpdates.checkOutPhoto = evidence.photoBase64;
+    if (photoUrl) recordUpdates.checkOutPhoto = photoUrl;
+    if (photoStoragePath) recordUpdates.checkOutPhotoStoragePath = photoStoragePath;
   }
   await recordRef.update(recordUpdates);
 

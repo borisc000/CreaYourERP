@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { uploadBase64ToStorage } from "../../shared/storageService";
 import { assertAction } from "../../shared/rbac";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
@@ -146,14 +147,53 @@ export const addReportPhoto = onCall(
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "reports.add_photo", { companyId });
-    const { companyId: _, reportId, checkpointId, photoUrl, ...data } = request.data;
-    if (!reportId || !checkpointId || !photoUrl) throw new HttpsError("invalid-argument", "Datos incompletos");
+    const { companyId: _, reportId, checkpointId, photoUrl, photoBase64, ...data } = request.data;
+    if (!reportId || !checkpointId) throw new HttpsError("invalid-argument", "Datos incompletos");
+
+    let finalPhotoUrl = photoUrl || "";
+    let finalThumbnailUrl = data.thumbnailUrl || photoUrl || "";
+    let storagePath = "";
+    let thumbnailStoragePath = "";
+
+    // If base64 provided, upload to Storage
+    if (photoBase64 && typeof photoBase64 === "string") {
+      const contentType = data.contentType || "image/jpeg";
+      const ext = contentType.includes("png") ? "png" : "jpg";
+      const timestamp = Date.now();
+      const uploadResult = await uploadBase64ToStorage(
+        companyId,
+        photoBase64,
+        `reports/${reportId}/photos/${timestamp}.${ext}`,
+        contentType
+      );
+      finalPhotoUrl = uploadResult.downloadUrl;
+      storagePath = uploadResult.storagePath;
+
+      // Thumbnail: if thumbnailBase64 provided, upload it too
+      if (data.thumbnailBase64 && typeof data.thumbnailBase64 === "string") {
+        const thumbResult = await uploadBase64ToStorage(
+          companyId,
+          data.thumbnailBase64,
+          `reports/${reportId}/photos/${timestamp}_thumb.${ext}`,
+          contentType
+        );
+        finalThumbnailUrl = thumbResult.downloadUrl;
+        thumbnailStoragePath = thumbResult.storagePath;
+      } else {
+        finalThumbnailUrl = finalPhotoUrl;
+        thumbnailStoragePath = storagePath;
+      }
+    }
+
+    if (!finalPhotoUrl) throw new HttpsError("invalid-argument", "photoUrl o photoBase64 requerido");
+
     const ref = await companyRef(companyId).collection("reportPhotos").add({
-      companyId, reportId, checkpointId, photoUrl,
-      thumbnailUrl: data.thumbnailUrl || photoUrl, caption: data.caption || "",
+      companyId, reportId, checkpointId, photoUrl: finalPhotoUrl,
+      thumbnailUrl: finalThumbnailUrl || finalPhotoUrl, caption: data.caption || "",
+      storagePath, thumbnailStoragePath,
       takenAt: data.takenAt || nowIso(), takenByUserId: request.auth?.uid || "",
       createdAt: nowIso(),
     });
-    return { id: ref.id };
+    return { id: ref.id, photoUrl: finalPhotoUrl, storagePath };
   }
 );

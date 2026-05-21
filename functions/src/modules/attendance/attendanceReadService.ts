@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { getSignedDownloadUrl, deleteStorageObject } from "../../shared/storageService";
 import { assertAction } from "../../shared/rbac";
 
 const cors = [
@@ -119,7 +120,17 @@ export const getAttendanceRecord = onCall(
 
     const snap = await companyRef(companyId).collection("attendanceRecords").doc(id).get();
     if (!snap.exists) throw new HttpsError("not-found", "Registro no encontrado");
-    return { record: { id: snap.id, ...snap.data() } };
+    const record = snap.data() || {};
+
+    // Refresh signed URLs for photos stored in Storage
+    if (record.checkInPhotoStoragePath) {
+      try { record.checkInPhoto = await getSignedDownloadUrl(record.checkInPhotoStoragePath as string, 60); } catch (e) { console.warn("[getAttendanceRecord] Failed to refresh checkInPhoto URL:", e); }
+    }
+    if (record.checkOutPhotoStoragePath) {
+      try { record.checkOutPhoto = await getSignedDownloadUrl(record.checkOutPhotoStoragePath as string, 60); } catch (e) { console.warn("[getAttendanceRecord] Failed to refresh checkOutPhoto URL:", e); }
+    }
+
+    return { record: { id: snap.id, ...record } };
   }
 );
 
@@ -133,6 +144,17 @@ export const deleteAttendanceRecord = onCall(
 
     const id = cleanString(request.data?.id);
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await companyRef(companyId).collection("attendanceRecords").doc(id).get();
+    if (snap.exists) {
+      const data = snap.data() || {};
+      if (data.checkInPhotoStoragePath) {
+        try { await deleteStorageObject(data.checkInPhotoStoragePath as string); } catch (e) { console.warn("[deleteAttendanceRecord] Failed to delete checkInPhoto:", e); }
+      }
+      if (data.checkOutPhotoStoragePath) {
+        try { await deleteStorageObject(data.checkOutPhotoStoragePath as string); } catch (e) { console.warn("[deleteAttendanceRecord] Failed to delete checkOutPhoto:", e); }
+      }
+    }
 
     await companyRef(companyId).collection("attendanceRecords").doc(id).delete();
     return { deleted: true };
@@ -256,7 +278,13 @@ export const getAttendanceEvent = onCall(
 
     const snap = await companyRef(companyId).collection("attendanceEvents").doc(id).get();
     if (!snap.exists) throw new HttpsError("not-found", "Evento no encontrado");
-    return { event: { id: snap.id, ...snap.data() } };
+    const eventData = snap.data() || {};
+
+    if (eventData.photoStoragePath) {
+      try { eventData.photoUrl = await getSignedDownloadUrl(eventData.photoStoragePath as string, 60); } catch (e) { console.warn("[getAttendanceEvent] Failed to refresh photoUrl:", e); }
+    }
+
+    return { event: { id: snap.id, ...eventData } };
   }
 );
 
@@ -270,6 +298,14 @@ export const deleteAttendanceEvent = onCall(
 
     const id = cleanString(request.data?.id);
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await companyRef(companyId).collection("attendanceEvents").doc(id).get();
+    if (snap.exists) {
+      const data = snap.data() || {};
+      if (data.photoStoragePath) {
+        try { await deleteStorageObject(data.photoStoragePath as string); } catch (e) { console.warn("[deleteAttendanceEvent] Failed to delete photo:", e); }
+      }
+    }
 
     await companyRef(companyId).collection("attendanceEvents").doc(id).delete();
     return { deleted: true };

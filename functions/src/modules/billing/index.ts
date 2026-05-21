@@ -14,3 +14,4 @@ export {
   getBillingReferenceData,
 } from "./billingReadService";
 export { uploadCafRange, getNextFolio } from "./cafService";
+export { generateInvoicePdf, getInvoicePdfUrl } from "./billingPdfService";

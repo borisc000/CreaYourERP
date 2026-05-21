@@ -14,6 +14,7 @@ import { db } from "../../config";
 import { assertAction } from "../../shared/rbac";
 import { toCents, taxFromSubtotalCents } from "../../shared/money";
 import { simulateSiiSubmission } from "./siiProviderService";
+import { deleteStorageObject } from "../../shared/storageService";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -521,6 +522,11 @@ export const deleteBillingDocument = onCall(
       const data = snap.data() as any;
       if (data.status === "issued" || data.siiStatus === "accepted") {
         throw new HttpsError("failed-precondition", "No se pueden eliminar documentos emitidos o aceptados por el SII");
+      }
+
+      // Delete PDF from Storage if exists
+      if (data.pdfStoragePath) {
+        try { await deleteStorageObject(data.pdfStoragePath); } catch (e) { console.warn("[deleteBillingDocument] Failed to delete PDF from storage:", e); }
       }
 
       const batch = db.batch();

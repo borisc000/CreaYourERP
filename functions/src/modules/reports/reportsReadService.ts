@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { getSignedDownloadUrl, deleteStorageObject } from "../../shared/storageService";
 import { assertAction } from "../../shared/rbac";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
@@ -85,6 +86,17 @@ export const deleteReport = onCall(
       ref.collection("reportPhotos").where("reportId", "==", id).limit(500).get(),
     ]);
 
+    // Delete photos from Storage first
+    for (const doc of photosSnap.docs) {
+      const photoData = doc.data();
+      if (photoData.storagePath) {
+        try { await deleteStorageObject(photoData.storagePath); } catch (e) { console.warn("[deleteReport] Failed to delete photo from storage:", e); }
+      }
+      if (photoData.thumbnailStoragePath && photoData.thumbnailStoragePath !== photoData.storagePath) {
+        try { await deleteStorageObject(photoData.thumbnailStoragePath); } catch (e) { console.warn("[deleteReport] Failed to delete thumbnail from storage:", e); }
+      }
+    }
+
     const batch = db.batch();
     for (const doc of checkpointsSnap.docs) batch.delete(doc.ref);
     for (const doc of photosSnap.docs) batch.delete(doc.ref);
@@ -153,6 +165,18 @@ export const deleteCheckpoint = onCall(
 
     const ref = companyRef(companyId);
     const photosSnap = await ref.collection("reportPhotos").where("checkpointId", "==", id).limit(500).get();
+
+    // Delete photos from Storage
+    for (const doc of photosSnap.docs) {
+      const photoData = doc.data();
+      if (photoData.storagePath) {
+        try { await deleteStorageObject(photoData.storagePath); } catch (e) { console.warn("[deleteCheckpoint] Failed to delete photo from storage:", e); }
+      }
+      if (photoData.thumbnailStoragePath && photoData.thumbnailStoragePath !== photoData.storagePath) {
+        try { await deleteStorageObject(photoData.thumbnailStoragePath); } catch (e) { console.warn("[deleteCheckpoint] Failed to delete thumbnail from storage:", e); }
+      }
+    }
+
     const batch = db.batch();
     for (const doc of photosSnap.docs) batch.delete(doc.ref);
     batch.delete(ref.collection("reportCheckpoints").doc(id));
@@ -201,7 +225,25 @@ export const getReportPhoto = onCall(
 
     const snap = await companyRef(companyId).collection("reportPhotos").doc(id).get();
     if (!snap.exists) throw new HttpsError("not-found", "Foto no encontrada");
-    return { photo: { id: snap.id, ...snap.data() } };
+    const photo = snap.data() || {};
+
+    // Refresh signed URLs if stored in Storage
+    if (photo.storagePath) {
+      try {
+        photo.photoUrl = await getSignedDownloadUrl(photo.storagePath, 60);
+      } catch (e) {
+        console.warn("[getReportPhoto] Failed to refresh signed URL:", e);
+      }
+    }
+    if (photo.thumbnailStoragePath) {
+      try {
+        photo.thumbnailUrl = await getSignedDownloadUrl(photo.thumbnailStoragePath, 60);
+      } catch (e) {
+        console.warn("[getReportPhoto] Failed to refresh thumbnail URL:", e);
+      }
+    }
+
+    return { photo: { id: snap.id, ...photo } };
   }
 );
 
@@ -232,6 +274,15 @@ export const deleteReportPhoto = onCall(
 
     const id = cleanString(request.data?.id);
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await companyRef(companyId).collection("reportPhotos").doc(id).get();
+    if (snap.exists) {
+      const data = snap.data() || {};
+      if (data.storagePath) await deleteStorageObject(data.storagePath);
+      if (data.thumbnailStoragePath && data.thumbnailStoragePath !== data.storagePath) {
+        await deleteStorageObject(data.thumbnailStoragePath);
+      }
+    }
 
     await companyRef(companyId).collection("reportPhotos").doc(id).delete();
     return { deleted: true };

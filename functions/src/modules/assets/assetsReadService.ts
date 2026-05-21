@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { uploadBase64ToStorage, deleteStorageObject } from "../../shared/storageService";
 import { assertAction } from "../../shared/rbac";
 
 const cors = [
@@ -322,15 +323,32 @@ export const createAssetDocument = onCall(
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "assets.edit", { companyId });
 
-    const { assetId, docType, name, fileUrl, fileName, notes, validFrom, validUntil } = request.data;
+    const { assetId, docType, name, fileUrl, fileBase64, fileName, mimeType, notes, validFrom, validUntil } = request.data;
     if (!assetId || !docType || !name) throw new HttpsError("invalid-argument", "assetId, docType y name son requeridos");
 
+    let finalFileUrl = fileUrl || "";
+    let storagePath = "";
+    let finalFileName = fileName || "";
+
+    if (fileBase64 && typeof fileBase64 === "string") {
+      const contentType = mimeType || "application/octet-stream";
+      finalFileName = fileName || `document_${Date.now()}`;
+      const uploadResult = await uploadBase64ToStorage(
+        companyId,
+        fileBase64,
+        `assets/${assetId}/documents/${Date.now()}_${finalFileName}`,
+        contentType
+      );
+      finalFileUrl = uploadResult.downloadUrl;
+      storagePath = uploadResult.storagePath;
+    }
+
     const ref = await db.collection("companies").doc(companyId).collection("assetDocuments").add({
-      companyId, assetId, docType, name, fileUrl: fileUrl || "", fileName: fileName || "",
-      notes: notes || "", validFrom: validFrom || "", validUntil: validUntil || "",
+      companyId, assetId, docType, name, fileUrl: finalFileUrl, fileName: finalFileName,
+      storagePath, notes: notes || "", validFrom: validFrom || "", validUntil: validUntil || "",
       createdAt: nowIso(), updatedAt: nowIso(),
     });
-    return { id: ref.id };
+    return { id: ref.id, fileUrl: finalFileUrl, storagePath };
   }
 );
 
@@ -344,6 +362,14 @@ export const deleteAssetDocument = onCall(
 
     const id = cleanString(request.data?.id);
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
+
+    const snap = await db.collection("companies").doc(companyId).collection("assetDocuments").doc(id).get();
+    if (snap.exists) {
+      const data = snap.data() || {};
+      if (data.storagePath) {
+        try { await deleteStorageObject(data.storagePath); } catch (e) { console.warn("[deleteAssetDocument] Failed to delete from storage:", e); }
+      }
+    }
 
     await db.collection("companies").doc(companyId).collection("assetDocuments").doc(id).delete();
     return { deleted: true };

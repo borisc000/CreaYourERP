@@ -261,6 +261,10 @@ export const SERVICE_ACTIONS = [
   "tasks.create",
   "tasks.edit",
   "tasks.delete",
+  // Storage
+  "storage.upload",
+  "storage.download",
+  "storage.delete",
 ] as const;
 
 export type ServiceAction = (typeof SERVICE_ACTIONS)[number];
@@ -525,6 +529,10 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "tasks.create": ["tasks"],
   "tasks.edit": ["tasks"],
   "tasks.delete": ["tasks"],
+  // Storage
+  "storage.upload": ["system"],
+  "storage.download": ["system"],
+  "storage.delete": ["system"],
 };
 
 // ==========================================

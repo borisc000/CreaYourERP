@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
+import { uploadBase64ToStorage, deleteStorageObject } from "../../shared/storageService";
 
 const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function companyRef(companyId: string) { return db.collection("companies").doc(companyId); }
@@ -74,16 +75,36 @@ export const addTaskAttachment = onCall(
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     await assertAction(request, "tasks.edit", { companyId });
 
-    const { taskId, fileName, fileUrl, fileSize, mimeType } = request.data;
-    if (!taskId || !fileName || !fileUrl) throw new HttpsError("invalid-argument", "taskId, fileName y fileUrl son requeridos");
+    const { taskId, fileName, fileUrl, fileBase64, fileSize, mimeType } = request.data;
+    if (!taskId || !fileName) throw new HttpsError("invalid-argument", "taskId y fileName son requeridos");
+    if (!fileUrl && !fileBase64) throw new HttpsError("invalid-argument", "fileUrl o fileBase64 requerido");
 
     const taskRef = companyRef(companyId).collection("tasks").doc(taskId);
     const snap = await taskRef.get();
     if (!snap.exists) throw new HttpsError("not-found", "Tarea no encontrada");
 
+    let finalFileUrl = fileUrl || "";
+    let storagePath = "";
+
+    // If base64 provided, upload to Storage
+    if (fileBase64 && typeof fileBase64 === "string") {
+      const contentType = mimeType || "application/octet-stream";
+      const uploadResult = await uploadBase64ToStorage(
+        companyId,
+        fileBase64,
+        `tasks/${taskId}/attachments/${Date.now()}_${fileName}`,
+        contentType
+      );
+      finalFileUrl = uploadResult.downloadUrl;
+      storagePath = uploadResult.storagePath;
+    }
+
+    if (!finalFileUrl) throw new HttpsError("invalid-argument", "No se pudo obtener fileUrl");
+
     const attachment = {
       id: db.collection("companies").doc().id,
-      taskId, fileName, fileUrl,
+      taskId, fileName, fileUrl: finalFileUrl,
+      storagePath,
       fileSize: Number(fileSize) || 0,
       mimeType: mimeType || "",
       uploadedBy: request.auth?.uid || "",
@@ -95,7 +116,7 @@ export const addTaskAttachment = onCall(
     attachments.push(attachment);
 
     await taskRef.update({ attachments, updatedAt: nowIso() });
-    return { added: true, attachmentId: attachment.id };
+    return { added: true, attachmentId: attachment.id, fileUrl: finalFileUrl, storagePath };
   }
 );
 
@@ -116,8 +137,14 @@ export const removeTaskAttachment = onCall(
 
     const current = snap.data() || {};
     const attachments = Array.isArray(current.attachments) ? current.attachments : [];
-    const filtered = attachments.filter((a: any) => a.id !== attachmentId);
+    const attachmentToRemove = attachments.find((a: any) => a.id === attachmentId);
 
+    // Delete from Storage if applicable
+    if (attachmentToRemove?.storagePath) {
+      try { await deleteStorageObject(attachmentToRemove.storagePath); } catch (e) { console.warn("[removeTaskAttachment] Failed to delete from storage:", e); }
+    }
+
+    const filtered = attachments.filter((a: any) => a.id !== attachmentId);
     await taskRef.update({ attachments: filtered, updatedAt: nowIso() });
     return { removed: true };
   }

@@ -67,6 +67,12 @@ export { createInitialCompany };
 export const checkPlanLimits = enforcePlanLimits;
 
 // ==========================================
+// SHARED STORAGE SERVICE
+// ==========================================
+
+export { getSignedUploadUrl, getSignedDownloadUrlCallable, deleteStorageObjectCallable } from "./shared/storageService";
+
+// ==========================================
 // QUOTES MODULE
 // ==========================================
 
@@ -525,7 +531,7 @@ export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs, listMailAccoun
 // BILLING MODULE
 // ==========================================
 
-export { getBillingDashboard, createBillingDocument, updateBillingDocument, deleteBillingDocument, simulateSii, registerPayment, sendDocumentToCustomer, uploadCafRange, getNextFolio, listBillingDocuments, getBillingDocument, duplicateBillingDocument, getBillingReferenceData } from "./modules/billing";
+export { getBillingDashboard, createBillingDocument, updateBillingDocument, deleteBillingDocument, simulateSii, registerPayment, sendDocumentToCustomer, uploadCafRange, getNextFolio, listBillingDocuments, getBillingDocument, duplicateBillingDocument, getBillingReferenceData, generateInvoicePdf, getInvoicePdfUrl } from "./modules/billing";
 
 // ==========================================
 // EXPENSES MODULE

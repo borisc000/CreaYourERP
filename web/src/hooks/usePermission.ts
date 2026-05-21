@@ -222,7 +222,11 @@ type ServiceAction =
   | "suppliers.view"
   | "suppliers.create"
   | "suppliers.edit"
-  | "suppliers.delete";
+  | "suppliers.delete"
+  // Storage
+  | "storage.upload"
+  | "storage.download"
+  | "storage.delete";
 
 const moduleMap: Record<ServiceAction, string[]> = {
   "service.view_internal": ["crm", "reports", "finance", "expenses", "safety", "accreditation", "document_center"],
@@ -439,6 +443,10 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "cross_correspondence.edit": ["document_center"],
   "cross_correspondence.send_for_signature": ["document_center"],
   "cross_correspondence.deliver": ["document_center"],
+  // Storage
+  "storage.upload": ["system"],
+  "storage.download": ["system"],
+  "storage.delete": ["system"],
 };
 
 function fallbackModulesForRole(role: string | null): string[] {
