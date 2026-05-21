@@ -181,7 +181,48 @@ type ServiceAction =
   | "cross_correspondence.create"
   | "cross_correspondence.edit"
   | "cross_correspondence.send_for_signature"
-  | "cross_correspondence.deliver";
+  | "cross_correspondence.deliver"
+  // Tasks
+  | "tasks.view"
+  | "tasks.create"
+  | "tasks.edit"
+  | "tasks.delete"
+  // Mail
+  | "mail.view"
+  | "mail.edit"
+  | "mail.create"
+  // Notifications
+  | "notifications.view"
+  | "notifications.manage"
+  // Riohs
+  | "riohs.view"
+  | "riohs.create"
+  | "riohs.edit"
+  | "riohs.delete"
+  // Inventory
+  | "inventory.view"
+  | "inventory.create"
+  | "inventory.edit"
+  | "inventory.delete"
+  // Rentals
+  | "rentals.view"
+  | "rentals.create"
+  | "rentals.edit"
+  | "rentals.delete"
+  | "rentals.manage_guarantees"
+  | "rentals.view_timeline"
+  | "rentals.create_backup"
+  | "rentals.recompute_allocations"
+  // Planning
+  | "planning.view"
+  | "planning.create"
+  | "planning.edit"
+  | "planning.delete"
+  // Suppliers
+  | "suppliers.view"
+  | "suppliers.create"
+  | "suppliers.edit"
+  | "suppliers.delete";
 
 const moduleMap: Record<ServiceAction, string[]> = {
   "service.view_internal": ["crm", "reports", "finance", "expenses", "safety", "accreditation", "document_center"],
@@ -318,6 +359,47 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "safety_activities.create": ["safety"],
   "safety_activities.edit": ["safety"],
   "safety_activities.delete": ["safety"],
+  // Tasks
+  "tasks.view": ["tasks"],
+  "tasks.create": ["tasks"],
+  "tasks.edit": ["tasks"],
+  "tasks.delete": ["tasks"],
+  // Mail
+  "mail.view": ["mail"],
+  "mail.edit": ["mail"],
+  "mail.create": ["mail"],
+  // Notifications
+  "notifications.view": ["system"],
+  "notifications.manage": ["system"],
+  // Riohs
+  "riohs.view": ["safety"],
+  "riohs.create": ["safety"],
+  "riohs.edit": ["safety"],
+  "riohs.delete": ["safety"],
+  // Inventory
+  "inventory.view": ["inventory"],
+  "inventory.create": ["inventory"],
+  "inventory.edit": ["inventory"],
+  "inventory.delete": ["inventory"],
+  // Rentals
+  "rentals.view": ["rentals"],
+  "rentals.create": ["rentals"],
+  "rentals.edit": ["rentals"],
+  "rentals.delete": ["rentals"],
+  "rentals.manage_guarantees": ["rentals"],
+  "rentals.view_timeline": ["rentals"],
+  "rentals.create_backup": ["rentals"],
+  "rentals.recompute_allocations": ["rentals"],
+  // Planning
+  "planning.view": ["planning"],
+  "planning.create": ["planning"],
+  "planning.edit": ["planning"],
+  "planning.delete": ["planning"],
+  // Suppliers
+  "suppliers.view": ["suppliers"],
+  "suppliers.create": ["suppliers"],
+  "suppliers.edit": ["suppliers"],
+  "suppliers.delete": ["suppliers"],
   // Recruitment
   "recruitment.view": ["hr"],
   // Payroll

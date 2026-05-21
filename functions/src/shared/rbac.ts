@@ -240,6 +240,7 @@ export const SERVICE_ACTIONS = [
   "riohs.view",
   "riohs.create",
   "riohs.edit",
+  "riohs.delete",
   // Safety Activities
   "safety_activities.view",
   "safety_activities.create",
@@ -503,6 +504,7 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "riohs.view": ["safety"],
   "riohs.create": ["safety"],
   "riohs.edit": ["safety"],
+  "riohs.delete": ["safety"],
   // Safety Activities
   "safety_activities.view": ["safety"],
   "safety_activities.create": ["safety"],

@@ -494,7 +494,7 @@ export { getSupplierDashboard, createSupplier, updateSupplier, deleteSupplier, l
 // RIOHS MODULE
 // ==========================================
 
-export { saveRiohsConfig, getRiohsConfig, generateRiohsDocument } from "./modules/riohs";
+export { saveRiohsConfig, getRiohsConfig, generateRiohsDocument, getRiohsConfigById, deleteRiohsConfig } from "./modules/riohs";
 
 // ==========================================
 // ATTENDANCE MODULE
@@ -507,7 +507,7 @@ export { onAttendanceEventCreated } from "./modules/attendance";
 // TASKS MODULE
 // ==========================================
 
-export { createTask, updateTask, completeTask, deleteTask } from "./modules/tasks";
+export { createTask, updateTask, completeTask, deleteTask, listTasks, getTask, addTaskAttachment, removeTaskAttachment } from "./modules/tasks";
 
 // ==========================================
 // ASSETS MODULE
@@ -519,7 +519,7 @@ export { getAssetDashboard, createAsset, updateAsset, deleteAsset, createAssetMa
 // MAIL MODULE
 // ==========================================
 
-export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs } from "./modules/mail";
+export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs, listMailAccounts, getMailAccount, deleteMailAccount, getEmailLog, deleteEmailLog, testMailConnection } from "./modules/mail";
 
 // ==========================================
 // BILLING MODULE
@@ -596,6 +596,7 @@ export { getReportDashboard, createReport, updateReport, closeReport, createChec
 export { getNotificationDashboard, createNotificationTemplate, updateNotificationTemplate, sendNotification, saveNotificationPreference } from "./modules/notifications";
 export { markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, getUnreadNotificationCount } from "./modules/notifications";
 export { onSignatureRequestCreated, onBillingDocumentSiiAccepted, onSafetyMatrixGenerated } from "./modules/notifications";
+export { listNotificationTemplates, getNotificationTemplate, deleteNotificationTemplate, listNotificationLogs, getNotificationLog, listNotifications, getNotification, listNotificationPreferences, getNotificationPreference, deleteNotificationPreference } from "./modules/notifications";
 
 // ==========================================
 // GOOGLE WORKSPACE MODULE
