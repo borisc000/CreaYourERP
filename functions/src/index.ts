@@ -482,13 +482,13 @@ export { createMultiSignerRequest, sendNextSignatureInvitation } from "./modules
 // INVENTORY MODULE
 // ==========================================
 
-export { getInventoryDashboard, createInventoryItem, updateInventoryItem, deleteInventoryItem, createInventoryMovement, createInventoryBackup } from "./modules/inventory";
+export { getInventoryDashboard, createInventoryItem, updateInventoryItem, deleteInventoryItem, createInventoryMovement, createInventoryBackup, listInventoryItems, getInventoryItem, listInventoryMovements, getInventoryMovement, listInventoryBackups, getInventoryBackup, deleteInventoryBackup, getInventoryReferenceData } from "./modules/inventory";
 
 // ==========================================
 // SUPPLIERS MODULE
 // ==========================================
 
-export { getSupplierDashboard, createSupplier, updateSupplier, deleteSupplier } from "./modules/suppliers";
+export { getSupplierDashboard, createSupplier, updateSupplier, deleteSupplier, listSuppliers, getSupplier, getSupplierReferenceData } from "./modules/suppliers";
 
 // ==========================================
 // RIOHS MODULE
@@ -537,13 +537,13 @@ export { getExpenseDashboard, createExpenseRecord, updateExpenseRecord, deleteEx
 // RENTALS MODULE
 // ==========================================
 
-export { getRentalDashboard, createRentalAsset, updateRentalAsset, createRentalContract, updateRentalContract, dispatchRentalContract, returnRentalContract, closeRentalContract, createRentalGuarantee, updateRentalGuarantee, deleteRentalGuarantee, createRentalEvent, getRentalTimeline, createRentalBackup, recomputeAssetAllocations } from "./modules/rentals";
+export { getRentalDashboard, createRentalAsset, updateRentalAsset, createRentalContract, updateRentalContract, dispatchRentalContract, returnRentalContract, closeRentalContract, createRentalGuarantee, updateRentalGuarantee, deleteRentalGuarantee, createRentalEvent, getRentalTimeline, createRentalBackup, recomputeAssetAllocations, listRentalAssets, getRentalAsset, deleteRentalAsset, listRentalContracts, getRentalContract, deleteRentalContract, listRentalContractLines, listRentalGuarantees, getRentalGuarantee, listRentalBackups, getRentalBackup, deleteRentalBackup, listRentalEvents, getRentalReferenceData } from "./modules/rentals";
 
 // ==========================================
 // PLANNING MODULE
 // ==========================================
 
-export { getPlanningDashboard, createPlanningBudget, updatePlanningBudget, createBudgetLine, updateBudgetLine, deleteBudgetLine } from "./modules/planning";
+export { getPlanningDashboard, createPlanningBudget, updatePlanningBudget, createBudgetLine, updateBudgetLine, deleteBudgetLine, listPlanningBudgets, getPlanningBudget, deletePlanningBudget, listBudgetLines, getBudgetLine, getPlanningReferenceData } from "./modules/planning";
 
 // ==========================================
 // RECRUITMENT MODULE

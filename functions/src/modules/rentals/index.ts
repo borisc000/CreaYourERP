@@ -15,3 +15,19 @@ export {
   createRentalBackup,
   recomputeAssetAllocations,
 } from "./rentalService";
+export {
+  listRentalAssets,
+  getRentalAsset,
+  deleteRentalAsset,
+  listRentalContracts,
+  getRentalContract,
+  deleteRentalContract,
+  listRentalContractLines,
+  listRentalGuarantees,
+  getRentalGuarantee,
+  listRentalBackups,
+  getRentalBackup,
+  deleteRentalBackup,
+  listRentalEvents,
+  getRentalReferenceData,
+} from "./rentalsReadService";
