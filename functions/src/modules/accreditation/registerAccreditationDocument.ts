@@ -18,6 +18,8 @@ export interface RegisterAccreditationDocumentInput {
   notes?: string;
   serviceOrderId?: string;
   signatureRequestId?: string;
+  verifiedBy?: string | null;
+  verifiedByName?: string | null;
 }
 
 export async function registerAccreditationDocument(
@@ -38,6 +40,8 @@ export async function registerAccreditationDocument(
     notes,
     serviceOrderId,
     signatureRequestId,
+    verifiedBy,
+    verifiedByName,
   } = input;
 
   if (!VALID_VERIFICATION_STATUSES.has(verificationStatus)) {
@@ -61,7 +65,7 @@ export async function registerAccreditationDocument(
 
   const now = new Date().toISOString();
 
-  const baseData = {
+  const baseData: any = {
     companyId,
     employeeId,
     type: "requirement" as const,
@@ -85,6 +89,12 @@ export async function registerAccreditationDocument(
     notes: notes || null,
     updatedAt: now,
   };
+
+  if (verifiedBy) {
+    baseData.verifiedBy = verifiedBy;
+    baseData.verifiedByName = verifiedByName || null;
+    baseData.verifiedAt = now;
+  }
 
   if (!existingSnap.empty) {
     const doc = existingSnap.docs[0];

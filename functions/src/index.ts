@@ -34,6 +34,7 @@ import { detectGaps } from "./modules/accreditation/detectGaps";
 import { triggerDocumentGeneration } from "./modules/accreditation/triggerDocumentGeneration";
 import { bulkAssignCrew } from "./modules/accreditation/bulkAssignCrew";
 import { checkExpiringDocuments } from "./modules/accreditation/checkExpiringDocuments";
+import { verifyAccreditationDocument } from "./modules/accreditation/verifyAccreditationDocument";
 import { onEmployeeHired } from "./modules/hr/onEmployeeHired";
 import { createEmployee } from "./modules/hr/createEmployee";
 import { updateEmployee } from "./modules/hr/updateEmployee";
@@ -154,6 +155,7 @@ export { detectGaps };
 export { triggerDocumentGeneration };
 export { bulkAssignCrew };
 export { checkExpiringDocuments };
+export { verifyAccreditationDocument };
 export { scheduledCheckExpiringDocuments } from "./modules/accreditation/scheduledCheckExpiring";
 export {
   listServiceOrders,
@@ -301,18 +303,29 @@ export const onContractUpdated = onDocumentUpdated(
       const employeeRef = db.collection("companies").doc(companyId).collection("employees").doc(employeeId);
 
       if (newStatus === "active") {
-        await employeeRef.update({
+        const employeeSnap = await employeeRef.get();
+        const employeeData = employeeSnap.data() || {};
+        const previousEmployeeStatus = employeeData.status || "draft";
+
+        const updates: any = {
           hireDate: after.startDate || null,
-          status: "active",
           baseSalary: after.salaryAmount || null,
           updatedAt: now,
-        });
+        };
+
+        // Solo cambiar a active si viene de draft, onboarding o leave
+        const canActivate = ["draft", "onboarding", "leave"].includes(previousEmployeeStatus);
+        if (canActivate) {
+          updates.status = "active";
+        }
+
+        await employeeRef.update(updates);
         await db.collection("companies").doc(companyId).collection("employmentStatusEvents").add({
           companyId,
           employeeId,
           eventType: "hired",
-          previousStatus: oldStatus,
-          newStatus: "active",
+          previousStatus: previousEmployeeStatus,
+          newStatus: canActivate ? "active" : previousEmployeeStatus,
           reason: `Contrato ${contractId} activado vía trigger`,
           effectiveDate: after.startDate || now,
           processedBy: "system",
@@ -419,6 +432,7 @@ export { saveTerminationRecord };
 export { saveJobProfile } from "./modules/hr/saveJobProfile";
 export { deleteJobProfile } from "./modules/hr/deleteJobProfile";
 export { saveJobProfileRisk, deleteJobProfileRisk, saveJobProfileRiskLink, deleteJobProfileRiskLink, getJobProfileComplete } from "./modules/hr/jobProfileRiskService";
+export { getEmployeeJobProfileMatrix, getBulkEmployeeJobProfileMatrices } from "./modules/hr/getEmployeeJobProfileMatrix";
 
 // ==========================================
 // SAFETY MODULE
@@ -476,6 +490,7 @@ export { approveGeneratedDocument, reviewGeneratedDocument, sendGeneratedDocumen
 export { mergeDocumentTemplate } from "./modules/documentCenter/mergeTemplate";
 export { onSignatureRequestUpdated } from "./modules/documentCenter/syncSignature";
 export { extractTemplatePlaceholders } from "./modules/documentCenter/extractPlaceholders";
+export { suggestPlaceholderMapping } from "./modules/documentCenter/suggestPlaceholderMapping";
 
 // ==========================================
 // SIGNATURE MODULE
@@ -549,7 +564,7 @@ export { getRentalDashboard, createRentalAsset, updateRentalAsset, createRentalC
 // PLANNING MODULE
 // ==========================================
 
-export { getPlanningDashboard, createPlanningBudget, updatePlanningBudget, createBudgetLine, updateBudgetLine, deleteBudgetLine, listPlanningBudgets, getPlanningBudget, deletePlanningBudget, listBudgetLines, getBudgetLine, getPlanningReferenceData } from "./modules/planning";
+export { getPlanningDashboard, createPlanningBudget, updatePlanningBudget, createBudgetLine, updateBudgetLine, deleteBudgetLine, registerActualAmount, registerCommittedAmount, listPlanningBudgets, getPlanningBudget, deletePlanningBudget, listBudgetLines, getBudgetLine, getPlanningReferenceData } from "./modules/planning";
 
 // ==========================================
 // RECRUITMENT MODULE

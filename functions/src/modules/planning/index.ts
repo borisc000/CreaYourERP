@@ -5,6 +5,8 @@ export {
   createBudgetLine,
   updateBudgetLine,
   deleteBudgetLine,
+  registerActualAmount,
+  registerCommittedAmount,
 } from "./planningService";
 export {
   listPlanningBudgets,
