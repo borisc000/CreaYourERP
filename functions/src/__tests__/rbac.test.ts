@@ -33,6 +33,11 @@ describe("RBAC — actionAllowed", () => {
     expect(actionAllowed(userNoModulesCtx, "quote.create")).toBe(false);
   });
 
+  it("profile actions are allowed for authenticated users", () => {
+    expect(actionAllowed(userNoModulesCtx, "profile.view")).toBe(true);
+    expect(actionAllowed(userNoModulesCtx, "profile.edit")).toBe(true);
+  });
+
   it("user with allowedModules fallback gets module access", () => {
     expect(actionAllowed(userWithModulesCtx, "hr.manage_contracts")).toBe(true);
   });

@@ -184,7 +184,7 @@ export const restoreExpenseBackup = onCall(
 
     for (const item of snapshot) {
       const newRef = expensesRef.doc();
-      const { id: originalId, createdAt, updatedAt, ...rest } = item;
+      const { id: _originalId, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = item;
       batch.set(newRef, {
         ...rest,
         companyId,

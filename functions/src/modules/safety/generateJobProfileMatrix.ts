@@ -91,7 +91,7 @@ export const generateJobProfileMatrix = onCall(
         .get();
 
       const activityBlockIds = activityLinksSnap.docs.map((d) => d.data().activityBlockId as string).filter(Boolean);
-      let activityBlocks: any[] = [];
+      const activityBlocks: any[] = [];
       if (activityBlockIds.length > 0) {
         // Fetch in chunks of 10 (Firestore "in" limit)
         for (let i = 0; i < activityBlockIds.length; i += 10) {

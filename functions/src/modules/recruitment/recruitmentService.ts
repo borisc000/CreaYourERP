@@ -442,7 +442,7 @@ export const calculateCandidateScore = onCall(
       .get();
 
     const applicationIds = applicationsSnap.docs.map((d) => d.id);
-    let interviewScores: number[] = [];
+    const interviewScores: number[] = [];
 
     if (applicationIds.length > 0) {
       // Firestore "in" query limited to 10; chunk if needed

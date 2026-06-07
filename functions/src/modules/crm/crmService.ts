@@ -926,33 +926,33 @@ export const crmPublicMirror = onCall({ region, cors: crmCors }, async (request)
     },
     lead: lead
       ? {
-          id: lead.id,
-          title: lead.title,
-          projectCode: lead.projectCode,
-          expectedRevenue: lead.expectedRevenue,
-          probability: lead.probability,
-          status: lead.status,
-          expectedCloseDate: lead.expectedCloseDate,
-        }
+        id: lead.id,
+        title: lead.title,
+        projectCode: lead.projectCode,
+        expectedRevenue: lead.expectedRevenue,
+        probability: lead.probability,
+        status: lead.status,
+        expectedCloseDate: lead.expectedCloseDate,
+      }
       : null,
     customer: customer
       ? {
-          id: customer.id,
-          name: customer.name,
-          legalName: customer.legalName,
-          taxId: customer.taxId,
-          email: customer.email,
-          phone: customer.phone,
-        }
+        id: customer.id,
+        name: customer.name,
+        legalName: customer.legalName,
+        taxId: customer.taxId,
+        email: customer.email,
+        phone: customer.phone,
+      }
       : null,
     mandante: mandante
       ? {
-          id: mandante.id,
-          name: mandante.name,
-          email: mandante.email,
-          phone: mandante.phone,
-          position: mandante.position,
-        }
+        id: mandante.id,
+        name: mandante.name,
+        email: mandante.email,
+        phone: mandante.phone,
+        position: mandante.position,
+      }
       : null,
     serviceType: serviceType ? { id: serviceType.id, name: serviceType.name } : null,
     documents,

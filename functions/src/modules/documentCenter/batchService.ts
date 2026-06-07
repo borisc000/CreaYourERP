@@ -56,8 +56,8 @@ async function generateForEmployee(
 
     if (template.sourceFormat === "docx" && template.storagePath) {
       // DOCX merge
-      const Docxtemplater = require("docxtemplater");
-      const PizZip = require("pizzip");
+      const { default: Docxtemplater } = await import("docxtemplater");
+      const { default: PizZip } = await import("pizzip");
 
       const [templateBuffer] = await bucket.file(template.storagePath).download();
       const mergeData: Record<string, any> = {

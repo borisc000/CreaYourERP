@@ -93,10 +93,10 @@ async function callOpenAI(
   const text = String(data.choices?.[0]?.message?.content ?? "").trim();
   const usage = data.usage
     ? {
-        promptTokens: data.usage.prompt_tokens,
-        completionTokens: data.usage.completion_tokens,
-        totalTokens: data.usage.total_tokens,
-      }
+      promptTokens: data.usage.prompt_tokens,
+      completionTokens: data.usage.completion_tokens,
+      totalTokens: data.usage.total_tokens,
+    }
     : undefined;
 
   return { ok: true, text, usage, raw: data };
@@ -144,10 +144,10 @@ async function callAnthropic(
   const text = String(data.content?.[0]?.text ?? "").trim();
   const usage = data.usage
     ? {
-        promptTokens: data.usage.input_tokens,
-        completionTokens: data.usage.output_tokens,
-        totalTokens: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0),
-      }
+      promptTokens: data.usage.input_tokens,
+      completionTokens: data.usage.output_tokens,
+      totalTokens: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0),
+    }
     : undefined;
 
   return { ok: true, text, usage, raw: data };
@@ -190,10 +190,10 @@ async function callGemini(
   const text = String(data.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
   const usage = data.usageMetadata
     ? {
-        promptTokens: data.usageMetadata.promptTokenCount,
-        completionTokens: data.usageMetadata.candidatesTokenCount,
-        totalTokens: data.usageMetadata.totalTokenCount,
-      }
+      promptTokens: data.usageMetadata.promptTokenCount,
+      completionTokens: data.usageMetadata.candidatesTokenCount,
+      totalTokens: data.usageMetadata.totalTokenCount,
+    }
     : undefined;
 
   return { ok: true, text, usage, raw: data };

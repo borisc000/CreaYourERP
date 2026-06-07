@@ -4,6 +4,8 @@ import { getFirestore } from "firebase-admin/firestore";
 
 let app: App | undefined;
 
+const TEST_PRIVATE_KEY = process.env.FIREBASE_TEST_PRIVATE_KEY || "test-private-key-placeholder";
+
 export function getTestApp(): App {
   if (!app) {
     app = initializeApp(
@@ -12,7 +14,7 @@ export function getTestApp(): App {
         credential: cert({
           projectId: "your-erp-staging",
           clientEmail: "firebase-adminsdk@test.iam.gserviceaccount.com",
-          privateKey: "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MQ0D0\n-----END RSA PRIVATE KEY-----\n",
+          privateKey: TEST_PRIVATE_KEY,
         }),
       },
       "test-app"

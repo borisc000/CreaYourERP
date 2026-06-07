@@ -615,6 +615,7 @@ function isKnownAction(action: string): action is ServiceAction {
 }
 
 export function actionAllowed(ctx: AuthContext, action: ServiceAction): boolean {
+  if (action === "profile.view" || action === "profile.edit") return true;
   if (adminRoles.has(ctx.role)) return true;
   if (ctx.serviceActions.includes(action)) return true;
 

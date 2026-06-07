@@ -126,8 +126,8 @@ export const scheduledCheckExpiringDocuments = onSchedule(
             docs.length === 1
               ? `${docs[0].requirementName} — vence el ${docs[0].validUntil}`
               : docs
-                  .map((d) => `• ${d.requirementName} (en ${d.daysRemaining} días)`)
-                  .join("\n");
+                .map((d) => `• ${d.requirementName} (en ${d.daysRemaining} días)`)
+                .join("\n");
 
           const notifRef = notificationsRef.doc();
           batch.set(notifRef, {

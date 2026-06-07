@@ -501,6 +501,7 @@ export function usePermission() {
   const { role, allowedModules, serviceActions } = useAuth();
 
   function hasPermission(action: ServiceAction): boolean {
+    if (action === "profile.view" || action === "profile.edit") return true;
     if (adminRoles.has(role || "")) return true;
     if (serviceActions.includes(action)) return true;
 
