@@ -1,12 +1,50 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { onUserCreated } from "./auth/onUserCreate";
+import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
+import { createInitialCompany } from "./auth/onboarding";
 import { enforcePlanLimits } from "./billing/enforcePlanLimits";
 import { calculateQuoteTotal } from "./modules/quotes/calculateTotal";
 import { onQuoteAccepted } from "./modules/quotes/onQuoteAccepted";
 import { onQuoteCreated } from "./modules/quotes/onQuoteCreated";
+import { getQuoteExportData } from "./modules/quotes/exportData";
+import { getQuoteControl } from "./modules/quotes/getQuoteControl";
+import { createQuote } from "./modules/quotes/createQuote";
+import { updateQuote } from "./modules/quotes/updateQuote";
+import { sendQuote } from "./modules/quotes/sendQuote";
+import { acceptQuote } from "./modules/quotes/acceptQuote";
+import { rejectQuote } from "./modules/quotes/rejectQuote";
+import { cancelQuote } from "./modules/quotes/cancelQuote";
+import { deleteQuote } from "./modules/quotes/deleteQuote";
+import { saveCatalogItem } from "./modules/quotes/saveCatalogItem";
+import { deleteCatalogItem } from "./modules/quotes/deleteCatalogItem";
+import { saveQuoteTemplate } from "./modules/quotes/saveQuoteTemplate";
+import { deleteQuoteTemplate } from "./modules/quotes/deleteQuoteTemplate";
+import { createBillingDocumentFromQuote } from "./modules/billing/createFromQuote";
+import { exportSafetyMatrixPdf } from "./modules/safety/exportMatrixPdf";
+import { publishReportMirror } from "./modules/reports/publishMirror";
+import { exportSafetyMatrixXlsx } from "./modules/safety/exportMatrixXlsx";
+import { listQuoteTemplates } from "./modules/quotes/listQuoteTemplates";
 import { checkCrewCompliance } from "./modules/accreditation/checkCrewCompliance";
+import { createServiceOrder } from "./modules/accreditation/createServiceOrder";
+import { updateServiceOrder } from "./modules/accreditation/updateServiceOrder";
+import { assignCrewMember } from "./modules/accreditation/assignCrewMember";
+import { removeCrewMember } from "./modules/accreditation/removeCrewMember";
+import { authorizeCrew } from "./modules/accreditation/authorizeCrew";
+import { recomputeChecks } from "./modules/accreditation/recomputeChecks";
+import { detectGaps } from "./modules/accreditation/detectGaps";
+import { triggerDocumentGeneration } from "./modules/accreditation/triggerDocumentGeneration";
+import { bulkAssignCrew } from "./modules/accreditation/bulkAssignCrew";
+import { checkExpiringDocuments } from "./modules/accreditation/checkExpiringDocuments";
+import { verifyAccreditationDocument } from "./modules/accreditation/verifyAccreditationDocument";
 import { onEmployeeHired } from "./modules/hr/onEmployeeHired";
+import { createEmployee } from "./modules/hr/createEmployee";
+import { updateEmployee } from "./modules/hr/updateEmployee";
+import { createContract } from "./modules/hr/createContract";
+import { updateContract } from "./modules/hr/updateContract";
+import { deleteContract } from "./modules/hr/deleteContract";
+import { saveTimeOffRequest } from "./modules/hr/saveTimeOffRequest";
+import { approveTimeOffRequest } from "./modules/hr/approveTimeOffRequest";
+import { cancelTimeOffRequest } from "./modules/hr/cancelTimeOffRequest";
+import { saveTerminationRecord } from "./modules/hr/saveTerminationRecord";
 import { onLeadCreated } from "./modules/crm/generateProjectCode";
 import { onLeadUpdated } from "./modules/crm/activityLog";
 import { onLeadWon, ensureServiceSync } from "./modules/crm/ensureService";
@@ -15,12 +53,13 @@ import { seedSafetyCatalogs } from "./modules/safety/seedSafety";
 import { generateRiskMatrix } from "./modules/safety/generateRiskMatrix";
 import { refreshFolderMetrics } from "./modules/safety/refreshFolderMetrics";
 import { db } from "./config";
+import { cleanString } from "./modules/hr/hrService";
 
 // ==========================================
 // AUTH TRIGGERS
 // ==========================================
 
-export const onAuthUserCreated = onUserCreated;
+export { createInitialCompany };
 
 // ==========================================
 // BILLING / PLAN LIMITS
@@ -29,16 +68,41 @@ export const onAuthUserCreated = onUserCreated;
 export const checkPlanLimits = enforcePlanLimits;
 
 // ==========================================
+// SHARED STORAGE SERVICE
+// ==========================================
+
+export { getSignedUploadUrl, getSignedDownloadUrlCallable, deleteStorageObjectCallable } from "./shared/storageService";
+
+// ==========================================
 // QUOTES MODULE
 // ==========================================
 
 export { onQuoteAccepted };
 export { onQuoteCreated };
+export { getQuoteExportData };
+export { getQuoteControl };
+export { createQuote };
+export { updateQuote };
+export { sendQuote };
+export { acceptQuote };
+export { rejectQuote };
+export { cancelQuote };
+export { deleteQuote };
+export { saveCatalogItem };
+export { deleteCatalogItem };
+export { saveQuoteTemplate };
+export { deleteQuoteTemplate };
+export { listQuoteTemplates };
+export { createBillingDocumentFromQuote };
+export { exportSafetyMatrixPdf };
+export { publishReportMirror };
+export { generateReportPdf } from "./modules/reports/generateReportPdf";
+export { exportSafetyMatrixXlsx };
 
 export const onQuoteUpdated = onDocumentUpdated(
   {
     document: "companies/{companyId}/quotes/{quoteId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, quoteId } = event.params;
@@ -81,10 +145,35 @@ export const onQuoteUpdated = onDocumentUpdated(
 // ACCREDITATION MODULE
 // ==========================================
 
+export { createServiceOrder };
+export { updateServiceOrder };
+export { assignCrewMember };
+export { removeCrewMember };
+export { authorizeCrew };
+export { recomputeChecks };
+export { detectGaps };
+export { triggerDocumentGeneration };
+export { bulkAssignCrew };
+export { checkExpiringDocuments };
+export { verifyAccreditationDocument };
+export { listUsers, getUser, createUser, updateUser, deleteUser, inviteUser, getProfile, updateProfile } from "./modules/auth/userService";
+export { scheduledCheckExpiringDocuments } from "./modules/accreditation/scheduledCheckExpiring";
+export {
+  listServiceOrders,
+  getServiceOrder,
+  deleteServiceOrder,
+  listCrewAssignments,
+  getCrewAssignment,
+  deleteCrewAssignment,
+  getAccreditationCheckMatrix,
+  listDocumentGenerationRequests,
+  generateAllMissingDocuments,
+} from "./modules/accreditation/accreditationReadService";
+
 export const onCrewAssigned = onDocumentCreated(
   {
     document: "companies/{companyId}/crewAssignments/{assignmentId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, assignmentId } = event.params;
@@ -99,6 +188,186 @@ export const onCrewAssigned = onDocumentCreated(
   }
 );
 
+export const onAccreditationUpdated = onDocumentUpdated(
+  {
+    document: "companies/{companyId}/employees/{employeeId}/accreditations/{accreditationId}",
+    region: "southamerica-west1",
+  },
+  async (event) => {
+    const { companyId, employeeId } = event.params;
+    const after = event.data?.after.data();
+    const before = event.data?.before.data();
+    if (!after) return;
+
+    // Recompute si cambió cualquier campo relevante para compliance
+    const relevantFields = [
+      "status",
+      "expiresOn",
+      "validUntil",
+      "documentUrl",
+      "verificationStatus",
+      "signatureStatus",
+      "signedDocumentUrl",
+    ];
+    const changed = relevantFields.some((f) => after[f] !== before?.[f]);
+    if (!changed) return;
+
+    try {
+      // Buscar asignaciones activas de este empleado
+      const assignmentsSnap = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("crewAssignments")
+        .where("employeeId", "==", employeeId)
+        .where("status", "in", ["assigned", "active"])
+        .get();
+
+      for (const doc of assignmentsSnap.docs) {
+        const data = doc.data();
+        try {
+          await checkCrewCompliance(companyId, doc.id, {
+            serviceOrderId: data.serviceOrderId,
+            employeeId: data.employeeId,
+            role: data.role || "worker",
+          });
+        } catch (err) {
+          console.error(`[onAccreditationUpdated] Recompute falló para assignment ${doc.id}:`, err);
+        }
+      }
+    } catch (error) {
+      console.error("[onAccreditationUpdated] Error:", error);
+    }
+  }
+);
+
+export const onAccreditationDeleted = onDocumentDeleted(
+  {
+    document: "companies/{companyId}/employees/{employeeId}/accreditations/{accreditationId}",
+    region: "southamerica-west1",
+  },
+  async (event) => {
+    const { companyId, employeeId } = event.params;
+    if (!companyId || !employeeId) return;
+
+    try {
+      const assignmentsSnap = await db
+        .collection("companies")
+        .doc(companyId)
+        .collection("crewAssignments")
+        .where("employeeId", "==", employeeId)
+        .where("status", "in", ["assigned", "active"])
+        .get();
+
+      for (const doc of assignmentsSnap.docs) {
+        const data = doc.data();
+        try {
+          await checkCrewCompliance(companyId, doc.id, {
+            serviceOrderId: data.serviceOrderId,
+            employeeId: data.employeeId,
+            role: data.role || "worker",
+          });
+        } catch (err) {
+          console.error(`[onAccreditationDeleted] Recompute falló para assignment ${doc.id}:`, err);
+        }
+      }
+    } catch (error) {
+      console.error("[onAccreditationDeleted] Error:", error);
+    }
+  }
+);
+
+// ==========================================
+// HR TRIGGERS
+// ==========================================
+
+export const onContractUpdated = onDocumentUpdated(
+  {
+    document: "companies/{companyId}/contracts/{contractId}",
+    region: "southamerica-west1",
+  },
+  async (event) => {
+    const { companyId, contractId } = event.params;
+    const after = event.data?.after.data();
+    const before = event.data?.before.data();
+    if (!after) return;
+
+    const oldStatus = cleanString(before?.status);
+    const newStatus = cleanString(after.status);
+    if (oldStatus === newStatus) return;
+
+    const employeeId = cleanString(after.employeeId);
+    if (!employeeId) return;
+
+    const now = new Date().toISOString();
+
+    try {
+      const employeeRef = db.collection("companies").doc(companyId).collection("employees").doc(employeeId);
+
+      if (newStatus === "active") {
+        const employeeSnap = await employeeRef.get();
+        const employeeData = employeeSnap.data() || {};
+        const previousEmployeeStatus = employeeData.status || "draft";
+
+        const updates: any = {
+          hireDate: after.startDate || null,
+          baseSalary: after.salaryAmount || null,
+          updatedAt: now,
+        };
+
+        // Solo cambiar a active si viene de draft, onboarding o leave
+        const canActivate = ["draft", "onboarding", "leave"].includes(previousEmployeeStatus);
+        if (canActivate) {
+          updates.status = "active";
+        }
+
+        await employeeRef.update(updates);
+        await db.collection("companies").doc(companyId).collection("employmentStatusEvents").add({
+          companyId,
+          employeeId,
+          eventType: "hired",
+          previousStatus: previousEmployeeStatus,
+          newStatus: canActivate ? "active" : previousEmployeeStatus,
+          reason: `Contrato ${contractId} activado vía trigger`,
+          effectiveDate: after.startDate || now,
+          processedBy: "system",
+          createdAt: now,
+        });
+      } else if (newStatus === "terminated") {
+        const otherActiveSnap = await db
+          .collection("companies")
+          .doc(companyId)
+          .collection("contracts")
+          .where("employeeId", "==", employeeId)
+          .where("status", "==", "active")
+          .where("__name__", "!=", contractId)
+          .limit(1)
+          .get();
+
+        if (otherActiveSnap.empty) {
+          await employeeRef.update({
+            status: "inactive",
+            terminationDate: now,
+            updatedAt: now,
+          });
+        }
+        await db.collection("companies").doc(companyId).collection("employmentStatusEvents").add({
+          companyId,
+          employeeId,
+          eventType: "terminated",
+          previousStatus: oldStatus,
+          newStatus: "terminated",
+          reason: `Contrato ${contractId} terminado vía trigger`,
+          effectiveDate: now,
+          processedBy: "system",
+          createdAt: now,
+        });
+      }
+    } catch (error) {
+      console.error("[onContractUpdated] Error:", error);
+    }
+  }
+);
+
 // ==========================================
 // CRM MODULE
 // ==========================================
@@ -108,12 +377,63 @@ export { onLeadUpdated };
 export { onLeadWon };
 export { ensureServiceSync };
 export { seedDefaultCompanyData };
+export {
+  crmCreateLead,
+  crmUpdateLead,
+  crmDeleteLeadCascade,
+  crmGetLeadDossier,
+  crmAddLeadNote,
+  crmListStages,
+  crmCreateStage,
+  crmUpdateStage,
+  crmDeleteStage,
+  crmReorderStages,
+  crmListServiceTypes,
+  crmCreateServiceType,
+  crmUpdateServiceType,
+  crmDeleteServiceType,
+  crmGetService,
+  crmGetServiceByLead,
+  crmUpdateServiceOperationalControl,
+  crmCreateDocumentUpload,
+  crmFinalizeDocumentUpload,
+  crmListDocuments,
+  crmGetDocumentDownloadUrl,
+  crmUpdateDocumentMirrorFlag,
+  crmGetServiceMirror,
+  crmListLeads,
+  crmPublicMirror,
+  crmGetCRMStats,
+  crmListCustomers,
+  crmGetCustomer,
+  crmCreateCustomer,
+  crmUpdateCustomer,
+  crmDeleteCustomer,
+  crmListMandantes,
+  crmGetMandante,
+  crmCreateMandante,
+  crmUpdateMandante,
+  crmDeleteMandante,
+} from "./modules/crm";
 
 // ==========================================
 // HR MODULE
 // ==========================================
 
 export { onEmployeeHired };
+export { createEmployee };
+export { updateEmployee };
+export { createContract };
+export { updateContract };
+export { deleteContract };
+export { saveTimeOffRequest };
+export { approveTimeOffRequest };
+export { cancelTimeOffRequest };
+export { saveTerminationRecord };
+export { saveJobProfile } from "./modules/hr/saveJobProfile";
+export { deleteJobProfile } from "./modules/hr/deleteJobProfile";
+export { saveJobProfileRisk, deleteJobProfileRisk, saveJobProfileRiskLink, deleteJobProfileRiskLink, getJobProfileComplete } from "./modules/hr/jobProfileRiskService";
+export { getEmployeeJobProfileMatrix, getBulkEmployeeJobProfileMatrices } from "./modules/hr/getEmployeeJobProfileMatrix";
 
 // ==========================================
 // SAFETY MODULE
@@ -121,134 +441,186 @@ export { onEmployeeHired };
 
 export { seedSafetyCatalogs };
 export { generateRiskMatrix };
+export { generateJobProfileMatrix } from "./modules/safety/generateJobProfileMatrix";
 export { refreshFolderMetrics };
+export {
+  saveEquipmentBlock, deleteEquipmentBlock,
+  saveClientSite, deleteClientSite,
+  saveClientArea, deleteClientArea,
+  saveWorkerRestriction, deleteWorkerRestriction,
+  saveGeneratorRule, deleteGeneratorRule,
+} from "./modules/safety/safetyCatalogsService";
+export { linkProcedureToFolder, unlinkProcedureFromFolder } from "./modules/safety/procedureLinkService";
 export { generateIRL, saveIRL, deleteIRL } from "./modules/safety/irlService";
 export { savePPEDelivery, deletePPEDelivery } from "./modules/safety/ppeService";
 export { saveTalk, deleteTalk } from "./modules/safety/talkService";
 export { saveChecklist, deleteChecklist } from "./modules/safety/checklistService";
 export { exportMIPER } from "./modules/safety/exportService";
+export { createSafetyFolder, updateSafetyFolder, deleteSafetyFolder } from "./modules/safety/folderService";
+export { approveRiskMatrix } from "./modules/safety/matrixApproval";
+export {
+  listSafetyChecklists,
+  getSafetyChecklist,
+  listSafetyIRLs,
+  getSafetyIRL,
+  listSafetyPPEDeliveries,
+  getSafetyPPEDelivery,
+  listSafetyTalks,
+  getSafetyTalk,
+  listEquipmentBlocks,
+  getEquipmentBlock,
+  listClientSites,
+  getClientSite,
+  listClientAreas,
+  getClientArea,
+  listWorkerRestrictions,
+  getWorkerRestriction,
+  listGeneratorRules,
+  getGeneratorRule,
+  getSafetyReferenceData,
+} from "./modules/safety";
 
 // ==========================================
 // DOCUMENT CENTER MODULE
 // ==========================================
 
-export { saveDocumentTemplate, deleteDocumentTemplate } from "./modules/documentCenter/templateService";
+export { saveDocumentTemplate, deleteDocumentTemplate, listDocumentTemplates, getDocumentTemplate } from "./modules/documentCenter/templateService";
 export { generateWorkerDocument } from "./modules/documentCenter/generationService";
-export { approveGeneratedDocument, closeGeneratedDocument, deleteGeneratedDocument, getDocumentCenterStats } from "./modules/documentCenter/lifecycleService";
+export { generateDocumentBatch, listDocumentBatches, getDocumentBatch } from "./modules/documentCenter/batchService";
+export { approveGeneratedDocument, reviewGeneratedDocument, sendGeneratedDocumentToSignature, closeGeneratedDocument, deleteGeneratedDocument, getDocumentCenterStats, listGeneratedDocuments, getGeneratedDocument, previewGeneratedDocument, duplicateGeneratedDocument } from "./modules/documentCenter/lifecycleService";
+export { mergeDocumentTemplate } from "./modules/documentCenter/mergeTemplate";
+export { onSignatureRequestUpdated } from "./modules/documentCenter/syncSignature";
+export { extractTemplatePlaceholders } from "./modules/documentCenter/extractPlaceholders";
+export { suggestPlaceholderMapping } from "./modules/documentCenter/suggestPlaceholderMapping";
 
 // ==========================================
 // SIGNATURE MODULE
 // ==========================================
 
 export { createSignatureRequest, sendSignatureRequest, signDocument, deleteSignatureRequest } from "./modules/signature/signatureService";
+export { createMultiSignerRequest, sendNextSignatureInvitation } from "./modules/signature/multiSignerService";
 
 // ==========================================
 // INVENTORY MODULE
 // ==========================================
 
-export { getInventoryDashboard, createInventoryItem, updateInventoryItem, deleteInventoryItem, createInventoryMovement, createInventoryBackup } from "./modules/inventory";
+export { getInventoryDashboard, createInventoryItem, updateInventoryItem, deleteInventoryItem, createInventoryMovement, createInventoryBackup, listInventoryItems, getInventoryItem, listInventoryMovements, getInventoryMovement, listInventoryBackups, getInventoryBackup, deleteInventoryBackup, getInventoryReferenceData } from "./modules/inventory";
 
 // ==========================================
 // SUPPLIERS MODULE
 // ==========================================
 
-export { getSupplierDashboard, createSupplier, updateSupplier, deleteSupplier } from "./modules/suppliers";
+export { getSupplierDashboard, createSupplier, updateSupplier, deleteSupplier, listSuppliers, getSupplier, getSupplierReferenceData } from "./modules/suppliers";
 
 // ==========================================
 // RIOHS MODULE
 // ==========================================
 
-export { saveRiohsConfig, getRiohsConfig, generateRiohsDocument } from "./modules/riohs";
+export { saveRiohsConfig, getRiohsConfig, generateRiohsDocument, getRiohsConfigById, deleteRiohsConfig } from "./modules/riohs";
 
 // ==========================================
 // ATTENDANCE MODULE
 // ==========================================
 
-export { saveAttendancePolicy, registerCheckIn, registerCheckOut, getAttendanceRecords, approveAttendanceRecord } from "./modules/attendance";
+export { saveAttendancePolicy, registerCheckIn, registerCheckOut, registerPunch, getAttendanceRecords, approveAttendanceRecord, getAttendanceComplianceReport, listAttendancePolicies, getAttendancePolicy, deleteAttendancePolicy, listAttendanceRecords, getAttendanceRecord, deleteAttendanceRecord, getAttendanceReferenceData, getAttendanceDashboard, listAttendanceEvents, getAttendanceEvent, deleteAttendanceEvent, updateAttendanceRecord } from "./modules/attendance";
+export { onAttendanceEventCreated } from "./modules/attendance";
 
 // ==========================================
 // TASKS MODULE
 // ==========================================
 
-export { createTask, updateTask, completeTask, deleteTask } from "./modules/tasks";
+export { createTask, updateTask, completeTask, deleteTask, listTasks, getTask, addTaskAttachment, removeTaskAttachment } from "./modules/tasks";
 
 // ==========================================
 // ASSETS MODULE
 // ==========================================
 
-export { getAssetDashboard, createAsset, updateAsset, deleteAsset, createAssetMaintenance } from "./modules/assets";
+export { getAssetDashboard, createAsset, updateAsset, deleteAsset, createAssetMaintenance, listAssets, getAsset, listAssetMaintenance, getAssetMaintenance, updateAssetMaintenance, deleteAssetMaintenance, getAssetReferenceData, listAssetFuelLogs, getAssetFuelLog, createAssetFuelLog, updateAssetFuelLog, deleteAssetFuelLog, listAssetDocuments, getAssetDocument, createAssetDocument, deleteAssetDocument } from "./modules/assets";
 
 // ==========================================
 // MAIL MODULE
 // ==========================================
 
-export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs } from "./modules/mail";
+export { getMailStatus, saveMailAccount, sendEmail, getEmailLogs, listMailAccounts, getMailAccount, deleteMailAccount, getEmailLog, deleteEmailLog, testMailConnection, resendEmail } from "./modules/mail";
 
 // ==========================================
 // BILLING MODULE
 // ==========================================
 
-export { getBillingDashboard, createBillingDocument, updateBillingDocument, deleteBillingDocument, simulateSii, registerPayment, sendDocumentToCustomer } from "./modules/billing";
+export { getBillingDashboard, createBillingDocument, updateBillingDocument, deleteBillingDocument, simulateSii, registerPayment, sendDocumentToCustomer, uploadCafRange, getNextFolio, listBillingDocuments, getBillingDocument, duplicateBillingDocument, getBillingReferenceData, generateInvoicePdf, getInvoicePdfUrl } from "./modules/billing";
 
 // ==========================================
 // EXPENSES MODULE
 // ==========================================
 
-export { getExpenseDashboard, createExpenseRecord, updateExpenseRecord, deleteExpenseRecord, createExpenseBackup } from "./modules/expenses";
+export { getExpenseDashboard, createExpenseRecord, updateExpenseRecord, deleteExpenseRecord, createExpenseBackup, listExpenseRecords, getExpenseRecord, listExpenseBackups, getExpenseBackup, deleteExpenseBackup, updateExpenseBackup, restoreExpenseBackup, getExpenseReferenceData } from "./modules/expenses";
 
 // ==========================================
 // RENTALS MODULE
 // ==========================================
 
-export { getRentalDashboard, createRentalAsset, updateRentalAsset, createRentalContract, updateRentalContract, dispatchRentalContract, returnRentalContract, closeRentalContract } from "./modules/rentals";
+export { getRentalDashboard, createRentalAsset, updateRentalAsset, createRentalContract, updateRentalContract, dispatchRentalContract, returnRentalContract, closeRentalContract, createRentalGuarantee, updateRentalGuarantee, deleteRentalGuarantee, createRentalEvent, getRentalTimeline, createRentalBackup, recomputeAssetAllocations, listRentalAssets, getRentalAsset, deleteRentalAsset, listRentalContracts, getRentalContract, deleteRentalContract, listRentalContractLines, listRentalGuarantees, getRentalGuarantee, listRentalBackups, getRentalBackup, deleteRentalBackup, listRentalEvents, getRentalReferenceData } from "./modules/rentals";
 
 // ==========================================
 // PLANNING MODULE
 // ==========================================
 
-export { getPlanningDashboard, createPlanningBudget, updatePlanningBudget, createBudgetLine, updateBudgetLine, deleteBudgetLine } from "./modules/planning";
+export { getPlanningDashboard, createPlanningBudget, updatePlanningBudget, createBudgetLine, updateBudgetLine, deleteBudgetLine, registerActualAmount, registerCommittedAmount, listPlanningBudgets, getPlanningBudget, deletePlanningBudget, listBudgetLines, getBudgetLine, getPlanningReferenceData } from "./modules/planning";
 
 // ==========================================
 // RECRUITMENT MODULE
 // ==========================================
 
-export { seedRecruitmentStages, getRecruitmentStats, createJobOpening, updateJobOpening, createCandidate, updateCandidate, createApplication, updateApplication, hireApplication, createInterview, updateInterview } from "./modules/recruitment";
+export {
+  seedRecruitmentStages, getRecruitmentStats,
+  createJobOpening, updateJobOpening, listJobOpenings, getJobOpening, deleteJobOpening,
+  createCandidate, updateCandidate, listCandidates, getCandidate, deleteCandidate,
+  createApplication, updateApplication, listApplications, getApplication, deleteApplication, calculateApplicationReadiness,
+  hireApplication,
+  createInterview, updateInterview, listInterviews, getInterview, deleteInterview,
+  calculateCandidateScore, getCandidateRanking,
+} from "./modules/recruitment";
 
 // ==========================================
 // PAYROLL MODULE
 // ==========================================
 
-export { seedPayrollParameters, getPayrollDashboard, createPayrollPeriod, calculatePeriod, approvePeriod, closePeriod, savePayrollProfile } from "./modules/payroll";
+export { seedPayrollParameters, getPayrollDashboard, createPayrollPeriod, calculatePeriod, approvePeriod, closePeriod, savePayrollProfile, generateSettlementPdf, sendSettlementToSignature, sendSettlementToEmail, listPayrollPeriods, getPayrollPeriod, deletePayrollPeriod, listPayrollProfiles, getPayrollProfile, deletePayrollProfile, listSettlements, getSettlement, updateSettlement, approveSettlement, closeSettlement, getSettlementHistory, createLegalParameter, updateLegalParameter, deleteLegalParameter, createTaxBracket, updateTaxBracket, deleteTaxBracket } from "./modules/payroll";
 
 // ==========================================
 // SAFETY PROCEDURES MODULE
 // ==========================================
 
-export { getProcedureDashboard, createProcedure, updateProcedure, approveProcedure, createProcedureStep, updateProcedureStep } from "./modules/safetyProcedures";
+export { getProcedureDashboard, createProcedure, updateProcedure, approveProcedure, createProcedureStep, updateProcedureStep, listSafetyProcedures, getSafetyProcedure, deleteSafetyProcedure, listSafetyProcedureSteps, getSafetyProcedureStep, deleteSafetyProcedureStep } from "./modules/safetyProcedures";
 
 // ==========================================
 // SAFETY ACTIVITIES MODULE
 // ==========================================
 
-export { getActivityDashboard, createActivityBlock, updateActivityBlock, createActivityHazard, updateActivityHazard } from "./modules/safetyActivities";
+export { getActivityDashboard, createActivityBlock, updateActivityBlock, createActivityHazard, updateActivityHazard, listSafetyActivityBlocks, getSafetyActivityBlock, deleteSafetyActivityBlock, listSafetyActivityHazards, getSafetyActivityHazard, deleteSafetyActivityHazard } from "./modules/safetyActivities";
+export { createIncident, updateIncident, investigateIncident, createCorrectiveAction, updateCorrectiveAction, closeCorrectiveAction, listSafetyIncidents, getSafetyIncident, deleteSafetyIncident, listCorrectiveActions, getCorrectiveAction, deleteCorrectiveAction, getSafetyIncidentDashboard, getIncidentStatsByArea, getIncidentTrends } from "./modules/safetyIncidents";
 
 // ==========================================
 // GANTT MODULE
 // ==========================================
 
-export { getOrCreateGanttPlan, importProcedureToGantt, createGanttTask, updateGanttTask } from "./modules/gantt";
+export { getOrCreateGanttPlan, importProcedureToGantt, createGanttTask, updateGanttTask, updateGanttPlan, listGanttPlans, getGanttPlan, deleteGanttPlan, listGanttTasks, getGanttTask, deleteGanttTask, getGanttReferenceData } from "./modules/gantt";
 
 // ==========================================
 // REPORTS MODULE
 // ==========================================
 
-export { getReportDashboard, createReport, updateReport, closeReport, createCheckpoint, updateCheckpoint, addReportPhoto } from "./modules/reports";
+export { getReportDashboard, createReport, updateReport, closeReport, createCheckpoint, updateCheckpoint, addReportPhoto, listReports, getReport, deleteReport, listCheckpoints, getCheckpoint, deleteCheckpoint, listReportPhotos, getReportPhoto, updateReportPhoto, deleteReportPhoto, getPublicReportMirror } from "./modules/reports";
 
 // ==========================================
 // NOTIFICATIONS MODULE
 // ==========================================
 
 export { getNotificationDashboard, createNotificationTemplate, updateNotificationTemplate, sendNotification, saveNotificationPreference } from "./modules/notifications";
+export { markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, getUnreadNotificationCount } from "./modules/notifications";
+export { onSignatureRequestCreated, onBillingDocumentSiiAccepted, onSafetyMatrixGenerated } from "./modules/notifications";
+export { processNotificationQueue, retryNotification, getNotificationDeliveryStatus } from "./modules/notifications";
+export { listNotificationTemplates, getNotificationTemplate, deleteNotificationTemplate, listNotificationLogs, getNotificationLog, listNotifications, getNotification, listNotificationPreferences, getNotificationPreference, deleteNotificationPreference } from "./modules/notifications";
 
 // ==========================================
 // GOOGLE WORKSPACE MODULE
@@ -260,7 +632,7 @@ export { getGoogleWorkspaceDashboard, createGoogleWorkspaceAccount, updateGoogle
 // AI MODULE
 // ==========================================
 
-export { getAIDashboard, createAIProvider, updateAIProvider, createAIPromptTemplate, updateAIPromptTemplate, createAIAgent, updateAIAgent, planAIExecution } from "./modules/ai";
+export { getAIDashboard, createAIProvider, updateAIProvider, createAIPromptTemplate, updateAIPromptTemplate, createAIAgent, updateAIAgent, planAIExecution, executeAI } from "./modules/ai";
 
 // ==========================================
 // PDF WORKSPACE MODULE
@@ -272,7 +644,7 @@ export { getPdfWorkspace, savePdfWorkspace } from "./modules/pdfWorkspace";
 // CROSS CORRESPONDENCE MODULE
 // ==========================================
 
-export { getCorrespondenceDashboard, createCorrespondence, updateCorrespondence, approveCorrespondence, sendCorrespondenceForSignature } from "./modules/crossCorrespondence";
+export { getCorrespondenceDashboard, createCorrespondence, updateCorrespondence, approveCorrespondence, sendCorrespondenceForSignature, deliverCorrespondence } from "./modules/crossCorrespondence";
 
 // ==========================================
 // UTILIDADES
@@ -281,7 +653,7 @@ export { getCorrespondenceDashboard, createCorrespondence, updateCorrespondence,
 export const getDashboardStats = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
+import { createServiceOrder, updateServiceOrder } from "@/services/accreditation";
 import { useAuth } from "@/contexts/AuthContext";
-import type { ServiceOrder, Lead, Customer } from "@/types";
+import type { ServiceOrder, Lead, Customer, AccreditationRequirement } from "@/types";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 
 export function ServiceOrderForm() {
@@ -14,6 +15,7 @@ export function ServiceOrderForm() {
 
   const [leads, setLeads] = useState<Array<{ id: string; title: string; customerId?: string }>>([]);
   const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
+  const [requirements, setRequirements] = useState<AccreditationRequirement[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState<Partial<ServiceOrder>>({
@@ -40,9 +42,14 @@ export function ServiceOrderForm() {
       query(collection(db, "companies", companyId, "customers"), where("active", "==", true), orderBy("name")),
       (snap) => setCustomers(snap.docs.map((d) => ({ id: d.id, name: d.data().name })))
     );
+    const unsubReqs = onSnapshot(
+      query(collection(db, "companies", companyId, "accreditationRequirements"), orderBy("displayOrder")),
+      (snap) => setRequirements(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AccreditationRequirement)))
+    );
     return () => {
       unsubLeads();
       unsubCustomers();
+      unsubReqs();
     };
   }, [companyId]);
 
@@ -76,6 +83,15 @@ export function ServiceOrderForm() {
     }
   }, [form.leadId, leads, form.customerId]);
 
+  // Pre-seleccionar requisitos globales al crear nueva orden
+  useEffect(() => {
+    if (isEdit || !requirements.length) return;
+    const globalReqIds = requirements.filter((r) => r.isGlobal).map((r) => r.id);
+    if (globalReqIds.length > 0 && (!form.requiredRequirementIds || form.requiredRequirementIds.length === 0)) {
+      setForm((prev) => ({ ...prev, requiredRequirementIds: globalReqIds }));
+    }
+  }, [requirements, isEdit]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title?.trim() || !form.leadId || !companyId || !user) {
@@ -85,15 +101,11 @@ export function ServiceOrderForm() {
 
     setIsSubmitting(true);
     try {
-      const payload = { ...form, companyId, updatedAt: serverTimestamp() };
+      const payload = { ...form };
       if (isEdit && id) {
-        await updateDoc(doc(db, "companies", companyId, "serviceOrders", id), payload);
+        await updateServiceOrder(id, payload);
       } else {
-        await addDoc(collection(db, "companies", companyId, "serviceOrders"), {
-          ...payload,
-          createdBy: user.uid,
-          createdAt: serverTimestamp(),
-        });
+        await createServiceOrder(payload);
       }
       navigate("/accreditation");
     } catch (err) {
@@ -175,6 +187,49 @@ export function ServiceOrderForm() {
               <textarea rows={3} value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} className={fieldClass} />
             </div>
           </div>
+        </div>
+
+        {/* Requisitos de Acreditación */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Requisitos de Acreditación</h2>
+          {requirements.length === 0 ? (
+            <p className="text-sm text-gray-500">No hay requisitos configurados. Ve a Configuración &gt; Acreditación para crear requisitos.</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500">Selecciona los requisitos obligatorios para esta orden de servicio. Los requisitos globales (Nivel A) ya están pre-seleccionados.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {requirements.map((req) => {
+                  const isSelected = form.requiredRequirementIds?.includes(req.id);
+                  return (
+                    <label key={req.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${isSelected ? "bg-blue-500/10 border-blue-500/30" : "bg-gray-800/30 border-gray-800 hover:border-gray-700"}`}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          const current = form.requiredRequirementIds || [];
+                          if (e.target.checked) {
+                            setForm({ ...form, requiredRequirementIds: [...current, req.id] });
+                          } else {
+                            setForm({ ...form, requiredRequirementIds: current.filter((id) => id !== req.id) });
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-600 text-blue-500 focus:ring-blue-500/50"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white truncate">{req.name}</p>
+                        <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                          <span className={`px-1 rounded ${req.isGlobal ? "bg-green-500/10 text-green-400" : "bg-orange-500/10 text-orange-400"}`}>
+                            {req.isGlobal ? "Nivel A" : "Nivel B"}
+                          </span>
+                          <span>{req.code}</span>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-3">

@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
-import type { SafetyRiskMatrix, SafetyRiskMatrixRow } from "@/types";
-import { TableCellsIcon, TrashIcon, PlusIcon, CalculatorIcon } from "@heroicons/react/24/outline";
+import { usePermission } from "@/hooks/usePermission";
+import type { SafetyRiskMatrix, SafetyRiskMatrixRow, JobProfile } from "@/types";
+import { TableCellsIcon, TrashIcon, PlusIcon, CalculatorIcon, DocumentArrowDownIcon, BriefcaseIcon } from "@heroicons/react/24/outline";
+import { exportSafetyMatrixPdf, exportSafetyMatrixXlsx } from "@/services/safetyExport";
 
 interface RiskMatrixEditorProps {
   folderId: string;
@@ -20,11 +23,45 @@ const severityColors: Record<string, string> = {
 
 export function RiskMatrixEditor({ folderId, onGenerate, isGenerating }: RiskMatrixEditorProps) {
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const [matrix, setMatrix] = useState<SafetyRiskMatrix | null>(null);
   const [rows, setRows] = useState<SafetyRiskMatrixRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<SafetyRiskMatrixRow>>({});
+  const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
+  const [showProfileSelector, setShowProfileSelector] = useState(false);
+  const [selectedProfileId, setSelectedProfileId] = useState("");
+  const [isGeneratingFromProfile, setIsGeneratingFromProfile] = useState(false);
+
+  // Load job profiles
+  useEffect(() => {
+    if (!companyId) return;
+    const q = query(
+      collection(db, "companies", companyId, "jobProfiles"),
+      where("isActive", "==", true)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const profiles = snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobProfile));
+      setJobProfiles(profiles.sort((a, b) => a.name.localeCompare(b.name)));
+    });
+    return () => unsub();
+  }, [companyId]);
+
+  const handleGenerateFromProfile = async () => {
+    if (!selectedProfileId || !folderId) return;
+    setIsGeneratingFromProfile(true);
+    try {
+      const generate = httpsCallable(functions, "generateJobProfileMatrix");
+      await generate({ jobProfileId: selectedProfileId, safetyFolderId: folderId });
+      setShowProfileSelector(false);
+      setSelectedProfileId("");
+    } catch (err: any) {
+      alert(err.message || "Error generando matriz desde perfil");
+    } finally {
+      setIsGeneratingFromProfile(false);
+    }
+  };
 
   useEffect(() => {
     if (!companyId || !folderId) return;
@@ -134,13 +171,15 @@ export function RiskMatrixEditor({ folderId, onGenerate, isGenerating }: RiskMat
       <div className="text-center py-12">
         <TableCellsIcon className="w-12 h-12 text-gray-700 mx-auto mb-3" />
         <p className="text-gray-500 text-sm mb-4">No hay matriz MIPER generada</p>
-        <button
-          onClick={onGenerate}
-          disabled={isGenerating}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          {isGenerating ? "Generando..." : "Generar Matriz MIPER"}
-        </button>
+        {hasPermission("safety.generate_risk_matrix") && (
+          <button
+            onClick={onGenerate}
+            disabled={isGenerating}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            {isGenerating ? "Generando..." : "Generar Matriz MIPER"}
+          </button>
+        )}
       </div>
     );
   }
@@ -167,14 +206,75 @@ export function RiskMatrixEditor({ folderId, onGenerate, isGenerating }: RiskMat
               {importantCount} importantes
             </span>
           )}
-          <button
-            onClick={onGenerate}
-            disabled={isGenerating}
-            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
-          >
-            <CalculatorIcon className="w-3.5 h-3.5" />
-            {isGenerating ? "Generando..." : "Regenerar"}
-          </button>
+          {hasPermission("safety.export_miper") && (
+            <>
+              <button
+                onClick={() => matrix && exportSafetyMatrixPdf(matrix.id)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium rounded-lg transition-colors"
+              >
+                <DocumentArrowDownIcon className="w-3.5 h-3.5" />
+                PDF
+              </button>
+              <button
+                onClick={() => matrix && exportSafetyMatrixXlsx(matrix.id)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium rounded-lg transition-colors"
+              >
+                <DocumentArrowDownIcon className="w-3.5 h-3.5" />
+                Excel
+              </button>
+            </>
+          )}
+          {hasPermission("safety.generate_risk_matrix") && (
+            <button
+              onClick={onGenerate}
+              disabled={isGenerating}
+              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
+            >
+              <CalculatorIcon className="w-3.5 h-3.5" />
+              {isGenerating ? "Generando..." : "Regenerar"}
+            </button>
+          )}
+          {hasPermission("safety.generate_risk_matrix") && jobProfiles.length > 0 && (
+            <div className="relative">
+              {!showProfileSelector ? (
+                <button
+                  onClick={() => setShowProfileSelector(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition-colors"
+                >
+                  <BriefcaseIcon className="w-3.5 h-3.5" />
+                  Generar desde perfil
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedProfileId}
+                    onChange={(e) => setSelectedProfileId(e.target.value)}
+                    className="px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs min-w-[180px]"
+                  >
+                    <option value="">Seleccionar perfil...</option>
+                    {jobProfiles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} {p.code ? `(${p.code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleGenerateFromProfile}
+                    disabled={!selectedProfileId || isGeneratingFromProfile}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
+                  >
+                    {isGeneratingFromProfile ? "Generando..." : "Generar"}
+                  </button>
+                  <button
+                    onClick={() => { setShowProfileSelector(false); setSelectedProfileId(""); }}
+                    className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-lg transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

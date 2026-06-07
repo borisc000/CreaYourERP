@@ -9,7 +9,7 @@ import { db } from "../../config";
 export const onQuoteCreated = onDocumentCreated(
   {
     document: "companies/{companyId}/quotes/{quoteId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, quoteId } = event.params;

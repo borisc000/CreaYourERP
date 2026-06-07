@@ -1,9 +1,57 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
+import { calculateChileanOvertime } from "./overtimeCalculator";
 
-const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app"];
+const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function nowIso() { return new Date().toISOString(); }
 function companyRef(companyId: string) { return db.collection("companies").doc(companyId); }
+
+// Workflow status constants
+const PERIOD_STATUSES = ["draft", "calculated", "approved", "closed"];
+const SETTLEMENT_STATUSES = ["draft", "calculated", "approved", "signature_pending", "signed", "closed", "error"];
+function isValidPeriodStatus(s: string): s is typeof PERIOD_STATUSES[number] { return PERIOD_STATUSES.includes(s as any); }
+function isValidSettlementStatus(s: string): s is typeof SETTLEMENT_STATUSES[number] { return SETTLEMENT_STATUSES.includes(s as any); }
+
+function calculateWorkedDays(contractStart: string, contractEnd: string | null | undefined, periodStart: string, periodEnd: string): number {
+  const start = new Date(contractStart);
+  const end = contractEnd ? new Date(contractEnd) : new Date(periodEnd);
+  const pStart = new Date(periodStart);
+  const pEnd = new Date(periodEnd);
+
+  const overlapStart = start > pStart ? start : pStart;
+  const overlapEnd = end < pEnd ? end : pEnd;
+
+  if (overlapStart > overlapEnd) return 0;
+
+  const diffTime = overlapEnd.getTime() - overlapStart.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  return Math.min(diffDays, 30);
+}
+
+function buildAccountingLines(settlement: any): any[] {
+  const lines = [
+    { accountCode: "510100", accountName: "Gasto remuneraciones", debit: settlement.totalEarnings, credit: 0 },
+    { accountCode: "510200", accountName: "Gasto cargas patronales", debit: settlement.employerTotal, credit: 0 },
+    { accountCode: "210100", accountName: "Por pagar líquidos trabajadores", debit: 0, credit: settlement.netPay },
+    { accountCode: "210110", accountName: "Por pagar AFP y comisiones", debit: 0, credit: settlement.pensionAmount + settlement.afpCommissionAmount },
+    { accountCode: "210120", accountName: "Por pagar salud", debit: 0, credit: settlement.healthAmount },
+    { accountCode: "210130", accountName: "Por pagar AFC", debit: 0, credit: settlement.afcEmployeeAmount + settlement.employerAfcAmount },
+    { accountCode: "210140", accountName: "Por pagar impuesto único", debit: 0, credit: settlement.taxAmount },
+    { accountCode: "210150", accountName: "Por pagar descuentos y préstamos", debit: 0, credit: (settlement.otherDeductions || 0) + (settlement.loanDeduction || 0) + (settlement.advanceDeduction || 0) },
+    { accountCode: "210160", accountName: "Por pagar SIS", debit: 0, credit: settlement.employerSisAmount },
+    { accountCode: "210170", accountName: "Por pagar ley 16.744", debit: 0, credit: settlement.employerAccidentAmount },
+    { accountCode: "210180", accountName: "Por pagar reforma previsional", debit: 0, credit: settlement.employerPensionReformAmount },
+  ];
+
+  const totalDebits = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
+  const totalCredits = lines.reduce((sum, l) => sum + (l.credit || 0), 0);
+  if (Math.abs(totalDebits - totalCredits) > 1) {
+    console.warn(`[calculatePeriod] Accounting lines imbalance: debits=${totalDebits}, credits=${totalCredits}`);
+  }
+
+  return lines;
+}
 
 const DEFAULT_PARAMS = [
   { code: "IMM", name: "Sueldo Mínimo Mensual", category: "salary", valueNumeric: 539000, sourceLabel: "Ministerio del Trabajo" },
@@ -36,6 +84,7 @@ export const seedPayrollParameters = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.create", { companyId });
     const existing = await companyRef(companyId).collection("payrollLegalParameters").limit(1).get();
     if (!existing.empty) return { alreadySeeded: true };
     for (const p of DEFAULT_PARAMS) {
@@ -71,6 +120,7 @@ export const getPayrollDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.view", { companyId });
     const [periods, profiles, settlements] = await Promise.all([
       companyRef(companyId).collection("payrollPeriods").limit(200).get(),
       companyRef(companyId).collection("payrollProfiles").limit(200).get(),
@@ -94,6 +144,7 @@ export const createPayrollPeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.create", { companyId });
     const { name, year, month, startDate, endDate, paymentDate } = request.data;
     if (!name || !year || !month) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("payrollPeriods").add({
@@ -112,11 +163,16 @@ export const calculatePeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.calculate", { companyId });
     const { periodId } = request.data;
     if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
     const period = await companyRef(companyId).collection("payrollPeriods").doc(periodId).get();
     if (!period.exists) throw new HttpsError("not-found", "Período no encontrado");
+    const periodData = period.data() || {};
+    if (!isValidPeriodStatus(periodData.status) || periodData.status === "approved" || periodData.status === "closed") {
+      throw new HttpsError("failed-precondition", "No se puede recalcular un período aprobado o cerrado");
+    }
 
     // Get legal params
     const paramsSnap = await companyRef(companyId).collection("payrollLegalParameters").get();
@@ -135,29 +191,55 @@ export const calculatePeriod = onCall(
     const employeeMap: Record<string, any> = {};
     employeesSnap.docs.forEach((d) => { employeeMap[d.id] = d.data(); });
 
+    // Get contracts for worked-days calculation
+    const contractsSnap = await companyRef(companyId).collection("contracts").get();
+    const contractMap: Record<string, any> = {};
+    contractsSnap.docs.forEach((d) => { contractMap[d.data().employeeId] = d.data(); });
+
+    const periodStart = periodData.startDate || "";
+    const periodEnd = periodData.endDate || "";
+
+    // Pre-fetch attendance records for the period range
+    const attendanceSnap = await companyRef(companyId)
+      .collection("attendanceRecords")
+      .where("date", ">=", periodStart)
+      .where("date", "<=", periodEnd)
+      .get();
+    const attendanceMap: Record<string, Array<{ date: string; overtimeMinutes: number }>> = {};
+    attendanceSnap.docs.forEach((d) => {
+      const a = d.data();
+      if (!a.employeeId || !(a.overtimeMinutes as number > 0)) return;
+      if (!attendanceMap[a.employeeId]) attendanceMap[a.employeeId] = [];
+      attendanceMap[a.employeeId].push({ date: a.date as string, overtimeMinutes: a.overtimeMinutes as number });
+    });
+
     const settlements: any[] = [];
 
     for (const profDoc of profilesSnap.docs) {
       const prof = profDoc.data();
       const emp = employeeMap[prof.employeeId] || {};
+      const contract = contractMap[prof.employeeId];
       const baseSalary = emp.baseSalary || params.IMM || 539000;
-      const workedDays = 30; // simplified
+
+      // Calculate real worked days from contract overlap with period
+      let workedDays = 30;
+      if (periodStart && periodEnd) {
+        const cStart = contract?.startDate || periodStart;
+        const cEnd = contract?.endDate || periodEnd;
+        workedDays = calculateWorkedDays(cStart, cEnd, periodStart, periodEnd);
+      }
+
       const taxableIncome = Math.round(baseSalary * (workedDays / 30));
 
-      // AFP
-      const afpRate = AFP_RATES[prof.afpCode || "habitat"] || { pension: 10.34, commission: 1.34 };
-      const topeAfpUf = params.TOPE_AFP || 90;
-      const topeAfp = topeAfpUf * (params.UF || 39790);
-      const afpBase = Math.min(taxableIncome, topeAfp);
-      const pensionAmount = Math.round(afpBase * (afpRate.pension / 100));
-      const afpCommissionAmount = Math.round(afpBase * (afpRate.commission / 100));
-
-      // Health
-      const topeHealth = (params.TOPE_SALUD || 90) * (params.UF || 39790);
-      const healthBase = Math.min(taxableIncome, topeHealth);
-      const healthAmount = prof.healthSystem === "isapre"
-        ? Math.round(prof.healthPlanClp || healthBase * 0.07)
-        : Math.round(healthBase * 0.07);
+      // Overtime calculation from attendance records
+      const dailyHours = contract?.dailyHours || 8;
+      const empAttendance = attendanceMap[prof.employeeId] || [];
+      const overtimeEvents = empAttendance.map((a) => ({
+        date: a.date,
+        hours: Math.round((a.overtimeMinutes / 60) * 100) / 100,
+      }));
+      const overtimeResult = calculateChileanOvertime(baseSalary, dailyHours, overtimeEvents);
+      const overtimeAmount = overtimeResult.overtimeAmount;
 
       // Gratification
       let legalGratificationAmount = 0;
@@ -168,8 +250,23 @@ export const calculatePeriod = onCall(
         legalGratificationAmount = prof.manualGratificationAmount || 0;
       }
 
-      // Taxable total
-      const taxableTotal = taxableIncome + legalGratificationAmount + (prof.recurringTaxableBonus || 0);
+      // Taxable total (renta imponible)
+      const taxableTotal = taxableIncome + overtimeAmount + legalGratificationAmount + (prof.recurringTaxableBonus || 0);
+
+      // AFP
+      const afpRate = AFP_RATES[prof.afpCode || "habitat"] || { pension: 10.34, commission: 1.34 };
+      const topeAfpUf = params.TOPE_AFP || 90;
+      const topeAfp = topeAfpUf * (params.UF || 39790);
+      const afpBase = Math.min(taxableTotal, topeAfp);
+      const pensionAmount = Math.round(afpBase * (afpRate.pension / 100));
+      const afpCommissionAmount = Math.round(afpBase * (afpRate.commission / 100));
+
+      // Health
+      const topeHealth = (params.TOPE_SALUD || 90) * (params.UF || 39790);
+      const healthBase = Math.min(taxableTotal, topeHealth);
+      const healthAmount = prof.healthSystem === "isapre"
+        ? Math.round(prof.healthPlanClp || healthBase * 0.07)
+        : Math.round(healthBase * 0.07);
 
       // Tax (impuesto única 2da categoría)
       const utm = params.UTM || 69889;
@@ -186,7 +283,7 @@ export const calculatePeriod = onCall(
       // AFC employee
       let afcEmployeeAmount = 0;
       const topeAfc = (params.TOPE_AFC || 135.2) * (params.UF || 39790);
-      const afcBase = Math.min(taxableIncome, topeAfc);
+      const afcBase = Math.min(taxableTotal, topeAfc);
       if (emp.contractType === "indefinite") afcEmployeeAmount = Math.round(afcBase * 0.006);
 
       // Family allowance
@@ -215,33 +312,60 @@ export const calculatePeriod = onCall(
 
       const lineItems = [
         { type: "earning", concept: "Sueldo base", amount: taxableIncome },
+        { type: "earning", concept: "Horas extras", amount: overtimeAmount },
         { type: "earning", concept: "Gratificación legal", amount: legalGratificationAmount },
         { type: "earning", concept: "Asignación familiar", amount: familyAllowanceAmount },
+        { type: "earning", concept: "Bono imponible recurrente", amount: prof.recurringTaxableBonus || 0 },
+        { type: "earning", concept: "Asignación no imponible recurrente", amount: prof.recurringNonTaxableAllowance || 0 },
         { type: "deduction", concept: "AFP pension", amount: pensionAmount },
         { type: "deduction", concept: "AFP comisión", amount: afpCommissionAmount },
         { type: "deduction", concept: "Salud", amount: healthAmount },
         { type: "deduction", concept: "Impuesto único", amount: taxAmount },
         { type: "deduction", concept: "AFC trabajador", amount: afcEmployeeAmount },
+        { type: "deduction", concept: "Otros descuentos", amount: prof.recurringOtherDeduction || 0 },
+        { type: "deduction", concept: "Préstamo", amount: prof.loanDeduction || 0 },
+        { type: "deduction", concept: "Anticipo", amount: prof.advanceDeduction || 0 },
       ];
 
       const warnings: string[] = [];
       if (taxableIncome < (params.IMM || 539000)) warnings.push("Sueldo base inferior al mínimo legal");
       if (netPay < 0) warnings.push("Líquido a pagar negativo");
+      if (workedDays < 30) warnings.push(`Período parcial: ${workedDays} días trabajados`);
 
-      const settleRef = await companyRef(companyId).collection("payrollSettlements").add({
+      const settlementData: any = {
         companyId, periodId, employeeId: prof.employeeId, employeeName: emp.fullName || "",
-        payrollProfileId: profDoc.id, status: "calculated", workedDays, overtimeHours: 0,
+        payrollProfileId: profDoc.id, contractId: contract?.id || "",
+        status: "calculated", workedDays, overtimeHours: overtimeResult.overtimeHours,
+        overtimeAmount, overtimeHourValue: overtimeResult.ordinaryHourValue,
+        overtimeDetails: overtimeResult.details,
         baseSalary, taxableIncome, nonTaxableIncome, totalEarnings, totalDeductions, netPay,
         taxBase: taxableTotal, taxAmount, legalGratificationAmount, familyAllowanceAmount,
         pensionAmount, afpCommissionAmount, healthAmount, afcEmployeeAmount,
         employerAfcAmount: employerAfc, employerSisAmount: employerSis,
         employerAccidentAmount: employerAccident, employerPensionReformAmount: employerPensionReform,
-        employerTotal, employerCost, lineItems, warnings, notes: "", createdAt: nowIso(), updatedAt: nowIso(),
-      });
+        employerTotal, employerCost,
+        otherDeductions: prof.recurringOtherDeduction || 0,
+        loanDeduction: prof.loanDeduction || 0,
+        advanceDeduction: prof.advanceDeduction || 0,
+        lineItems, warnings, notes: "", createdAt: nowIso(), updatedAt: nowIso(),
+      };
+
+      settlementData.accountingLines = buildAccountingLines(settlementData);
+
+      const settleRef = await companyRef(companyId).collection("payrollSettlements").add(settlementData);
       settlements.push({ id: settleRef.id, employeeName: emp.fullName, netPay });
     }
 
     await companyRef(companyId).collection("payrollPeriods").doc(periodId).update({ status: "calculated", updatedAt: nowIso() });
+    await companyRef(companyId).collection("activityLogs").add({
+      companyId,
+      type: "payroll.calculated",
+      periodId,
+      message: `Período calculado: ${settlements.length} liquidaciones`,
+      userId: request.auth?.uid || "",
+      metadata: { settlementsCount: settlements.length },
+      createdAt: nowIso(),
+    });
     return { calculated: true, settlementsCount: settlements.length, settlements };
   }
 );
@@ -254,13 +378,40 @@ export const approvePeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.approve", { companyId });
     const { periodId } = request.data;
     if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
-    const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
-    for (const d of settlements.docs) {
-      await d.ref.update({ status: "approved", approvedBy: request.auth?.uid || "", approvedAt: nowIso(), updatedAt: nowIso() });
+
+    const periodRef = companyRef(companyId).collection("payrollPeriods").doc(periodId);
+    const periodSnap = await periodRef.get();
+    if (!periodSnap.exists) throw new HttpsError("not-found", "Período no encontrado");
+    const periodData = periodSnap.data() || {};
+    if (!isValidPeriodStatus(periodData.status) || periodData.status !== "calculated") {
+      throw new HttpsError("failed-precondition", "Solo períodos calculados pueden ser aprobados");
     }
-    await companyRef(companyId).collection("payrollPeriods").doc(periodId).update({ status: "approved", updatedAt: nowIso() });
+
+    const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
+    const batch = db.batch();
+    for (const d of settlements.docs) {
+      batch.update(d.ref, { status: "approved", approvedBy: request.auth?.uid || "", approvedAt: nowIso(), updatedAt: nowIso() });
+    }
+    batch.update(periodRef, {
+      status: "approved",
+      approvedBy: request.auth?.uid || "",
+      approvedAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    const logRef = companyRef(companyId).collection("activityLogs").doc();
+    batch.set(logRef, {
+      companyId,
+      type: "payroll.approved",
+      periodId,
+      message: "Período aprobado",
+      userId: request.auth?.uid || "",
+      metadata: { settlementsCount: settlements.size },
+      createdAt: nowIso(),
+    });
+    await batch.commit();
     return { approved: true };
   }
 );
@@ -273,13 +424,48 @@ export const closePeriod = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.close", { companyId });
     const { periodId } = request.data;
     if (!periodId) throw new HttpsError("invalid-argument", "Datos incompletos");
-    const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
-    for (const d of settlements.docs) {
-      await d.ref.update({ status: "closed", closedAt: nowIso(), updatedAt: nowIso() });
+
+    const periodRef = companyRef(companyId).collection("payrollPeriods").doc(periodId);
+    const periodSnap = await periodRef.get();
+    if (!periodSnap.exists) throw new HttpsError("not-found", "Período no encontrado");
+    const periodData = periodSnap.data() || {};
+    if (!isValidPeriodStatus(periodData.status) || periodData.status !== "approved") {
+      throw new HttpsError("failed-precondition", "Solo períodos aprobados pueden ser cerrados");
     }
-    await companyRef(companyId).collection("payrollPeriods").doc(periodId).update({ status: "closed", updatedAt: nowIso() });
+
+    const settlements = await companyRef(companyId).collection("payrollSettlements").where("periodId", "==", periodId).get();
+    const notReady = settlements.docs.filter((d) => {
+      const s = d.data();
+      return !isValidSettlementStatus(s.status) || (s.status !== "approved" && s.status !== "signed" && s.status !== "closed");
+    });
+    if (notReady.length > 0) {
+      throw new HttpsError("failed-precondition", `Hay ${notReady.length} liquidaciones no aprobadas/firmadas`);
+    }
+
+    const batch = db.batch();
+    for (const d of settlements.docs) {
+      batch.update(d.ref, { status: "closed", closedBy: request.auth?.uid || "", closedAt: nowIso(), updatedAt: nowIso() });
+    }
+    batch.update(periodRef, {
+      status: "closed",
+      closedBy: request.auth?.uid || "",
+      closedAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    const logRef = companyRef(companyId).collection("activityLogs").doc();
+    batch.set(logRef, {
+      companyId,
+      type: "payroll.closed",
+      periodId,
+      message: "Período cerrado",
+      userId: request.auth?.uid || "",
+      metadata: { settlementsCount: settlements.size },
+      createdAt: nowIso(),
+    });
+    await batch.commit();
     return { closed: true };
   }
 );
@@ -292,6 +478,7 @@ export const savePayrollProfile = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "payroll.edit", { companyId });
     const { id, ...data } = request.data;
     if (!data.employeeId) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (id) {

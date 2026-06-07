@@ -8,7 +8,7 @@ import { db, PLANS } from "../config";
 export const enforcePlanLimits = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -40,26 +40,26 @@ export const enforcePlanLimits = onCall(
     let resourceName = "";
 
     switch (resourceType) {
-      case "user":
-        currentCount = (await companyRef.collection("users").count().get()).data().count;
-        maxAllowed = plan.maxUsers;
-        resourceName = "usuarios";
-        break;
+    case "user":
+      currentCount = (await companyRef.collection("users").count().get()).data().count;
+      maxAllowed = plan.maxUsers;
+      resourceName = "usuarios";
+      break;
 
-      case "quote":
-        currentCount = (await companyRef.collection("quotes").count().get()).data().count;
-        maxAllowed = plan.maxQuotes;
-        resourceName = "cotizaciones";
-        break;
+    case "quote":
+      currentCount = (await companyRef.collection("quotes").count().get()).data().count;
+      maxAllowed = plan.maxQuotes;
+      resourceName = "cotizaciones";
+      break;
 
-      case "serviceOrder":
-        currentCount = (await companyRef.collection("serviceOrders").count().get()).data().count;
-        maxAllowed = plan.maxServiceOrders;
-        resourceName = "órdenes de servicio";
-        break;
+    case "serviceOrder":
+      currentCount = (await companyRef.collection("serviceOrders").count().get()).data().count;
+      maxAllowed = plan.maxServiceOrders;
+      resourceName = "órdenes de servicio";
+      break;
 
-      default:
-        throw new HttpsError("invalid-argument", "Tipo de recurso no soportado");
+    default:
+      throw new HttpsError("invalid-argument", "Tipo de recurso no soportado");
     }
 
     if (currentCount >= maxAllowed) {
@@ -86,7 +86,7 @@ export const stripeWebhook = onCall(
     region: "us-central1",
     secrets: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
   },
-  async (request) => {
+  async (_request) => {
     // Aquí iría la lógica de webhook de Stripe
     // Para producción, esto debería ser una función HTTP (onRequest), no onCall
     // porque Stripe necesita enviar el webhook directamente

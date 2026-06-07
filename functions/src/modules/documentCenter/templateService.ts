@@ -4,6 +4,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db, storage } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -37,7 +38,7 @@ interface TemplatePayload {
 export const saveDocumentTemplate = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -48,6 +49,8 @@ export const saveDocumentTemplate = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "document_center.save_template", { companyId });
 
     const payload = request.data as TemplatePayload;
     if (!payload.name?.trim()) {
@@ -125,10 +128,63 @@ export const saveDocumentTemplate = onCall(
   }
 );
 
+export const listDocumentTemplates = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.view", { companyId });
+
+    const data = request.data || {};
+    const status = (data.status || "").trim();
+    const category = (data.category || "").trim();
+    const search = (data.search || "").trim().toLowerCase();
+    const limit = Math.min(500, Math.max(1, Number(data.limit || 200)));
+
+    let q: FirebaseFirestore.Query = companyRef(companyId).collection("documentTemplates").orderBy("updatedAt", "desc").limit(limit);
+    if (status) q = q.where("status", "==", status);
+    if (category) q = q.where("category", "==", category);
+
+    const snap = await q.get();
+    let templates = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    if (search) {
+      templates = templates.filter((t: any) =>
+        String(t.name || "").toLowerCase().includes(search) ||
+        String(t.description || "").toLowerCase().includes(search)
+      );
+    }
+    return { templates };
+  }
+);
+
+export const getDocumentTemplate = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.view", { companyId });
+
+    const id = (request.data?.id || request.data?.templateId || "").trim();
+    if (!id) throw new HttpsError("invalid-argument", "id es requerido");
+
+    const snap = await companyRef(companyId).collection("documentTemplates").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Plantilla no encontrada");
+    return { template: { id: snap.id, ...snap.data() } };
+  }
+);
+
 export const deleteDocumentTemplate = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -139,6 +195,8 @@ export const deleteDocumentTemplate = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "document_center.delete_template", { companyId });
 
     const { id } = request.data as { id: string };
     if (!id) {

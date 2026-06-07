@@ -9,7 +9,7 @@ import { db } from "../../config";
 export const onEmployeeHired = onDocumentCreated(
   {
     document: "companies/{companyId}/employees/{employeeId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, employeeId } = event.params;
@@ -94,6 +94,24 @@ export const onEmployeeHired = onDocumentCreated(
           }
         }
       }
+
+      // 3. Actualizar estado del empleado a "onboarding"
+      await db.collection("companies").doc(companyId).collection("employees").doc(employeeId).update({
+        status: "onboarding",
+        updatedAt: new Date().toISOString(),
+      });
+
+      await db.collection("companies").doc(companyId).collection("employmentStatusEvents").add({
+        companyId,
+        employeeId,
+        eventType: "onboarding_started",
+        previousStatus: data.status || "draft",
+        newStatus: "onboarding",
+        reason: "Empleado creado, inicio de onboarding",
+        effectiveDate: new Date().toISOString(),
+        processedBy: "system",
+        createdAt: new Date().toISOString(),
+      });
 
       console.log(`[onEmployeeHired] Onboarding created for ${employeeId}`);
     } catch (error) {

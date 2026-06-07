@@ -38,6 +38,8 @@ export interface User {
   name: string;
   phone?: string;
   role: "admin" | "manager" | "user";
+  allowedModules?: string[];
+  serviceActions?: ServiceAction[];
   isActive: boolean;
   language: string;
   timezone: string;
@@ -56,6 +58,9 @@ export interface Stage {
   order: number;
   color?: string;
   isDefault?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ServiceType {
@@ -155,11 +160,79 @@ export interface ActivityLog {
   id: string;
   companyId: string;
   leadId: string;
-  type: "created" | "stage_changed" | "status_changed" | "updated" | "note_added" | "document_added";
+  type: "created" | "stage_changed" | "status_changed" | "updated" | "note_added" | "document_added" | string;
   message: string;
   userId?: string;
   userName?: string;
   metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export type ServiceAction =
+  | "service.view_internal"
+  | "service.edit_context"
+  | "service.edit_operational_control"
+  | "service.close_operational_step"
+  | "service.manage_documents"
+  | "service.version_documents"
+  | "service.request_report_signature"
+  | "service.view_mirror_internal"
+  | "service.publish_mirror"
+  | "service.view_financial"
+  | "service.edit_financial"
+  | "crm.create_lead"
+  | "crm.edit_lead"
+  | "crm.delete_lead"
+  | "crm.manage_pipeline"
+  | "crm.manage_customers"
+  | "crm.manage_mandantes"
+  | "hr.manage_contracts"
+  | "hr.manage_terminations"
+  | "hr.verify_accreditation"
+  | "hr.cancel_timeoff"
+  | "hr.manage_job_profile_functions"
+  | "hr.manage_job_profile_responsibilities"
+  | "hr.manage_job_profile_risks"
+  | "hr.view_job_profile_matrix"
+  | "recruitment.view"
+  | "recruitment.create"
+  | "recruitment.edit"
+  | "recruitment.hire"
+  | "recruitment.delete_job"
+  | "recruitment.delete_candidate"
+  | "recruitment.delete_application"
+  | "recruitment.delete_interview"
+  | "recruitment.calculate_score"
+  | "recruitment.calculate_readiness"
+  | "storage.upload"
+  | "storage.download"
+  | "storage.delete"
+  | "mail.resend"
+  | "notifications.retry"
+  | "notifications.view_status"
+  | "payroll.send_email"
+  | "safety_incidents.view"
+  | "safety_incidents.create"
+  | "safety_incidents.edit"
+  | "safety_incidents.delete"
+  | "safety_incidents.investigate"
+  | "safety_incidents.manage_capa";
+
+export interface ServicePermissionContext {
+  uid: string;
+  companyId: string;
+  role: string;
+  allowedModules: string[];
+  serviceActions: ServiceAction[];
+}
+
+export interface LeadNote {
+  id: string;
+  companyId: string;
+  leadId: string;
+  body: string;
+  createdBy: string;
+  createdByName?: string;
   createdAt: string;
 }
 
@@ -205,20 +278,78 @@ export interface CRMDocument {
   companyId: string;
   filename: string;
   filePath: string;
+  storagePath?: string;
   mimeType: string;
   modelName: "Lead" | "Service" | "Customer";
   recordId: string;
   uploadedBy: string;
+  uploadedByName?: string;
   category?: string;
+  leadId?: string;
+  customerId?: string;
   serviceId?: string;
   documentType?: string;
   version: number;
   isCurrent: boolean;
   parentDocumentId?: string;
+  publishToMirror?: boolean;
   metadata?: CRMDocumentMetadata;
   signatureRequestId?: string;
   signedAt?: string;
+  status?: "pending_upload" | "ready" | "failed";
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CRMDocumentVersion extends CRMDocument {
+  replacedByDocumentId?: string;
+}
+
+export interface LeadDossier {
+  lead: Lead;
+  customer?: Customer | null;
+  mandante?: Mandante | null;
+  stage?: Stage | null;
+  serviceType?: ServiceType | null;
+  assignedUser?: User | null;
+  service?: CRMService | null;
+  quotes: Quote[];
+  reports: Report[];
+  expenses: ExpenseRecord[];
+  rentals: RentalContract[];
+  safetyFolders: SafetyFolder[];
+  documents: CRMDocument[];
+  activity: ActivityLog[];
+  notes: LeadNote[];
+  summary: {
+    expectedRevenue: number;
+    weightedRevenue: number;
+    quotesCount: number;
+    acceptedQuotesCount: number;
+    acceptedQuotesTotal: number;
+    reportsCount: number;
+    openReportsCount: number;
+    expensesCount: number;
+    expensesTotal: number;
+    rentalsCount: number;
+    activeRentalsCount: number;
+    safetyFoldersCount: number;
+    safetyTrafficLight: "red" | "yellow" | "green" | null;
+    documentsCount: number;
+    currentDocumentsCount: number;
+    notesCount: number;
+    hasService: boolean;
+  };
+}
+
+export interface ServiceMirrorPayload {
+  service: CRMService;
+  lead?: Lead | null;
+  customer?: Customer | null;
+  mandante?: Mandante | null;
+  serviceType?: ServiceType | null;
+  documents: CRMDocument[];
+  activity: ActivityLog[];
 }
 
 // ==========================================
@@ -277,6 +408,48 @@ export interface QuoteTemplate {
   createdAt: string;
 }
 
+export type CatalogType = "service" | "worker" | "item";
+
+export interface CatalogItem {
+  id: string;
+  companyId: string;
+  catalogType: CatalogType;
+  code: string;
+  name: string;
+  description?: string;
+  unitPrice: number;
+  unit?: string;
+  category?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface QuoteTemplateLine {
+  id: string;
+  sectionType: "SERVICIOS" | "PERSONAL" | "INSUMOS";
+  catalogItemId?: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discountPercent?: number;
+}
+
+export interface QuoteTemplate {
+  id: string;
+  companyId: string;
+  name: string;
+  description?: string;
+  lines: QuoteTemplateLine[];
+  taxPct: number;
+  admMarginPct: number;
+  profitMarginPct: number;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface QuoteLine {
   id: string;
   sectionType: "SERVICIOS" | "PERSONAL" | "INSUMOS";
@@ -314,6 +487,7 @@ export interface Quote {
   acceptedAt?: string;
   controlMeta?: Record<string, unknown>;
   controlSnapshot?: Record<string, unknown>;
+  rentalContractId?: string;
   createdBy: string;
   createdAt: string;
   updatedAt?: string;
@@ -410,7 +584,43 @@ export interface TimeOffRequest {
   status: "pending" | "approved" | "rejected" | "cancelled";
   approvedBy?: string;
   approvedAt?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
   createdAt: string;
+}
+
+export interface LeaveBalance {
+  id: string;
+  companyId: string;
+  employeeId: string;
+  vacationDays: number;
+  sickLeaveDays: number;
+  personalDays: number;
+  year: number;
+  updatedAt: string;
+}
+
+export interface TerminationRecord {
+  id: string;
+  companyId: string;
+  employeeId: string;
+  terminationDate: string;
+  noticeDate?: string | null;
+  cause?: string;
+  reason: string;
+  noticePeriodDays: number;
+  yearsOfService: number;
+  salary?: number;
+  severancePay: number;
+  pendingVacationPay: number;
+  proportionalBonus: number;
+  otherSettlements: number;
+  totalSettlement: number;
+  rehireEligible?: boolean;
+  contractId?: string | null;
+  status: "draft" | "processed" | "paid";
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface EmploymentStatusEvent {
@@ -467,13 +677,17 @@ export interface CrewAssignment {
 export interface DocumentGenerationRequest {
   id: string;
   companyId: string;
+  accreditationCheckId: string;
   serviceOrderId: string;
   employeeId: string;
   requirementId: string;
-  status: "pending" | "generating" | "completed" | "failed";
   templateId?: string;
-  generatedDocumentUrl?: string;
+  generatedDocumentId?: string;
+  signatureRequestId?: string;
+  accreditationDocumentId?: string;
+  status: "pending" | "template_found" | "generating" | "generated" | "signature_pending" | "signed" | "failed" | "skipped";
   errorMessage?: string;
+  personalizationData?: Record<string, any>;
   createdAt: string;
   completedAt?: string;
 }
@@ -511,12 +725,29 @@ export interface AccreditationCheck {
   levelBValid: number;
   levelBMissingIds: string[];
   overallStatus: "compliant" | "attention" | "non_compliant";
+  pendingGenerationIds?: string[];
   lastCheckedAt?: string;
 }
 
 // ==========================================
 // SIGNATURE
 // ==========================================
+
+export interface SignatureSigner {
+  id: string;
+  signatureRequestId: string;
+  companyId: string;
+  order: number;
+  name: string;
+  email: string;
+  status: "pending" | "sent" | "signed" | "rejected";
+  sentAt?: string;
+  signedAt?: string;
+  signedStoragePath?: string;
+  evidenceJson?: Record<string, any>;
+  accessToken?: string;
+  createdAt: string;
+}
 
 export interface SignatureRequest {
   id: string;
@@ -530,7 +761,7 @@ export interface SignatureRequest {
   documentUrl?: string;
   generatedDocumentId?: string; // links to Document Center
   storagePath?: string; // source PDF in Storage
-  signaturePositions: Array<{
+  signaturePositions?: Array<{
     page: number;
     x: number;
     y: number;
@@ -540,6 +771,9 @@ export interface SignatureRequest {
     label?: string;
   }>;
   status: "draft" | "sent" | "viewed" | "signed" | "declined" | "expired";
+  signerMode?: "single" | "ordered";
+  currentSignerOrder?: number;
+  originalHash?: string; // SHA-256 before signing
   signedAt?: string;
   signedByEmail?: string;
   signedByName?: string;
@@ -618,9 +852,38 @@ export interface EmployeeAccreditation {
   referenceId: string; // requirementId or courseId
   status: "pending" | "valid" | "expired" | "rejected";
   documentUrl?: string;
+  documentOrigin?: string;
+  templateId?: string;
+  generatedDocumentId?: string;
+  documentName?: string;
+  documentNumber?: string;
+  verificationStatus?: "pending_review" | "approved" | "rejected";
+  signatureStatus?: "not_required" | "pending" | "signed";
+  signedDocumentUrl?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  serviceOrderId?: string;
+  signatureRequestId?: string;
+  sourceModule?: string;
+  issuedOn?: string;
+  expiresOn?: string;
   validFrom?: string;
   validUntil?: string;
+  notes?: string;
   createdAt: string;
+}
+
+export interface JobProfileFunction {
+  title: string;
+  description?: string;
+  displayOrder?: number;
+}
+
+export interface JobProfileResponsibility {
+  title: string;
+  description?: string;
+  category?: "general" | "operational" | "safety" | "compliance";
+  displayOrder?: number;
 }
 
 export interface JobProfile {
@@ -630,12 +893,57 @@ export interface JobProfile {
   code?: string;
   departmentId?: string;
   description?: string;
+  objective?: string;
+  scope?: string;
   riskLevel?: string;
   requiredCourseIds: string[];
   requiredRequirementIds: string[];
   salaryRangeMin?: number;
   salaryRangeMax?: number;
   isActive: boolean;
+  status?: "draft" | "active" | "archived";
+  functions?: JobProfileFunction[];
+  responsibilities?: JobProfileResponsibility[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface JobProfileRisk {
+  id: string;
+  profileId: string;
+  companyId: string;
+  processName?: string;
+  taskName: string;
+  hazardFactor: string;
+  riskName: string;
+  consequence?: string;
+  controlsSummary?: string;
+  requiredPpe?: string[];
+  protocolCodes?: string[];
+  masterRiskCode?: string;
+  probability?: number;
+  severity?: number;
+  vep?: number;
+  riskLevelLabel?: string;
+  ownerName?: string;
+  sourceNote?: string;
+  displayOrder?: number;
+  active?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface JobProfileRiskLink {
+  id: string;
+  profileId: string;
+  companyId: string;
+  masterRiskId: string;
+  masterRiskCode?: string;
+  hazardCategory?: string;
+  hazardName?: string;
+  riskName?: string;
+  displayOrder?: number;
+  active?: boolean;
   createdAt: string;
 }
 
@@ -793,6 +1101,9 @@ export interface SafetyRiskMatrixRow {
   sourceLabels?: string[];
   sourceGroup?: string;
   sourceTitle?: string;
+  source?: string;
+  sourceId?: string;
+  jobProfileName?: string;
   severityColor?: string;
   approvalBlocked?: boolean;
   mitigationRequired?: boolean;
@@ -1066,6 +1377,8 @@ export interface DocumentTemplate {
   templateMime?: string;
   sourceFormat?: "docx" | "doc" | "pdf";
   storagePath?: string; // Firebase Storage path
+  base64Content?: string; // for upload
+  fileName?: string; // original filename for upload
   availableFormats?: string[];
   placeholderKeys?: string[];
   placeholderValidationStatus?: "pending" | "valid" | "invalid";
@@ -1096,6 +1409,7 @@ export interface GeneratedDocument {
   sourceLabel?: string;
   mergePayload?: Record<string, any>;
   storagePath?: string; // generated file in Storage
+  outputFormat?: "docx" | "pdf";
   availableFormats?: string[];
   status: "generated" | "ready_for_review" | "approved" | "signature_pending" | "signed" | "closed" | "error";
   requiresSignature: boolean;
@@ -1394,6 +1708,7 @@ export interface InventoryMovement {
   performedBy?: string;
   performedByName?: string;
   movementDate: string;
+  assetMaintenanceId?: string;
   createdAt: string;
 }
 
@@ -1425,9 +1740,14 @@ export interface AttendancePolicy {
   workHoursStart: string; // '08:00'
   workHoursEnd: string; // '17:00'
   lunchBreakMinutes: number;
+  minBreakMinutes?: number;
+  standardDailyMinutes?: number;
   toleranceMinutesEarly: number;
   toleranceMinutesLate: number;
   overtimeThresholdMinutes: number;
+  declarationText?: string;
+  legalBasis?: string;
+  timezone?: string;
   isDefault: boolean;
   isActive: boolean;
   createdAt: string;
@@ -1447,9 +1767,13 @@ export interface AttendanceRecord {
   checkInPhoto?: string;
   checkOutPhoto?: string;
   workMinutes: number;
+  breakMinutes?: number;
   overtimeMinutes: number;
   lunchMinutes: number;
+  lateMinutes?: number;
+  earlyExitMinutes?: number;
   status: "present" | "absent" | "late" | "early_leave" | "on_leave" | "holiday";
+  flags?: string[];
   notes?: string;
   approvedBy?: string;
   approvedAt?: string;
@@ -1462,14 +1786,29 @@ export interface AttendanceEvent {
   companyId: string;
   employeeId: string;
   employeeName?: string;
-  eventType: "check_in" | "check_out" | "overtime_start" | "overtime_end" | "manual_correction";
+  eventType: "entry" | "exit" | "break_start" | "break_end" | "check_in" | "check_out" | "overtime_start" | "overtime_end" | "manual_correction";
   timestamp: string;
+  date?: string;
   latitude?: number;
   longitude?: number;
   photoUrl?: string;
   notes?: string;
   createdBy?: string;
   createdAt: string;
+  evidencePayload?: Record<string, unknown>;
+  payloadHash?: string;
+  previousHash?: string;
+  chainHash?: string;
+}
+
+export interface AttendanceComplianceSummary {
+  employeeId: string;
+  employeeName: string;
+  daysWorked: number;
+  daysWithFlags: number;
+  totalLateMinutes: number;
+  totalOvertimeMinutes: number;
+  flagsBreakdown: Record<string, number>;
 }
 
 // ==========================================
@@ -1564,6 +1903,9 @@ export interface AssetMaintenance {
   nextDueDate?: string;
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
   notes?: string;
+  partsUsed?: Array<{ inventoryItemId: string; quantity: number; unitCost?: number }>;
+  expenseId?: string;
+  inventoryMovementIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -1653,6 +1995,19 @@ export interface BillingEvent {
   occurredAt: string;
 }
 
+export interface BillingCafRange {
+  id: string;
+  companyId: string;
+  documentType: "33" | "34" | "61" | "56";
+  startFolio: number;
+  endFolio: number;
+  nextFolio: number;
+  cafXmlBase64?: string;
+  uploadDate: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 // ==========================================
 // EXPENSES
 // ==========================================
@@ -1667,6 +2022,7 @@ export interface ExpenseRecord {
   assetRecordId?: string;
   assetRecordCode?: string;
   assetRecordName?: string;
+  assetMaintenanceId?: string;
   expenseDate: string;
   vendorName?: string;
   spenderName?: string;
@@ -1744,7 +2100,7 @@ export interface RentalContract {
   customerName?: string;
   sourceType?: string;
   sourceQuoteId?: string;
-  status: "draft" | "dispatched" | "returned" | "closed";
+  status: "draft" | "precheck" | "quoted" | "approved" | "reserved" | "contracted" | "dispatched" | "active" | "returned" | "closed" | "cancelled";
   precheckStatus: string;
   legalStatus: string;
   guaranteeStatus: string;
@@ -1804,6 +2160,8 @@ export interface RentalGuarantee {
   status: string;
   receivedAt?: string;
   releasedAt?: string;
+  notes?: string;
+  documentUrl?: string;
   createdAt: string;
 }
 
@@ -1817,6 +2175,17 @@ export interface RentalEvent {
   details?: string;
   payload?: Record<string, any>;
   eventAt: string;
+  createdAt: string;
+}
+
+export interface RentalBackup {
+  id: string;
+  contractId: string;
+  companyId: string;
+  backupName: string;
+  checksum: string;
+  snapshotSize?: number;
+  createdByUserId?: string;
   createdAt: string;
 }
 
@@ -1927,8 +2296,10 @@ export interface Candidate {
   resumeUrl?: string;
   portfolioUrl?: string;
   summary?: string;
+  experienceYears?: number;
   rating: number;
   completionPct: number;
+  calculatedScore?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -2386,8 +2757,12 @@ export interface Report {
   serviceId?: string;
   status: "abierto" | "cerrado" | "en_revision";
   publicToken?: string;
+  verificationCode?: string;
+  generatedPdfPath?: string;
   signatureRequestId?: string;
   signatureStatus?: string;
+  signedAt?: string;
+  signedBy?: string;
   servicio?: string;
   empresa?: string;
   area?: string;

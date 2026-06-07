@@ -14,6 +14,8 @@ interface AuthContextType {
   user: FirebaseUser | null;
   companyId: string | null;
   role: string | null;
+  allowedModules: string[];
+  serviceActions: string[];
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -27,6 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [allowedModules, setAllowedModules] = useState<string[]>([]);
+  const [serviceActions, setServiceActions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -55,9 +59,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setCompanyId(claimsCompanyId || null);
         setRole(claimsRole || null);
+
+        // Leer allowedModules y serviceActions del user doc
+        if (claimsCompanyId && firebaseUser) {
+          try {
+            const userDoc = await getDoc(doc(db, "companies", claimsCompanyId, "users", firebaseUser.uid));
+            if (userDoc.exists()) {
+              const data = userDoc.data();
+              const mods = Array.isArray(data.allowedModules)
+                ? data.allowedModules
+                : Array.isArray(data.allowed_modules)
+                  ? data.allowed_modules
+                  : [];
+              const acts = Array.isArray(data.serviceActions)
+                ? data.serviceActions
+                : Array.isArray(data.service_actions)
+                  ? data.service_actions
+                  : [];
+              setAllowedModules(mods.map((m: unknown) => String(m).trim()).filter(Boolean));
+              setServiceActions(acts.map((a: unknown) => String(a).trim()).filter(Boolean));
+            }
+          } catch {
+            // Silenciar error
+          }
+        }
       } else {
         setCompanyId(null);
         setRole(null);
+        setAllowedModules([]);
+        setServiceActions([]);
       }
 
       setIsLoading(false);
@@ -85,6 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         companyId,
         role,
+        allowedModules,
+        serviceActions,
         isLoading,
         isAuthenticated: !!user,
         login,

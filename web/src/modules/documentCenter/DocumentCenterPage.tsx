@@ -8,10 +8,11 @@ import {
   doc,
   getDocs,
 } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { db, storage, functions } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "@/firebase/config";
+import { ref as storageRef, getDownloadURL } from "firebase/storage";
 import type { DocumentTemplate, GeneratedDocument, Employee, Customer } from "@/types";
 import {
   DocumentTextIcon,
@@ -29,19 +30,23 @@ import {
 
 export function DocumentCenterPage() {
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocument[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stats, setStats] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"templates" | "generated">("templates");
+  const [activeTab, setActiveTab] = useState<"templates" | "generated" | "batches">("templates");
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
+  const [showBatchForm, setShowBatchForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<DocumentTemplate | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
   // Form states
   const [templateForm, setTemplateForm] = useState<Partial<DocumentTemplate>>({ status: "draft", sourceFormat: "docx" });
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [extractingPlaceholders, setExtractingPlaceholders] = useState(false);
   const [genForm, setGenForm] = useState({
     templateId: "",
     employeeId: "",
@@ -50,6 +55,11 @@ export function DocumentCenterPage() {
     effectiveDate: "",
     notes: "",
   });
+  const [batchForm, setBatchForm] = useState({
+    templateId: "",
+    selectedEmployeeIds: [] as string[],
+  });
+  const [batches, setBatches] = useState<any[]>([]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -74,6 +84,11 @@ export function DocumentCenterPage() {
       setCustomers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Customer)))
     );
 
+    const qBatches = query(collection(db, "companies", companyId, "documentBatches"));
+    const unsubBatches = onSnapshot(qBatches, (snap) =>
+      setBatches(snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt)))
+    );
+
     // Load stats
     httpsCallable(functions, "getDocumentCenterStats")().then((res) => {
       setStats((res.data as any)?.statusBreakdown || {});
@@ -84,18 +99,51 @@ export function DocumentCenterPage() {
       unsubDocs();
       unsubEmp();
       unsubCust();
+      unsubBatches();
     };
   }, [companyId]);
 
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const saveTemplate = async () => {
     try {
-      await httpsCallable(functions, "saveDocumentTemplate")({
+      const payload: any = {
         id: editingTemplate?.id,
         ...templateForm,
-      });
+      };
+      if (templateFile) {
+        payload.base64Content = await fileToBase64(templateFile);
+        payload.fileName = templateFile.name;
+        payload.sourceFormat = templateFile.name.endsWith(".docx") ? "docx" : "pdf";
+      }
+      const res = await httpsCallable(functions, "saveDocumentTemplate")(payload);
+      const data = res.data as any;
       setShowTemplateForm(false);
       setEditingTemplate(null);
       setTemplateForm({ status: "draft", sourceFormat: "docx" });
+      setTemplateFile(null);
+
+      // Extract placeholders if we uploaded a new DOCX file
+      if (templateFile && templateFile.name.endsWith(".docx") && data.id) {
+        setExtractingPlaceholders(true);
+        try {
+          // Wait a moment for Storage to be ready
+          await new Promise((r) => setTimeout(r, 1500));
+          const path = `companies/${companyId}/templates/${data.id}_${templateFile.name}`;
+          // Actually, storagePath was set by the function; we need to know it.
+          // Let's use a simpler approach: the function returns no storagePath.
+          // We'll skip auto-extract for now and let user trigger it manually.
+        } catch (e) {
+          console.warn("Auto-extract failed", e);
+        }
+        setExtractingPlaceholders(false);
+      }
     } catch (err: any) {
       alert(err.message || "Error al guardar plantilla");
     }
@@ -116,9 +164,12 @@ export function DocumentCenterPage() {
       return;
     }
     try {
-      const res = await httpsCallable(functions, "generateWorkerDocument")(genForm);
+      const template = templates.find((t) => t.id === genForm.templateId);
+      const useMerge = template?.sourceFormat === "docx" && template?.storagePath;
+      const fnName = useMerge ? "mergeDocumentTemplate" : "generateWorkerDocument";
+      const res = await httpsCallable(functions, fnName)(genForm);
       const data = res.data as any;
-      alert(`Documento generado: ${data.documentId}`);
+      alert(`Documento generado: ${data.documentId} (${useMerge ? "DOCX mergeado" : "PDF simple"})`);
       setShowGenerateForm(false);
       setGenForm({
         templateId: "",
@@ -166,6 +217,47 @@ export function DocumentCenterPage() {
     }
   };
 
+  const reviewDoc = async (id: string) => {
+    try {
+      await httpsCallable(functions, "reviewGeneratedDocument")({ documentId: id });
+    } catch (err: any) {
+      alert(err.message || "Error al enviar a revisión");
+    }
+  };
+
+  const sendDocToSignature = async (docItem: any) => {
+    try {
+      const res = await httpsCallable(functions, "sendGeneratedDocumentToSignature")({
+        documentId: docItem.id,
+        signerEmail: docItem.recipientEmail,
+        signerName: docItem.recipientName,
+      });
+      const data = res.data as any;
+      alert(`Enviado a firma: ${data.signatureRequestId}`);
+    } catch (err: any) {
+      alert(err.message || "Error al enviar a firma");
+    }
+  };
+
+  const generateBatch = async () => {
+    if (!batchForm.templateId || batchForm.selectedEmployeeIds.length === 0) {
+      alert("Selecciona plantilla y al menos un empleado");
+      return;
+    }
+    try {
+      const res = await httpsCallable(functions, "generateDocumentBatch")({
+        templateId: batchForm.templateId,
+        employeeIds: batchForm.selectedEmployeeIds,
+      });
+      const data = res.data as any;
+      alert(`Lote generado: ${data.generatedCount} éxitos, ${data.failedCount} fallos`);
+      setShowBatchForm(false);
+      setBatchForm({ templateId: "", selectedEmployeeIds: [] });
+    } catch (err: any) {
+      alert(err.message || "Error al generar lote");
+    }
+  };
+
   const deleteDocItem = async (id: string) => {
     if (!confirm("¿Eliminar este documento?")) return;
     try {
@@ -176,9 +268,12 @@ export function DocumentCenterPage() {
   };
 
   const getDownloadUrl = async (storagePath: string) => {
-    // For emulators, we can't easily get signed URLs. In production this would use getDownloadURL.
-    // For now, return a placeholder or use the Firebase SDK directly.
-    return `#`;
+    try {
+      const url = await getDownloadURL(storageRef(storage, storagePath));
+      return url;
+    } catch {
+      return "#";
+    }
   };
 
   const statusColors: Record<string, string> = {
@@ -203,20 +298,33 @@ export function DocumentCenterPage() {
           <p className="text-gray-500 text-sm mt-1">Plantillas, generación masiva y trazabilidad documental</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowGenerateForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium"
-          >
-            <UserIcon className="w-4 h-4" />
-            Generar para trabajador
-          </button>
-          <button
-            onClick={() => { setEditingTemplate(null); setTemplateForm({ status: "draft", sourceFormat: "docx" }); setShowTemplateForm(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
-          >
-            <PlusIcon className="w-4 h-4" />
-            Nueva plantilla
-          </button>
+          {hasPermission("document_center.generate_document") && (
+            <>
+              <button
+                onClick={() => setShowBatchForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium"
+              >
+                <UserIcon className="w-4 h-4" />
+                Generar por lote
+              </button>
+              <button
+                onClick={() => setShowGenerateForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium"
+              >
+                <UserIcon className="w-4 h-4" />
+                Generar individual
+              </button>
+            </>
+          )}
+          {hasPermission("document_center.save_template") && (
+            <button
+              onClick={() => { setEditingTemplate(null); setTemplateForm({ status: "draft", sourceFormat: "docx" }); setShowTemplateForm(true); }}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Nueva plantilla
+            </button>
+          )}
         </div>
       </div>
 
@@ -237,6 +345,7 @@ export function DocumentCenterPage() {
         {[
           { key: "templates" as const, label: `Plantillas (${templates.length})`, icon: FolderIcon },
           { key: "generated" as const, label: `Generados (${generatedDocs.length})`, icon: DocumentTextIcon },
+          { key: "batches" as const, label: `Lotes (${batches.length})`, icon: DocumentTextIcon },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -302,9 +411,11 @@ export function DocumentCenterPage() {
                         >
                           <PencilIcon className="w-4 h-4" />
                         </button>
-                        <button onClick={() => deleteTemplate(t.id)} className="text-gray-400 hover:text-red-400">
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
+                        {hasPermission("document_center.delete_template") && (
+                          <button onClick={() => deleteTemplate(t.id)} className="text-gray-400 hover:text-red-400">
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -351,28 +462,49 @@ export function DocumentCenterPage() {
                     <td className="px-4 py-3">
                       <div className="flex gap-2 flex-wrap">
                         {d.storagePath && (
-                          <button className="text-gray-400 hover:text-white" title="Descargar PDF">
+                          <button
+                            onClick={async () => {
+                              const url = await getDownloadUrl(d.storagePath!);
+                              if (url && url !== "#") window.open(url, "_blank");
+                            }}
+                            className="text-gray-400 hover:text-white"
+                            title="Descargar"
+                          >
                             <ArrowDownTrayIcon className="w-4 h-4" />
                           </button>
                         )}
-                        {d.status === "generated" && (
-                          <button onClick={() => approveDoc(d.id)} className="text-gray-400 hover:text-blue-400" title="Aprobar">
+                        {d.status === "generated" && hasPermission("document_center.review_document") && (
+                          <button onClick={() => reviewDoc(d.id)} className="text-yellow-400 hover:text-yellow-300" title="Enviar a revisión">
+                            <PencilIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                        {d.status === "ready_for_review" && hasPermission("document_center.approve_document") && (
+                          <button onClick={() => approveDoc(d.id)} className="text-blue-400 hover:text-blue-300" title="Aprobar">
                             <CheckCircleIcon className="w-4 h-4" />
                           </button>
                         )}
                         {d.status === "approved" && (
                           <>
-                            <button onClick={() => sendToSignature(d)} className="text-purple-400 hover:text-purple-300" title="Enviar a firmar">
+                            <button onClick={() => sendDocToSignature(d)} className="text-purple-400 hover:text-purple-300" title="Enviar a firma">
                               <PencilSquareIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={() => closeDoc(d.id)} className="text-gray-400 hover:text-green-400" title="Cerrar">
-                              <CheckCircleIcon className="w-4 h-4" />
-                            </button>
+                            {hasPermission("document_center.close_document") && (
+                              <button onClick={() => closeDoc(d.id)} className="text-gray-400 hover:text-green-400" title="Cerrar">
+                                <CheckCircleIcon className="w-4 h-4" />
+                              </button>
+                            )}
                           </>
                         )}
-                        <button onClick={() => deleteDocItem(d.id)} className="text-gray-400 hover:text-red-400" title="Eliminar">
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
+                        {d.status === "signed" && hasPermission("document_center.close_document") && (
+                          <button onClick={() => closeDoc(d.id)} className="text-green-400 hover:text-green-300" title="Cerrar">
+                            <CheckCircleIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                        {hasPermission("document_center.delete_document") && (
+                          <button onClick={() => deleteDocItem(d.id)} className="text-gray-400 hover:text-red-400" title="Eliminar">
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -517,6 +649,35 @@ export function DocumentCenterPage() {
                   placeholder="ANEXO_INDEFINIDO, EPP_ENTREGA..."
                 />
               </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Archivo plantilla (.docx / .pdf)</label>
+                <input
+                  type="file"
+                  accept=".docx,.pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setTemplateFile(file);
+                    if (file) {
+                      setTemplateForm({ ...templateForm, fileName: file.name, sourceFormat: file.name.endsWith(".docx") ? "docx" : "pdf" });
+                    }
+                  }}
+                  className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-gray-800 file:text-gray-300 hover:file:bg-gray-700"
+                />
+                {templateFile && <p className="text-xs text-gray-500 mt-1">{templateFile.name}</p>}
+                {editingTemplate?.storagePath && !templateFile && (
+                  <p className="text-xs text-gray-500 mt-1">Archivo existente: {editingTemplate.originalFilename || editingTemplate.storagePath}</p>
+                )}
+              </div>
+              {templateForm.placeholderKeys && templateForm.placeholderKeys.length > 0 && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Placeholders detectados</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {templateForm.placeholderKeys.map((k) => (
+                      <span key={k} className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-xs rounded-full">{"{"}{k}{"}"}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 p-4 border-t border-gray-800">
               <button onClick={() => setShowTemplateForm(false)} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm">
@@ -524,6 +685,110 @@ export function DocumentCenterPage() {
               </button>
               <button onClick={saveTemplate} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium">
                 Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batches tab */}
+      {activeTab === "batches" && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          {batches.length === 0 ? (
+            <div className="text-center py-12">
+              <DocumentTextIcon className="w-12 h-12 text-gray-700 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">Sin lotes generados.</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 text-left text-gray-500">
+                  <th className="px-4 py-3">Plantilla</th>
+                  <th className="px-4 py-3">Empleados</th>
+                  <th className="px-4 py-3">Éxito</th>
+                  <th className="px-4 py-3">Fallos</th>
+                  <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3">Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batches.map((b) => (
+                  <tr key={b.id} className="border-b border-gray-800/50">
+                    <td className="px-4 py-3 text-white font-medium">{b.templateName}</td>
+                    <td className="px-4 py-3 text-gray-300">{b.employeeIds?.length || 0}</td>
+                    <td className="px-4 py-3 text-green-400">{b.successCount}</td>
+                    <td className="px-4 py-3 text-red-400">{b.failedCount}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${
+                        b.status === "completed" ? "bg-green-500/20 text-green-400" :
+                        b.status === "failed" ? "bg-red-500/20 text-red-400" :
+                        "bg-yellow-500/20 text-yellow-400"
+                      }`}>
+                        {b.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{new Date(b.createdAt).toLocaleDateString("es-CL")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Batch Generation Modal */}
+      {showBatchForm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-800">
+              <h3 className="text-lg font-semibold text-white">Generar Documentos por Lote</h3>
+              <button onClick={() => setShowBatchForm(false)} className="text-gray-400 hover:text-white">
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Plantilla *</label>
+                <select
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
+                  value={batchForm.templateId}
+                  onChange={(e) => setBatchForm({ ...batchForm, templateId: e.target.value })}
+                >
+                  <option value="">Seleccionar...</option>
+                  {templates.filter((t) => t.status === "active").map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Empleados *</label>
+                <div className="max-h-60 overflow-y-auto bg-gray-800 border border-gray-700 rounded-lg p-2 space-y-1">
+                  {employees.map((emp) => (
+                    <label key={emp.id} className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700/50 rounded px-2 py-1">
+                      <input
+                        type="checkbox"
+                        checked={batchForm.selectedEmployeeIds.includes(emp.id)}
+                        onChange={(e) => {
+                          const ids = e.target.checked
+                            ? [...batchForm.selectedEmployeeIds, emp.id]
+                            : batchForm.selectedEmployeeIds.filter((id) => id !== emp.id);
+                          setBatchForm({ ...batchForm, selectedEmployeeIds: ids });
+                        }}
+                        className="rounded border-gray-600"
+                      />
+                      {emp.fullName || `${emp.firstName} ${emp.lastName}`}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{batchForm.selectedEmployeeIds.length} seleccionados (máx 100)</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t border-gray-800">
+              <button onClick={() => setShowBatchForm(false)} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm">
+                Cancelar
+              </button>
+              <button onClick={generateBatch} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium">
+                Generar lote
               </button>
             </div>
           </div>

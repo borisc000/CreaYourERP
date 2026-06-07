@@ -8,6 +8,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db, storage } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -21,7 +22,7 @@ interface ApprovePayload {
 export const approveGeneratedDocument = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -32,6 +33,8 @@ export const approveGeneratedDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "document_center.approve_document", { companyId });
 
     const { documentId } = request.data as ApprovePayload;
     if (!documentId) {
@@ -70,6 +73,105 @@ export const approveGeneratedDocument = onCall(
   }
 );
 
+// ---------- reviewGeneratedDocument ----------
+interface ReviewPayload {
+  documentId: string;
+}
+
+export const reviewGeneratedDocument = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.review_document", { companyId });
+
+    const { documentId } = request.data as ReviewPayload;
+    if (!documentId) throw new HttpsError("invalid-argument", "documentId es requerido");
+
+    const ref = companyRef(companyId).collection("generatedDocuments").doc(documentId);
+    const snap = await ref.get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    const data = snap.data()!;
+    if (data.status !== "generated") throw new HttpsError("failed-precondition", "Solo documentos en estado 'generated' pueden pasar a revisión");
+
+    const now = new Date().toISOString();
+    await ref.update({ status: "ready_for_review", reviewedBy: request.auth.uid, reviewedAt: now, updatedAt: now });
+    await companyRef(companyId).collection("documentEventLogs").add({ companyId, documentId, event: "ready_for_review", userId: request.auth.uid, createdAt: now });
+    return { success: true };
+  }
+);
+
+// ---------- sendGeneratedDocumentToSignature ----------
+interface SendToSignaturePayload {
+  documentId: string;
+  signerEmail?: string;
+  signerName?: string;
+  signaturePositions?: any[];
+}
+
+export const sendGeneratedDocumentToSignature = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.send_to_signature", { companyId });
+
+    const { documentId, signerEmail, signerName, signaturePositions } = request.data as SendToSignaturePayload;
+    if (!documentId) throw new HttpsError("invalid-argument", "documentId es requerido");
+
+    const ref = companyRef(companyId).collection("generatedDocuments").doc(documentId);
+    const snap = await ref.get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    const data = snap.data()!;
+    if (data.status !== "approved") throw new HttpsError("failed-precondition", "El documento debe estar aprobado antes de enviar a firma");
+
+    const resolvedSignerEmail = signerEmail || data.recipientEmail || "";
+    const resolvedSignerName = signerName || data.recipientName || "";
+    if (!resolvedSignerEmail) throw new HttpsError("invalid-argument", "No se pudo determinar el email del firmante");
+
+    // Create signature request
+    const now = new Date().toISOString();
+    const token = generateToken();
+    const sigRef = companyRef(companyId).collection("signatureRequests").doc();
+    await sigRef.set({
+      companyId,
+      name: data.name,
+      description: `Documento generado: ${data.templateName}`,
+      requestFrom: request.auth.uid,
+      requestToEmail: resolvedSignerEmail,
+      requestToName: resolvedSignerName,
+      generatedDocumentId: documentId,
+      storagePath: data.storagePath || "",
+      signaturePositions: signaturePositions || [],
+      status: "draft",
+      accessToken: token,
+      expiresAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await ref.update({ status: "signature_pending", signatureRequestId: sigRef.id, updatedAt: now });
+    await companyRef(companyId).collection("documentEventLogs").add({ companyId, documentId, event: "signature_pending", signatureRequestId: sigRef.id, userId: request.auth.uid, createdAt: now });
+
+    return { success: true, signatureRequestId: sigRef.id, token };
+  }
+);
+
+function generateToken(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let token = "";
+  for (let i = 0; i < 32; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+  return token;
+}
+
 // ---------- closeGeneratedDocument ----------
 interface ClosePayload {
   documentId: string;
@@ -78,7 +180,7 @@ interface ClosePayload {
 export const closeGeneratedDocument = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -90,6 +192,8 @@ export const closeGeneratedDocument = onCall(
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
 
+    await assertAction(request, "document_center.close_document", { companyId });
+
     const { documentId } = request.data as ClosePayload;
     if (!documentId) {
       throw new HttpsError("invalid-argument", "documentId es requerido");
@@ -100,6 +204,12 @@ export const closeGeneratedDocument = onCall(
       const snap = await ref.get();
       if (!snap.exists) {
         throw new HttpsError("not-found", "Documento no encontrado");
+      }
+
+      const docData = snap.data()!;
+      // Require signed status before closing if signature was required
+      if (docData.requiresSignature && docData.status !== "signed") {
+        throw new HttpsError("failed-precondition", "El documento requiere firma antes de cerrarse");
       }
 
       const now = new Date().toISOString();
@@ -134,7 +244,7 @@ interface DeletePayload {
 export const deleteGeneratedDocument = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -145,6 +255,8 @@ export const deleteGeneratedDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "document_center.delete_document", { companyId });
 
     const { documentId } = request.data as DeletePayload;
     if (!documentId) {
@@ -174,11 +286,162 @@ export const deleteGeneratedDocument = onCall(
   }
 );
 
+// ---------- listGeneratedDocuments ----------
+export const listGeneratedDocuments = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.view", { companyId });
+
+    const data = request.data || {};
+    const status = (data.status || "").trim();
+    const templateId = (data.templateId || "").trim();
+    const employeeId = (data.employeeId || "").trim();
+    const search = (data.search || "").trim().toLowerCase();
+    const limit = Math.min(500, Math.max(1, Number(data.limit || 200)));
+
+    let q: FirebaseFirestore.Query = companyRef(companyId).collection("generatedDocuments").orderBy("createdAt", "desc").limit(limit);
+    if (status) q = q.where("status", "==", status);
+    if (templateId) q = q.where("templateId", "==", templateId);
+    if (employeeId) q = q.where("employeeId", "==", employeeId);
+
+    const snap = await q.get();
+    let docs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    if (search) {
+      docs = docs.filter((d: any) =>
+        String(d.name || "").toLowerCase().includes(search) ||
+        String(d.recipientName || "").toLowerCase().includes(search)
+      );
+    }
+    return { documents: docs };
+  }
+);
+
+// ---------- getGeneratedDocument ----------
+export const getGeneratedDocument = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.view", { companyId });
+
+    const id = (request.data?.id || request.data?.documentId || "").trim();
+    if (!id) throw new HttpsError("invalid-argument", "id es requerido");
+
+    const snap = await companyRef(companyId).collection("generatedDocuments").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    return { document: { id: snap.id, ...snap.data() } };
+  }
+);
+
+// ---------- previewGeneratedDocument ----------
+export const previewGeneratedDocument = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.preview_document", { companyId });
+
+    const id = (request.data?.id || request.data?.documentId || "").trim();
+    if (!id) throw new HttpsError("invalid-argument", "id es requerido");
+
+    const snap = await companyRef(companyId).collection("generatedDocuments").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    const data = snap.data()!;
+    const storagePath = data.storagePath || "";
+    if (!storagePath) throw new HttpsError("failed-precondition", "Documento sin archivo");
+
+    const [url] = await storage.bucket().file(storagePath).getSignedUrl({
+      action: "read",
+      expires: Date.now() + 15 * 60 * 1000,
+    });
+
+    return { url, contentType: data.outputFormat === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+  }
+);
+
+// ---------- duplicateGeneratedDocument ----------
+export const duplicateGeneratedDocument = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "document_center.duplicate_document", { companyId });
+
+    const id = (request.data?.id || request.data?.documentId || "").trim();
+    if (!id) throw new HttpsError("invalid-argument", "id es requerido");
+
+    const snap = await companyRef(companyId).collection("generatedDocuments").doc(id).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Documento no encontrado");
+    const original = snap.data()!;
+
+    const now = new Date().toISOString();
+    let newStoragePath: string | null = null;
+
+    if (original.storagePath) {
+      try {
+        const bucket = storage.bucket();
+        const ext = original.storagePath.split(".").pop() || "pdf";
+        const newFileName = `copy_${Date.now()}_${original.outputFilename || `document.${ext}`}`;
+        newStoragePath = `companies/${companyId}/generated/${newFileName}`;
+        await bucket.file(original.storagePath).copy(newStoragePath);
+      } catch (e) {
+        console.warn("[duplicateGeneratedDocument] Could not copy file:", e);
+      }
+    }
+
+    const newRef = companyRef(companyId).collection("generatedDocuments").doc();
+    await newRef.set({
+      companyId,
+      templateId: original.templateId || null,
+      templateName: original.templateName || "",
+      name: `${original.name || "Documento"} (copia)`,
+      outputFilename: newStoragePath ? newStoragePath.split("/").pop() : original.outputFilename || "",
+      outputFormat: original.outputFormat || "pdf",
+      recipientName: original.recipientName || "",
+      recipientEmail: original.recipientEmail || "",
+      employeeId: original.employeeId || null,
+      customerId: original.customerId || null,
+      serviceOrderId: original.serviceOrderId || null,
+      targetModule: original.targetModule || "general",
+      sourceModule: "document_center",
+      sourceLabel: `${original.recipientName || "Copia"} / ${original.templateName || "Documento"}`,
+      storagePath: newStoragePath,
+      availableFormats: original.availableFormats || [original.outputFormat || "pdf"],
+      status: "generated",
+      requiresSignature: !!original.requiresSignature,
+      tags: [],
+      duplicatedFrom: id,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { success: true, documentId: newRef.id, storagePath: newStoragePath };
+  }
+);
+
 // ---------- getDocumentCenterStats ----------
 export const getDocumentCenterStats = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -189,6 +452,8 @@ export const getDocumentCenterStats = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "document_center.view_stats", { companyId });
 
     try {
       const cRef = companyRef(companyId);

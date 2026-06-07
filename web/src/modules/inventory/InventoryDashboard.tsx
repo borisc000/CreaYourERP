@@ -12,7 +12,11 @@ import {
   ShieldCheckIcon,
   ClockIcon,
   FolderArrowDownIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ChartBarIcon,
 } from "@heroicons/react/24/outline";
+import { InventoryBackupDetail } from "./InventoryBackupDetail";
 
 interface DashboardStats {
   totalItems: number;
@@ -21,6 +25,10 @@ interface DashboardStats {
   lowStockItems: number;
   outOfStockItems: number;
   totalInventoryValue: number;
+  inboundToday: number;
+  outboundToday: number;
+  inboundValueToday: number;
+  outboundValueToday: number;
 }
 
 interface AlertItem {
@@ -82,6 +90,7 @@ export function InventoryDashboard() {
   const { companyId } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedBackupId, setSelectedBackupId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!companyId) return;
@@ -95,6 +104,13 @@ export function InventoryDashboard() {
       })
       .finally(() => setLoading(false));
   }, [companyId]);
+
+  const healthScore = useState(() => {
+    if (!data) return 0;
+    const total = data.stats.totalItems || 1;
+    const healthy = total - data.stats.lowStockItems - data.stats.outOfStockItems - data.stats.inactiveItems;
+    return Math.round((Math.max(0, healthy) / total) * 100);
+  })[0];
 
   const statCards = [
     {
@@ -167,6 +183,18 @@ export function InventoryDashboard() {
     );
   };
 
+  const stockProgress = (current: number, minimum: number) => {
+    const pct = minimum > 0 ? Math.min((current / (minimum * 2)) * 100, 100) : current > 0 ? 100 : 0;
+    const color = current <= 0 ? "bg-red-500" : current <= minimum ? "bg-amber-500" : "bg-emerald-500";
+    return (
+      <div className="w-full">
+        <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+          <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="p-8">
@@ -183,11 +211,16 @@ export function InventoryDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Inventario</h1>
-          <p className="text-gray-400 text-sm mt-1">
-            Dashboard general de inventario y movimientos
-          </p>
+          <p className="text-gray-400 text-sm mt-1">Dashboard general de inventario y movimientos</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/inventory/movements")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            <ClockIcon className="w-4 h-4" />
+            Movimientos
+          </button>
           <button
             onClick={() => navigate("/inventory/items")}
             className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
@@ -204,7 +237,7 @@ export function InventoryDashboard() {
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats + Health Score + Today */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card) => (
           <div key={card.label} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
@@ -219,7 +252,74 @@ export function InventoryDashboard() {
             </div>
           </div>
         ))}
+        {/* Health Score */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-400 text-sm">Health Score</p>
+              <p className={`text-2xl font-bold mt-1 ${healthScore >= 80 ? "text-emerald-400" : healthScore >= 50 ? "text-amber-400" : "text-red-400"}`}>
+                {healthScore}%
+              </p>
+            </div>
+            <div className={`w-10 h-10 rounded-lg ${healthScore >= 80 ? "bg-emerald-500/10" : healthScore >= 50 ? "bg-amber-500/10" : "bg-red-500/10"} flex items-center justify-center`}>
+              <ChartBarIcon className={`w-5 h-5 ${healthScore >= 80 ? "text-emerald-400" : healthScore >= 50 ? "text-amber-400" : "text-red-400"}`} />
+            </div>
+          </div>
+          <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden mt-3">
+            <div
+              className={`h-full rounded-full ${healthScore >= 80 ? "bg-emerald-500" : healthScore >= 50 ? "bg-amber-500" : "bg-red-500"}`}
+              style={{ width: `${healthScore}%` }}
+            />
+          </div>
+        </div>
+        {/* Inbound Today */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-400 text-sm">Entradas hoy</p>
+              <p className="text-2xl font-bold text-emerald-400 mt-1">{data?.stats.inboundToday ?? 0}</p>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <ArrowDownIcon className="w-5 h-5 text-emerald-400" />
+            </div>
+          </div>
+          <p className="text-gray-500 text-xs mt-2">
+            Valor: ${(data?.stats.inboundValueToday ?? 0).toLocaleString("es-CL")}
+          </p>
+        </div>
+        {/* Outbound Today */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-400 text-sm">Salidas hoy</p>
+              <p className="text-2xl font-bold text-red-400 mt-1">{data?.stats.outboundToday ?? 0}</p>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+              <ArrowUpIcon className="w-5 h-5 text-red-400" />
+            </div>
+          </div>
+          <p className="text-gray-500 text-xs mt-2">
+            Valor: ${(data?.stats.outboundValueToday ?? 0).toLocaleString("es-CL")}
+          </p>
+        </div>
       </div>
+
+      {/* Category Chips */}
+      {data && data.categories.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {data.categories.map((cat) => (
+            <button
+              key={cat.name}
+              onClick={() => navigate(`/inventory/items?category=${encodeURIComponent(cat.name)}`)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+            >
+              <span className="w-2 h-2 rounded-full bg-blue-400" />
+              {cat.name}
+              <span className="text-gray-500 text-xs">({cat.count})</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Alerts */}
       {(data?.alerts?.length ?? 0) > 0 && (
@@ -235,20 +335,23 @@ export function InventoryDashboard() {
                 onClick={() => navigate(`/inventory/items/${alert.id}`)}
                 className="flex items-center justify-between py-3 cursor-pointer hover:bg-gray-800/30 px-2 rounded transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center shrink-0">
                     <CubeIcon className="w-4 h-4 text-gray-400" />
                   </div>
-                  <div>
-                    <p className="text-white text-sm font-medium">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white text-sm font-medium truncate">
                       {alert.code} — {alert.name}
                     </p>
-                    <p className="text-gray-500 text-xs">
-                      Stock: {alert.currentStock} / Mín: {alert.minimumStock}
-                    </p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <p className="text-gray-500 text-xs">
+                        Stock: {alert.currentStock} / Mín: {alert.minimumStock}
+                      </p>
+                      {stockProgress(alert.currentStock, alert.minimumStock)}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0 ml-4">
                   {statusBadge(alert.stockStatus)}
                   <ArrowRightIcon className="w-4 h-4 text-gray-600" />
                 </div>
@@ -305,13 +408,23 @@ export function InventoryDashboard() {
               <ClockIcon className="w-4 h-4 text-emerald-400" />
               Movimientos Recientes
             </h2>
+            <button
+              onClick={() => navigate("/inventory/movements")}
+              className="text-blue-400 hover:text-blue-300 text-xs font-medium"
+            >
+              Ver todos
+            </button>
           </div>
           <div className="divide-y divide-gray-800">
             {(data?.recentMovements?.length ?? 0) === 0 ? (
               <p className="text-gray-500 text-sm py-4 text-center">No hay movimientos registrados</p>
             ) : (
               data?.recentMovements.map((mov) => (
-                <div key={mov.id} className="flex items-center justify-between py-3 px-2">
+                <div
+                  key={mov.id}
+                  onClick={() => navigate(`/inventory/movements/${mov.id}`)}
+                  className="flex items-center justify-between py-3 px-2 cursor-pointer hover:bg-gray-800/30 rounded transition-colors"
+                >
                   <div>
                     <p className="text-white text-sm font-medium">
                       {mov.itemCode} — {mov.itemName}
@@ -344,7 +457,11 @@ export function InventoryDashboard() {
             <p className="text-gray-500 text-sm py-4 text-center">No hay backups registrados</p>
           ) : (
             data?.recentBackups.map((b) => (
-              <div key={b.id} className="flex items-center justify-between py-3 px-2">
+              <div
+                key={b.id}
+                onClick={() => setSelectedBackupId(b.id)}
+                className="flex items-center justify-between py-3 px-2 cursor-pointer hover:bg-gray-800/30 rounded transition-colors"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center shrink-0">
                     <ShieldCheckIcon className="w-4 h-4 text-gray-400" />
@@ -362,6 +479,10 @@ export function InventoryDashboard() {
           )}
         </div>
       </div>
+
+      {selectedBackupId && (
+        <InventoryBackupDetail backupId={selectedBackupId} onClose={() => setSelectedBackupId(null)} />
+      )}
     </div>
   );
 }

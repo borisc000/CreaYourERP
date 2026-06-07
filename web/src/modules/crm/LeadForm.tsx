@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { doc, getDoc, collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFirestoreDoc } from "@/hooks/useFirestore";
+import { crmCreateLead, crmUpdateLead } from "@/services/crm";
 import type { Lead, Customer, Stage, ServiceType, User, LeadPriority, LeadStatus } from "@/types";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 
@@ -13,7 +13,6 @@ export function LeadForm() {
   const { companyId } = useAuth();
   const isEdit = Boolean(id);
 
-  const { create, update } = useFirestoreDoc<Lead>("leads");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
@@ -157,11 +156,12 @@ export function LeadForm() {
     setIsSubmitting(true);
     try {
       if (isEdit && id) {
-        await update(id, form);
+        await crmUpdateLead(id, form);
+        navigate(`/crm/leads/${id}`);
       } else {
-        await create(form as Omit<Lead, "id" | "companyId" | "createdAt">);
+        const result = await crmCreateLead(form);
+        navigate(`/crm/leads/${result.id}`);
       }
-      navigate("/crm/leads");
     } catch (err) {
       console.error("Error guardando oportunidad:", err);
       alert("Error al guardar la oportunidad");

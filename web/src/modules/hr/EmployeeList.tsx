@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { orderBy } from "firebase/firestore";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
+import { usePermission } from "@/hooks/usePermission";
 import type { Employee, Department } from "@/types";
 import {
   UsersIcon,
@@ -12,6 +13,7 @@ import {
 
 export function EmployeeList() {
   const navigate = useNavigate();
+  const { hasPermission } = usePermission();
   const { data: employees, isLoading } = useFirestoreCollection<Employee>("employees", [
     orderBy("lastName"),
   ]);
@@ -62,13 +64,15 @@ export function EmployeeList() {
           <h1 className="text-2xl font-bold text-white">Colaboradores</h1>
           <p className="text-gray-400 text-sm mt-1">Gestiona empleados, contratos y acreditaciones</p>
         </div>
-        <button
-          onClick={() => navigate("/hr/employees/new")}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <PlusIcon className="w-4 h-4" />
-          Nuevo Colaborador
-        </button>
+        {hasPermission("hr.create_employee") && (
+          <button
+            onClick={() => navigate("/hr/employees/new")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Nuevo Colaborador
+          </button>
+        )}
       </div>
 
       {/* Stats */}

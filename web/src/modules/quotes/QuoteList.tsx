@@ -2,16 +2,20 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { orderBy } from "firebase/firestore";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
+import { usePermission } from "@/hooks/usePermission";
 import type { Quote } from "@/types";
 import {
   DocumentTextIcon,
   PlusIcon,
   MagnifyingGlassIcon,
   ChevronRightIcon,
+  PrinterIcon,
+  TruckIcon,
 } from "@heroicons/react/24/outline";
 
 export function QuoteList() {
   const navigate = useNavigate();
+  const { hasPermission } = usePermission();
   const { data: quotes, isLoading } = useFirestoreCollection<Quote>("quotes", [
     orderBy("createdAt", "desc"),
   ]);
@@ -60,13 +64,29 @@ export function QuoteList() {
             {quotes.length} {quotes.length === 1 ? "cotización" : "cotizaciones"} registradas
           </p>
         </div>
-        <button
-          onClick={() => navigate("/quotes/new")}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <PlusIcon className="w-4 h-4" />
-          Nueva Cotización
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/quotes/catalog/service")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            Catálogos
+          </button>
+          <button
+            onClick={() => navigate("/quotes/templates")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            Plantillas
+          </button>
+          {hasPermission("quote.create") && (
+            <button
+              onClick={() => navigate("/quotes/new")}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Nueva Cotización
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -150,6 +170,12 @@ export function QuoteList() {
                         {quote.quoteNumber}
                       </span>
                     )}
+                    {quote.rentalContractId && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-900/30 text-amber-400 text-xs rounded shrink-0">
+                        <TruckIcon className="w-3 h-3" />
+                        Arriendo
+                      </span>
+                    )}
                   </div>
                   <p className="text-gray-500 text-sm mt-0.5">
                     {quote.grossTotal
@@ -164,6 +190,16 @@ export function QuoteList() {
                 >
                   {statusLabels[quote.status] || quote.status}
                 </span>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    navigate(`/quotes/${quote.id}/preview`);
+                  }}
+                  className="p-2 text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
+                  title="Vista PDF"
+                >
+                  <PrinterIcon className="w-5 h-5" />
+                </button>
                 <ChevronRightIcon className="w-5 h-5 text-gray-600 group-hover:text-gray-400 transition-colors" />
               </div>
             ))}

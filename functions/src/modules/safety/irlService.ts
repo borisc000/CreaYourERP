@@ -7,6 +7,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -22,7 +23,7 @@ interface GenerateIRLPayload {
 export const generateIRL = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -33,6 +34,8 @@ export const generateIRL = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.generate_irl", { companyId });
 
     const { folderId, employeeId, positionTitle } = request.data as GenerateIRLPayload;
     if (!folderId) {
@@ -138,7 +141,7 @@ export const generateIRL = onCall(
         riskItems,
         complementMaterials: [],
         observations: "",
-        introText: `Por medio de la presente se informa a usted, en cumplimiento de lo dispuesto en el artículo 14 del D.S. N° 44, sobre los riesgos laborales a que estará expuesto en el desarrollo de sus labores.`,
+        introText: "Por medio de la presente se informa a usted, en cumplimiento de lo dispuesto en el artículo 14 del D.S. N° 44, sobre los riesgos laborales a que estará expuesto en el desarrollo de sus labores.",
         themeColor: "#0F4C81",
         signedByEmployee: false,
         createdAt: now,
@@ -190,7 +193,7 @@ interface SaveIRLPayload {
 export const saveIRL = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -201,6 +204,8 @@ export const saveIRL = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.save_irl", { companyId });
 
     const { irlId, ...payload } = request.data as SaveIRLPayload;
     if (!irlId) {
@@ -241,7 +246,7 @@ interface DeleteIRLPayload {
 export const deleteIRL = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -252,6 +257,8 @@ export const deleteIRL = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.delete_irl", { companyId });
 
     const { irlId } = request.data as DeleteIRLPayload;
     if (!irlId) {

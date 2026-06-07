@@ -9,6 +9,7 @@
  */
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 import * as crypto from "crypto";
 
@@ -42,7 +43,7 @@ function computeInventoryValue(currentStock: number, averageCost: number): numbe
 export const getInventoryDashboard = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -53,6 +54,7 @@ export const getInventoryDashboard = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.view", { companyId });
 
     try {
       const cref = companyRef(companyId);
@@ -74,6 +76,19 @@ export const getInventoryDashboard = onCall(
       const lowStockItems = items.filter((i) => i.stockStatus === "low").length;
       const outOfStockItems = items.filter((i) => i.stockStatus === "out").length;
       const totalInventoryValue = items.reduce((sum, i) => sum + (i.inventoryValue || 0), 0);
+
+      const today = new Date().toISOString().split("T")[0];
+      const todayMovements = movementsSnap.docs
+        .map((d) => d.data() as any)
+        .filter((m) => (m.movementDate || "").startsWith(today) || (m.createdAt || "").startsWith(today));
+      const inboundToday = todayMovements.filter((m) => m.movementDirection === "in").length;
+      const outboundToday = todayMovements.filter((m) => m.movementDirection === "out").length;
+      const inboundValueToday = todayMovements
+        .filter((m) => m.movementDirection === "in")
+        .reduce((sum, m) => sum + (m.totalCost || 0), 0);
+      const outboundValueToday = todayMovements
+        .filter((m) => m.movementDirection === "out")
+        .reduce((sum, m) => sum + (m.totalCost || 0), 0);
 
       const categories = Array.from(new Set(items.map((i) => i.category).filter(Boolean)));
       const categoryBreakdown = categories.map((cat) => ({
@@ -148,6 +163,10 @@ export const getInventoryDashboard = onCall(
           lowStockItems,
           outOfStockItems,
           totalInventoryValue: Math.round(totalInventoryValue * 100) / 100,
+          inboundToday,
+          outboundToday,
+          inboundValueToday: Math.round(inboundValueToday * 100) / 100,
+          outboundValueToday: Math.round(outboundValueToday * 100) / 100,
         },
         categories: categoryBreakdown,
         alerts,
@@ -183,7 +202,7 @@ interface CreateInventoryItemPayload {
 export const createInventoryItem = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -194,6 +213,7 @@ export const createInventoryItem = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.create", { companyId });
 
     const payload = request.data as CreateInventoryItemPayload;
     if (!payload.code?.trim() || !payload.name?.trim() || !payload.category?.trim() || !payload.unit?.trim() || !payload.location?.trim()) {
@@ -303,7 +323,7 @@ interface UpdateInventoryItemPayload {
 export const updateInventoryItem = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -314,6 +334,7 @@ export const updateInventoryItem = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.edit", { companyId });
 
     const { itemId, ...updates } = request.data as UpdateInventoryItemPayload;
     if (!itemId) {
@@ -373,7 +394,7 @@ interface DeleteInventoryItemPayload {
 export const deleteInventoryItem = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -384,6 +405,7 @@ export const deleteInventoryItem = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.delete", { companyId });
 
     const { itemId } = request.data as DeleteInventoryItemPayload;
     if (!itemId) {
@@ -427,6 +449,8 @@ interface CreateInventoryMovementPayload {
   hasSignatureEvidence?: boolean;
   evidencePhotoData?: string;
   evidenceSignatureData?: string;
+  photoBase64?: string;
+  signatureBase64?: string;
   notes?: string;
   movementDate?: string;
 }
@@ -434,7 +458,7 @@ interface CreateInventoryMovementPayload {
 export const createInventoryMovement = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -445,6 +469,7 @@ export const createInventoryMovement = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.create", { companyId });
 
     const payload = request.data as CreateInventoryMovementPayload;
     if (!payload.itemId || !payload.movementType || payload.quantity === undefined || payload.quantity === null) {
@@ -463,12 +488,17 @@ export const createInventoryMovement = onCall(
       throw new HttpsError("invalid-argument", "Tipo de movimiento no válido");
     }
 
+    const photoData = payload.photoBase64?.trim() || payload.evidencePhotoData?.trim() || "";
+    const signatureData = payload.signatureBase64?.trim() || payload.evidenceSignatureData?.trim() || "";
+    const hasPhoto = Boolean(photoData);
+    const hasSignature = Boolean(signatureData);
+
     // For in/out movements, require deliveredByName, receivedByName, and at least one evidence
     if (payload.movementType === "in" || payload.movementType === "out") {
       if (!payload.deliveredByName?.trim() || !payload.receivedByName?.trim()) {
         throw new HttpsError("invalid-argument", "Las entradas y salidas requieren nombre de quien entrega y quien recibe");
       }
-      if (!payload.hasPhotoEvidence && !payload.hasSignatureEvidence) {
+      if (!hasPhoto && !hasSignature && !payload.hasPhotoEvidence && !payload.hasSignatureEvidence) {
         throw new HttpsError("invalid-argument", "Las entradas y salidas requieren al menos una evidencia (foto o firma)");
       }
     }
@@ -554,11 +584,11 @@ export const createInventoryMovement = onCall(
           destination: payload.destination?.trim() || "",
           deliveredByName: payload.deliveredByName?.trim() || "",
           receivedByName: payload.receivedByName?.trim() || "",
-          hasPhotoEvidence: Boolean(payload.hasPhotoEvidence),
-          hasSignatureEvidence: Boolean(payload.hasSignatureEvidence),
-          evidenceAvailable: Boolean(payload.hasPhotoEvidence) || Boolean(payload.hasSignatureEvidence),
-          evidencePhotoData: payload.evidencePhotoData?.trim() || "",
-          evidenceSignatureData: payload.evidenceSignatureData?.trim() || "",
+          hasPhotoEvidence: hasPhoto || Boolean(payload.hasPhotoEvidence),
+          hasSignatureEvidence: hasSignature || Boolean(payload.hasSignatureEvidence),
+          evidenceAvailable: hasPhoto || hasSignature || Boolean(payload.hasPhotoEvidence) || Boolean(payload.hasSignatureEvidence),
+          evidencePhotoData: photoData,
+          evidenceSignatureData: signatureData,
           notes: payload.notes?.trim() || "",
           performedBy,
           performedByName,
@@ -591,7 +621,7 @@ interface CreateInventoryBackupPayload {
 export const createInventoryBackup = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -602,6 +632,7 @@ export const createInventoryBackup = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "inventory.create", { companyId });
 
     const payload = request.data as CreateInventoryBackupPayload;
     if (!payload.backupName?.trim()) {

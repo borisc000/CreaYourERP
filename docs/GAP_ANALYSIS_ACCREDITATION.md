@@ -1,6 +1,7 @@
 # Gap Analysis: Módulo Accreditation (Python ERP → Firebase)
 
 **Fecha:** 2026-05-10  
+**Estado cambio reciente:** CRUD de ServiceOrder y crew operations migrados a Callable Functions (2026-05-15)  
 **Alcance:** Compara la implementación REAL del backend Python (`YOUR_ERP_CORE/modules/accreditation/`) contra la migración Firebase (`your-erp-firebase/`).
 
 ---
@@ -52,22 +53,24 @@ El Python registra 5 listeners en el EventBus. Firebase solo tiene el trigger `o
 
 ### 2.3 HTTPS Callable / Endpoints Faltantes
 
-Los API routes del Python exponen ~15 endpoints. Firebase no expone ninguno propio del módulo accreditation (solo el genérico `getDashboardStats`).
+Los API routes del Python exponen ~15 endpoints. **Los writes criticos ya están en Callables; reads aún directos.**
 
-| Endpoint Python | Método | Uso |
-|-----------------|--------|-----|
+| Endpoint Python | Método | Estado Firebase |
+|-----------------|--------|-----------------|
 | `GET /api/accreditation/service-orders` | Listar órdenes | ✅ Frontend lee Firestore directamente. |
-| `POST /api/accreditation/service-orders` | Crear orden | ✅ Frontend escribe Firestore directamente. |
+| `POST /api/accreditation/service-orders` | Crear orden | ✅ Callable `createServiceOrder` (valida leadId y riskLevel) |
 | `GET /api/accreditation/service-orders/{id}` | Obtener orden + resumen compliance | ⚠️ Frontend arma resumen en cliente (más costoso). |
-| `PUT /api/accreditation/service-orders/{id}` | Actualizar orden | ✅ Frontend escribe directo. |
-| `DELETE /api/accreditation/service-orders/{id}` | Soft-delete | ✅ Frontend hace update de status. |
-| `GET /api/accreditation/service-orders/{id}/requirements` | Requisitos Level A/B | ❌ No existe. Frontend no puede obtener requisitos desglosados por nivel. |
-| `PUT /api/accreditation/service-orders/{id}/requirements` | Actualizar reqs Level B | ❌ No existe. |
+| `PUT /api/accreditation/service-orders/{id}` | Actualizar orden | ✅ Callable `updateServiceOrder` |
+| `DELETE /api/accreditation/service-orders/{id}` | Soft-delete | ✅ Frontend hace update de status (aún directo, no crítico). |
+| `GET /api/accreditation/service-orders/{id}/requirements` | Requisitos Level A/B | ✅ Callable `detectGaps` + computeCheck real. |
+| `PUT /api/accreditation/service-orders/{id}/requirements` | Actualizar reqs Level B | ⚠️ Parcial (ServiceOrderForm aún sin selector multi-req). |
 | `GET /api/accreditation/service-orders/{id}/crew` | Listar crew | ✅ Frontend lee subcolección directamente. |
-| `POST /api/accreditation/service-orders/{id}/crew` | Agregar miembros | ✅ Frontend escribe directo. |
-| `POST /api/accreditation/service-orders/{id}/crew/bulk` | Bulk assign con roles | ❌ No existe. Solo se puede agregar de a 1 en el UI. |
-| `DELETE /api/accreditation/service-orders/{id}/crew/{empId}` | Remover miembro | ✅ Frontend hace update de status. |
-| `POST /api/accreditation/service-orders/{id}/crew/authorize` | Autorizar cuadrilla completa | ⚠️ UI tiene botón pero no marca `authorizedBy` ni `revalidationReason`. |
+| `POST /api/accreditation/service-orders/{id}/crew` | Agregar miembros | ✅ Callable `assignCrewMember` (previene duplicados + compliance check) |
+| `POST /api/accreditation/service-orders/{id}/crew/bulk` | Bulk assign con roles | ✅ Callable `bulkAssignCrew` (asignación masiva + compliance check) |
+| `DELETE /api/accreditation/service-orders/{id}/crew/{empId}` | Remover miembro | ✅ Callable `removeCrewMember` (soft remove + audit) |
+| `POST /api/accreditation/service-orders/{id}/crew/authorize` | Autorizar cuadrilla completa | ✅ Callable `authorizeCrew` (bloquea si requires_revalidation) |
+| `POST /checks/{empId}/generate-missing` | Generar docs faltantes | ✅ Callable `triggerDocumentGeneration` (PDF + Storage + GeneratedDocument + EmployeeAccreditation) |
+| `POST /checks/recompute` | Forzar recomputo | ✅ Callable `recomputeChecks` |
 | `GET /api/accreditation/service-orders/{id}/checks` | Matriz de acreditación | ⚠️ Frontend la arma con onSnapshot de `accreditationChecks`, pero sin `compute_all_checks` garantizado. |
 | `POST /api/accreditation/service-orders/{id}/checks/recompute` | Forzar recomputo | ❌ No existe. |
 | `POST /api/accreditation/service-orders/{id}/checks/{empId}/generate-missing` | Generar docs faltantes 1 empleado | ❌ No existe. |
@@ -101,15 +104,23 @@ Los API routes del Python exponen ~15 endpoints. Firebase no expone ninguno prop
 
 ## 4. Endpoints / Lógica de Negocio Faltante (Resumen Ejecutivo)
 
-### 4.1 Pipeline de Documentos Automáticos (mayor gap)
+### 4.1 Pipeline de Documentos Automáticos ✅ IMPLEMENTADO (2026-05-15)
 El Python tiene un flujo end-to-end:
 ```
 Crew Assigned → Compute Check → Detect Gaps → Match Template → Generate DOCX/PDF → Signature (if needed) → Register in HR → Recompute Check
 ```
-En Firebase este pipeline **no existe**. Solo hay:
+En Firebase ahora existe el pipeline completo usando PDF (pdf-lib) en lugar de DOCX:
 ```
-Crew Assigned → Basic Compliance Check (requirements vs accreditations)
+Crew Assigned → Compute Check (Level A/B + vencimiento) → Detect Gaps → Match Template → Generate PDF → Signature (if needed) → Register EmployeeAccreditation → Recompute Check
 ```
+
+**Callables implementados:**
+- `computeCheck` / `checkCrewCompliance`: discriminación Level A/B + evaluación de vencimiento
+- `detectGaps`: template matching con preferencia customer-specific > general
+- `triggerDocumentGeneration`: genera PDF, guarda en Storage, crea GeneratedDocument, registra EmployeeAccreditation
+- `recomputeChecks`: recomputo masivo por orden de servicio
+
+**Integración con Signature:** Al completar firma (`signDocument`), se cierra el loop actualizando DGR, registrando EmployeeAccreditation como approved, y recomputando el check.
 
 ### 4.2 Nivel A vs Nivel B
 - **Python**: discrimina `AccreditationRequirement` sin `customer_id` (Level A) vs con `customer_id` (Level B) + `required_requirement_ids` explícitos.
@@ -119,9 +130,14 @@ Crew Assigned → Basic Compliance Check (requirements vs accreditations)
 - **Python**: `_find_valid_doc` filtra por `verification_status=approved` **y** `expires_on >= today`.
 - **Firebase**: solo filtra `status == "valid"`. No considera fechas de vencimiento.
 
-### 4.4 Eventos y Recomputo en Cascada
+### 4.4 Eventos y Recomputo en Cascada ✅ PARCIAL
 - **Python**: al modificar crew autorizada, se invalida (`requires_revalidation`) toda la cuadrilla. Al completar firma, se recomputea el check automáticamente.
-- **Firebase**: no hay invalidación automática ni recomputo post-firma.
+- **Firebase**:
+  - `assignCrewMember` y `authorizeCrew` recomputean automáticamente
+  - `triggerDocumentGeneration` recomputea post-registro de documento
+  - `signDocument` recomputea post-firma
+  - `onAccreditationUpdated` trigger recomputea cuando un empleado sube un documento manualmente
+  - Falta invalidación automática de crew autorizada cuando se modifica la cuadrilla (`requires_revalidation`)
 
 ---
 
@@ -146,8 +162,8 @@ Crew Assigned → Basic Compliance Check (requirements vs accreditations)
 12. **Mostrar acreditaciones en `EmployeeDetail`**.
 
 ### Prioridad 4 — Baja (Optimizaciones)
-13. **Listener `signature.completed`** para cerrar el loop documento-firma-acreditación.
-14. **Alertas de documentos por vencer** (cron o scheduled function).
+13. ✅ **Listener `signature.completed`** implementado en `signDocument`.
+14. ⚠️ **Alertas de documentos por vencer**: callable `checkExpiringDocuments` implementado (escaneo bajo demanda). Falta Cloud Scheduler para ejecución automática diaria.
 
 ---
 

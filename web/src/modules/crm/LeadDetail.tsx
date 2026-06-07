@@ -1,56 +1,180 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { doc, getDoc, onSnapshot, deleteDoc } from "firebase/firestore";
-import { db } from "@/firebase/config";
-import { useAuth } from "@/contexts/AuthContext";
-import type { Lead, Customer } from "@/types";
+import { ref, uploadBytes } from "firebase/storage";
+import { storage } from "@/firebase/config";
 import {
+  crmAddLeadNote,
+  crmCreateDocumentUpload,
+  crmDeleteLeadCascade,
+  crmFinalizeDocumentUpload,
+  crmGetDocumentDownloadUrl,
+  crmGetLeadDossier,
+  crmUpdateDocumentMirrorFlag,
+} from "@/services/crm";
+import type { CRMDocument, LeadDossier } from "@/types";
+import {
+  ArrowDownTrayIcon,
   ArrowLeftIcon,
-  PencilIcon,
-  TrashIcon,
-  UserIcon,
-  BuildingOfficeIcon,
+  ArrowPathIcon,
   DocumentTextIcon,
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
+  TrashIcon,
+  BanknotesIcon,
+  TruckIcon,
+  ShieldCheckIcon,
+  ClipboardDocumentListIcon,
+  CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
+
+type TabId = "overview" | "activity" | "documents" | "service" | "financial" | "quotes" | "reports" | "expenses" | "rentals" | "safety";
+
+const tabs: Array<{ id: TabId; label: string }> = [
+  { id: "overview", label: "Resumen" },
+  { id: "quotes", label: "Cotizaciones" },
+  { id: "reports", label: "Reportes" },
+  { id: "expenses", label: "Gastos" },
+  { id: "rentals", label: "Arriendos" },
+  { id: "safety", label: "Seguridad" },
+  { id: "activity", label: "Actividad" },
+  { id: "documents", label: "Documentos" },
+  { id: "service", label: "Servicio" },
+  { id: "financial", label: "Finanzas" },
+];
+
+const statusLabels: Record<string, string> = { open: "Abierta", won: "Ganada", lost: "Perdida" };
+const priorityLabels: Record<string, string> = { low: "Baja", medium: "Media", high: "Alta" };
+
+function money(value: number | undefined) {
+  return `$${Math.round(value || 0).toLocaleString("es-CL")}`;
+}
+
+function dateLabel(value?: string) {
+  if (!value) return "-";
+  return value.slice(0, 10);
+}
+
+function Field({ label, value }: { label: string; value?: string | number | boolean | null }) {
+  return (
+    <div>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-sm text-gray-200 mt-1">{value === true ? "Si" : value === false ? "No" : value || "-"}</p>
+    </div>
+  );
+}
 
 export function LeadDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { companyId } = useAuth();
-  const [lead, setLead] = useState<Lead | null>(null);
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [dossier, setDossier] = useState<LeadDossier | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [noteBody, setNoteBody] = useState("");
+  const [documentType, setDocumentType] = useState("general");
+  const [publishToMirror, setPublishToMirror] = useState(false);
+
+  const loadDossier = useCallback(async () => {
+    if (!id) return;
+    setIsLoading(true);
+    try {
+      setDossier(await crmGetLeadDossier(id));
+    } catch (error) {
+      console.error("Error cargando dossier:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
-    if (!id || !companyId) return;
-    setLoading(true);
+    loadDossier();
+  }, [loadDossier]);
 
-    const unsub = onSnapshot(doc(db, "companies", companyId, "leads", id), async (snap) => {
-      if (snap.exists()) {
-        const leadData = { id: snap.id, ...snap.data() } as Lead;
-        setLead(leadData);
-
-        if (leadData.customerId) {
-          const customerSnap = await getDoc(doc(db, "companies", companyId, "customers", leadData.customerId));
-          if (customerSnap.exists()) {
-            setCustomer({ id: customerSnap.id, ...customerSnap.data() } as Customer);
-          }
-        }
-      }
-      setLoading(false);
-    });
-
-    return () => unsub();
-  }, [id, companyId]);
+  const currentDocuments = useMemo(
+    () => (dossier?.documents || []).filter((document) => document.isCurrent !== false),
+    [dossier?.documents]
+  );
 
   const handleDelete = async () => {
-    if (!companyId || !id) return;
-    if (!confirm("¿Eliminar esta oportunidad? Esta acción no se puede deshacer.")) return;
-    await deleteDoc(doc(db, "companies", companyId, "leads", id));
-    navigate("/crm/leads");
+    if (!id) return;
+    if (!confirm("Eliminar esta oportunidad y sus datos CRM asociados? Esta accion no se puede deshacer.")) return;
+    setIsSaving(true);
+    try {
+      await crmDeleteLeadCascade(id);
+      navigate("/crm/leads");
+    } catch (error) {
+      console.error("Error eliminando oportunidad:", error);
+      alert("No se pudo eliminar la oportunidad");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  if (loading) {
+  const handleAddNote = async () => {
+    if (!id || !noteBody.trim()) return;
+    setIsSaving(true);
+    try {
+      await crmAddLeadNote(id, noteBody.trim());
+      setNoteBody("");
+      await loadDossier();
+    } catch (error) {
+      console.error("Error agregando nota:", error);
+      alert("No se pudo agregar la nota");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpload = async (file: File | null) => {
+    if (!id || !file) return;
+    setIsSaving(true);
+    try {
+      const upload = await crmCreateDocumentUpload({
+        modelName: "Lead",
+        recordId: id,
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+        documentType,
+        category: documentType,
+        publishToMirror,
+      });
+      await uploadBytes(ref(storage, upload.storagePath), file, { contentType: file.type || "application/octet-stream" });
+      await crmFinalizeDocumentUpload(upload.documentId);
+      await loadDossier();
+    } catch (error) {
+      console.error("Error subiendo documento:", error);
+      alert("No se pudo subir el documento");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDownload = async (document: CRMDocument) => {
+    try {
+      const result = await crmGetDocumentDownloadUrl(document.id);
+      window.open(result.url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.error("Error descargando documento:", error);
+      alert("No se pudo descargar el documento");
+    }
+  };
+
+  const handleToggleMirror = async (document: CRMDocument) => {
+    setIsSaving(true);
+    try {
+      await crmUpdateDocumentMirrorFlag(document.id, !document.publishToMirror);
+      await loadDossier();
+    } catch (error) {
+      console.error("Error actualizando mirror:", error);
+      alert("No se pudo actualizar la visibilidad del documento");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
     return (
       <div className="flex justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
@@ -58,7 +182,7 @@ export function LeadDetail() {
     );
   }
 
-  if (!lead) {
+  if (!dossier) {
     return (
       <div className="p-8 text-center">
         <p className="text-gray-400">Oportunidad no encontrada</p>
@@ -69,20 +193,12 @@ export function LeadDetail() {
     );
   }
 
-  const statusLabels = { open: "Abierta", won: "Ganada", lost: "Perdida" };
-  const statusColors = {
-    open: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    won: "bg-green-500/10 text-green-400 border-green-500/20",
-    lost: "bg-red-500/10 text-red-400 border-red-500/20",
-  };
-  const priorityLabels = { low: "Baja", medium: "Media", high: "Alta" };
-  const priorityColors = { low: "text-gray-400", medium: "text-yellow-400", high: "text-red-400" };
+  const { lead, customer, mandante, stage, serviceType, assignedUser, service, summary } = dossier;
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+    <div className="p-8 max-w-7xl mx-auto">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+        <div className="flex items-start gap-3">
           <button
             onClick={() => navigate("/crm/leads")}
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
@@ -90,18 +206,34 @@ export function LeadDetail() {
             <ArrowLeftIcon className="w-5 h-5" />
           </button>
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold text-white">{lead.title}</h1>
-              <span className={`px-2.5 py-1 text-xs font-medium rounded-full border ${statusColors[lead.status]}`}>
-                {statusLabels[lead.status]}
+              <span className="px-2.5 py-1 text-xs font-medium rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-300">
+                {statusLabels[lead.status] || lead.status}
               </span>
             </div>
-            {lead.projectCode && (
-              <p className="text-gray-500 text-sm mt-0.5">{lead.projectCode}</p>
-            )}
+            <p className="text-gray-500 text-sm mt-1">
+              {lead.projectCode || "Sin codigo"} {customer ? `- ${customer.name}` : ""}
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {service?.id && (
+            <button
+              onClick={() => navigate(`/crm/services/${service.id}/mirror`)}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+            >
+              <EyeIcon className="w-4 h-4" />
+              Mirror
+            </button>
+          )}
+          <button
+            onClick={loadDossier}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            <ArrowPathIcon className="w-4 h-4" />
+            Actualizar
+          </button>
           <button
             onClick={() => navigate(`/crm/leads/${id}/edit`)}
             className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
@@ -111,7 +243,8 @@ export function LeadDetail() {
           </button>
           <button
             onClick={handleDelete}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm font-medium rounded-lg transition-colors"
+            disabled={isSaving}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 text-red-400 text-sm font-medium rounded-lg transition-colors"
           >
             <TrashIcon className="w-4 h-4" />
             Eliminar
@@ -119,189 +252,352 @@ export function LeadDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column - Key info */}
-        <div className="lg:col-span-1 space-y-4">
-          {/* Financial card */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-              Resumen Financiero
-            </h2>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">Ingreso Esperado</span>
-                <span className="text-white font-semibold">
-                  ${lead.expectedRevenue.toLocaleString("es-CL")}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">Probabilidad</span>
-                <span className={`font-semibold ${priorityColors[lead.priority]}`}>
-                  {lead.probability}%
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">Valor Ponderado</span>
-                <span className="text-blue-400 font-semibold">
-                  ${Math.round((lead.expectedRevenue * lead.probability) / 100).toLocaleString("es-CL")}
-                </span>
-              </div>
-              {lead.isPaid && (
-                <div className="flex justify-between items-center pt-2 border-t border-gray-800">
-                  <span className="text-green-400 text-sm font-medium">Pagado</span>
-                  <span className="text-green-400 font-semibold">Sí</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Customer card */}
-          {customer && (
-            <div
-              className="bg-gray-900 border border-gray-800 rounded-xl p-6 cursor-pointer hover:border-gray-700 transition-colors"
-              onClick={() => navigate(`/crm/customers/${customer.id}`)}
-            >
-              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">
-                Cliente
-              </h2>
-              <div className="flex items-center gap-3">
-                <BuildingOfficeIcon className="w-5 h-5 text-gray-500" />
-                <div>
-                  <p className="text-white font-medium">{customer.name}</p>
-                  {customer.taxId && <p className="text-gray-500 text-xs">RUT: {customer.taxId}</p>}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Details card */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-              Detalles
-            </h2>
-            <div className="space-y-2.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Prioridad</span>
-                <span className={priorityColors[lead.priority]}>{priorityLabels[lead.priority]}</span>
-              </div>
-              {lead.expectedCloseDate && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Cierre Esperado</span>
-                  <span className="text-gray-300">{lead.expectedCloseDate}</span>
-                </div>
-              )}
-              {lead.visitDate && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Visita</span>
-                  <span className="text-gray-300">{lead.visitDate}</span>
-                </div>
-              )}
-              {lead.quoteDeadline && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Deadline Cotización</span>
-                  <span className="text-gray-300">{lead.quoteDeadline}</span>
-                </div>
-              )}
-              {lead.source && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Origen</span>
-                  <span className="text-gray-300">{lead.source}</span>
-                </div>
-              )}
-            </div>
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Esperado</p>
+          <p className="text-xl font-semibold text-white mt-1">{money(summary.expectedRevenue)}</p>
         </div>
-
-        {/* Right column - Context & tabs placeholder */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Project team */}
-          {(lead.aprName || lead.supervisorName || lead.contractAdminName || lead.empresaFaena) && (
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-                Equipo y Contexto
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {lead.empresaFaena && (
-                  <div className="flex items-center gap-3">
-                    <BuildingOfficeIcon className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <p className="text-xs text-gray-500">Empresa Faena</p>
-                      <p className="text-sm text-white">{lead.empresaFaena}</p>
-                    </div>
-                  </div>
-                )}
-                {lead.aprName && (
-                  <div className="flex items-center gap-3">
-                    <UserIcon className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <p className="text-xs text-gray-500">APR</p>
-                      <p className="text-sm text-white">{lead.aprName}</p>
-                    </div>
-                  </div>
-                )}
-                {lead.supervisorName && (
-                  <div className="flex items-center gap-3">
-                    <UserIcon className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <p className="text-xs text-gray-500">Supervisor</p>
-                      <p className="text-sm text-white">{lead.supervisorName}</p>
-                    </div>
-                  </div>
-                )}
-                {lead.contractAdminName && (
-                  <div className="flex items-center gap-3">
-                    <UserIcon className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <p className="text-xs text-gray-500">Admin. Contrato</p>
-                      <p className="text-sm text-white">{lead.contractAdminName}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Description */}
-          {lead.description && (
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-2">
-                Descripción
-              </h2>
-              <p className="text-gray-400 text-sm whitespace-pre-wrap">{lead.description}</p>
-            </div>
-          )}
-
-          {/* Tabs placeholder for future integrations */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <DocumentTextIcon className="w-4 h-4 text-gray-500" />
-              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-                Integraciones
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div
-                onClick={() => navigate(`/quotes?leadId=${id}`)}
-                className="p-4 bg-gray-800/50 rounded-lg hover:bg-gray-800 cursor-pointer transition-colors"
-              >
-                <p className="text-white font-medium text-sm">Cotizaciones</p>
-                <p className="text-gray-500 text-xs mt-1">Ver cotizaciones vinculadas</p>
-              </div>
-              <div
-                onClick={() => navigate(`/accreditation?leadId=${id}`)}
-                className="p-4 bg-gray-800/50 rounded-lg hover:bg-gray-800 cursor-pointer transition-colors"
-              >
-                <p className="text-white font-medium text-sm">Acreditaciones</p>
-                <p className="text-gray-500 text-xs mt-1">Ver orden de servicio</p>
-              </div>
-              <div className="p-4 bg-gray-800/50 rounded-lg opacity-50">
-                <p className="text-white font-medium text-sm">Documentos</p>
-                <p className="text-gray-500 text-xs mt-1">Próximamente</p>
-              </div>
-            </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Ponderado</p>
+          <p className="text-xl font-semibold text-blue-300 mt-1">{money(summary.weightedRevenue)}</p>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Cotiz. aceptadas</p>
+          <p className="text-xl font-semibold text-green-300 mt-1">{money(summary.acceptedQuotesTotal)}</p>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Gastos</p>
+          <p className="text-xl font-semibold text-red-300 mt-1">{money(summary.expensesTotal)}</p>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Documentos</p>
+          <p className="text-xl font-semibold text-white mt-1">{summary.currentDocumentsCount}</p>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Seguridad</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`w-3 h-3 rounded-full ${summary.safetyTrafficLight === "red" ? "bg-red-500" : summary.safetyTrafficLight === "yellow" ? "bg-yellow-500" : summary.safetyTrafficLight === "green" ? "bg-green-500" : "bg-gray-600"}`} />
+            <span className="text-sm text-gray-300">{summary.safetyFoldersCount}</span>
           </div>
         </div>
       </div>
+
+      <div className="border-b border-gray-800 mb-6">
+        <nav className="flex flex-wrap gap-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? "border-blue-500 text-blue-300"
+                  : "border-transparent text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {activeTab === "overview" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <section className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-lg p-6">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Dossier</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <Field label="Cliente" value={customer?.name} />
+              <Field label="Mandante" value={mandante?.name} />
+              <Field label="Asignado a" value={assignedUser?.name} />
+              <Field label="Etapa" value={stage?.name} />
+              <Field label="Tipo de servicio" value={serviceType?.name} />
+              <Field label="Prioridad" value={priorityLabels[lead.priority]} />
+              <Field label="Servicio" value={lead.serviceName} />
+              <Field label="Empresa/Faena" value={lead.empresaFaena} />
+              <Field label="APR" value={lead.aprName} />
+              <Field label="Supervisor" value={lead.supervisorName} />
+              <Field label="Admin. contrato" value={lead.contractAdminName} />
+              <Field label="Origen" value={lead.source} />
+            </div>
+            {lead.description && (
+              <div className="mt-6 pt-6 border-t border-gray-800">
+                <p className="text-xs text-gray-500 mb-2">Descripcion</p>
+                <p className="text-sm text-gray-300 whitespace-pre-wrap">{lead.description}</p>
+              </div>
+            )}
+          </section>
+
+          <section className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Notas</h2>
+            <textarea
+              rows={4}
+              value={noteBody}
+              onChange={(event) => setNoteBody(event.target.value)}
+              placeholder="Agregar nota interna..."
+              className="w-full px-3 py-2 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            />
+            <button
+              onClick={handleAddNote}
+              disabled={isSaving || !noteBody.trim()}
+              className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Agregar nota
+            </button>
+            <div className="mt-5 space-y-3 max-h-80 overflow-y-auto">
+              {dossier.notes.map((note) => (
+                <div key={note.id} className="border border-gray-800 rounded-lg p-3">
+                  <p className="text-sm text-gray-200 whitespace-pre-wrap">{note.body}</p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {note.createdByName || "Usuario"} - {dateLabel(note.createdAt)}
+                  </p>
+                </div>
+              ))}
+              {dossier.notes.length === 0 && <p className="text-sm text-gray-500">Sin notas.</p>}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {activeTab === "activity" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="divide-y divide-gray-800">
+            {dossier.activity.map((item) => (
+              <div key={item.id} className="p-4">
+                <p className="text-sm text-gray-200">{item.message}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {item.userName || item.userId || "Sistema"} - {dateLabel(item.createdAt)}
+                </p>
+              </div>
+            ))}
+            {dossier.activity.length === 0 && <p className="p-6 text-sm text-gray-500">Sin actividad registrada.</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "documents" && (
+        <section className="space-y-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Tipo</label>
+                <input
+                  value={documentType}
+                  onChange={(event) => setDocumentType(event.target.value)}
+                  className="w-full px-3 py-2 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={publishToMirror}
+                  onChange={(event) => setPublishToMirror(event.target.checked)}
+                  className="rounded border-gray-700 bg-gray-950 text-blue-600"
+                />
+                Visible en mirror autenticado
+              </label>
+              <label className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg cursor-pointer">
+                <DocumentTextIcon className="w-4 h-4" />
+                Subir archivo
+                <input type="file" className="hidden" disabled={isSaving} onChange={(event) => handleUpload(event.target.files?.[0] || null)} />
+              </label>
+            </div>
+          </div>
+
+          <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+            <div className="divide-y divide-gray-800">
+              {currentDocuments.map((document) => (
+                <div key={document.id} className="p-4 flex flex-col lg:flex-row lg:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{document.filename}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {document.documentType || document.category || "general"} - v{document.version} - {dateLabel(document.createdAt)}
+                      {document.publishToMirror ? " - mirror" : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleMirror(document)}
+                      disabled={isSaving}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 text-xs font-medium rounded-lg"
+                    >
+                      {document.publishToMirror ? "Ocultar mirror" : "Publicar mirror"}
+                    </button>
+                    <button
+                      onClick={() => handleDownload(document)}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium rounded-lg"
+                    >
+                      <ArrowDownTrayIcon className="w-4 h-4" />
+                      Descargar
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {currentDocuments.length === 0 && <p className="p-6 text-sm text-gray-500">Sin documentos vigentes.</p>}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === "service" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Servicio canonico</h2>
+          {service ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <Field label="Codigo" value={service.serviceCode} />
+              <Field label="Comercial" value={service.commercialStatus} />
+              <Field label="Operacional" value={service.operationalStatus} />
+              <Field label="Financiero" value={service.financialStatus} />
+              <Field label="Mirror habilitado" value={service.mirrorEnabled} />
+              <Field label="Actualizado" value={dateLabel(service.updatedAt)} />
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Servicio no disponible.</p>
+          )}
+        </section>
+      )}
+
+      {activeTab === "financial" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Control financiero</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+            <Field label="OC / PO" value={lead.poNumber} />
+            <Field label="Reporte" value={lead.reportNumber} />
+            <Field label="HES" value={lead.hesNumber} />
+            <Field label="Factura" value={lead.invoiceNumber} />
+            <Field label="Pagado" value={lead.isPaid} />
+            <Field label="Cotizaciones" value={summary.quotesCount} />
+            <Field label="Reportes" value={summary.reportsCount} />
+            <Field label="Ingreso esperado" value={money(lead.expectedRevenue)} />
+          </div>
+        </section>
+      )}
+
+      {activeTab === "quotes" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Cotizaciones</h2>
+            <span className="text-xs text-gray-500">{dossier.quotes.length} total · {summary.acceptedQuotesCount} aceptadas</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {dossier.quotes.map((q) => (
+              <div key={q.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/quotes/${q.id}`)}>
+                <div>
+                  <p className="text-sm font-medium text-white">{q.title || q.quoteNumber || "Sin título"}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{q.lines?.length || 0} líneas · {dateLabel(q.quoteDate)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-white">{money(q.grossTotal)}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${q.status === "accepted" ? "bg-green-500/10 text-green-400" : q.status === "sent" ? "bg-blue-500/10 text-blue-400" : "bg-gray-500/10 text-gray-400"}`}>
+                    {q.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {dossier.quotes.length === 0 && <p className="p-6 text-sm text-gray-500">Sin cotizaciones.</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "reports" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Reportes de terreno</h2>
+            <span className="text-xs text-gray-500">{dossier.reports.length} total · {summary.openReportsCount} abiertos</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {dossier.reports.map((r) => (
+              <div key={r.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/reports/${r.id}`)}>
+                <div>
+                  <p className="text-sm font-medium text-white">{r.servicio || "Reporte sin nombre"}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{r.empresa} · {r.area}/{r.sector}</p>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${r.status === "cerrado" ? "bg-green-500/10 text-green-400" : "bg-blue-500/10 text-blue-400"}`}>
+                  {r.status}
+                </span>
+              </div>
+            ))}
+            {dossier.reports.length === 0 && <p className="p-6 text-sm text-gray-500">Sin reportes.</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "expenses" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Gastos</h2>
+            <span className="text-xs text-gray-500">{dossier.expenses.length} registros · {money(summary.expensesTotal)} total</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {dossier.expenses.map((e) => (
+              <div key={e.id} className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-white">{e.description || e.category || "Gasto"}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{e.scope} · {dateLabel(e.createdAt)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-white">{money(e.totalAmount)}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${e.status === "reconciled" ? "bg-green-500/10 text-green-400" : e.status === "observed" ? "bg-red-500/10 text-red-400" : "bg-yellow-500/10 text-yellow-400"}`}>
+                    {e.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {dossier.expenses.length === 0 && <p className="p-6 text-sm text-gray-500">Sin gastos registrados.</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "rentals" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Arriendos</h2>
+            <span className="text-xs text-gray-500">{dossier.rentals.length} contratos · {summary.activeRentalsCount} activos</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {dossier.rentals.map((r) => (
+              <div key={r.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/rentals/contracts/${r.id}`)}>
+                <div>
+                  <p className="text-sm font-medium text-white">{r.title || r.rentalNumber || "Contrato"}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{dateLabel(r.startDate)} - {dateLabel(r.endDate || r.returnDueDate)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-white">{money(r.contractValue)}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${r.status === "dispatched" ? "bg-amber-500/10 text-amber-400" : r.status === "closed" ? "bg-green-500/10 text-green-400" : "bg-gray-500/10 text-gray-400"}`}>
+                    {r.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {dossier.rentals.length === 0 && <p className="p-6 text-sm text-gray-500">Sin contratos de arriendo.</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "safety" && (
+        <section className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Seguridad</h2>
+            <span className="text-xs text-gray-500">{dossier.safetyFolders.length} carpetas</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {dossier.safetyFolders.map((s) => (
+              <div key={s.id} className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer" onClick={() => navigate(`/safety/folders/${s.id}`)}>
+                <div>
+                  <p className="text-sm font-medium text-white">Carpeta {s.id.slice(-6)}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{s.readinessPct || 0}% listo · {s.status}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${s.trafficLight === "red" ? "bg-red-500" : s.trafficLight === "yellow" ? "bg-yellow-500" : "bg-green-500"}`} />
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === "closed" ? "bg-green-500/10 text-green-400" : s.status === "in_progress" ? "bg-blue-500/10 text-blue-400" : "bg-gray-500/10 text-gray-400"}`}>
+                    {s.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {dossier.safetyFolders.length === 0 && <p className="p-6 text-sm text-gray-500">Sin carpetas de seguridad.</p>}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

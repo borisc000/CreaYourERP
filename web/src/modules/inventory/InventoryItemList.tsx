@@ -178,8 +178,21 @@ export function InventoryItemList() {
                     </td>
                     <td className="px-4 py-3 text-gray-300">{item.category}</td>
                     <td className="px-4 py-3 text-gray-300">{item.location}</td>
-                    <td className="px-4 py-3 text-gray-300">
-                      {item.currentStock} {item.unit}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-300 text-sm">{item.currentStock} {item.unit}</span>
+                        {item.minimumStock > 0 && (
+                          <div className="w-16 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                item.currentStock <= 0 ? "bg-red-500" :
+                                item.currentStock <= item.minimumStock ? "bg-amber-500" : "bg-emerald-500"
+                              }`}
+                              style={{ width: `${Math.min((item.currentStock / (item.minimumStock * 2)) * 100, 100)}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">{statusBadge(item.stockStatus)}</td>
                     <td className="px-4 py-3 text-right text-gray-300">

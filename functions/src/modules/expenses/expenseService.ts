@@ -9,10 +9,11 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 import * as crypto from "crypto";
 
 const cors = [
-  "https://your-erp.web.app",
+  "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com",
   "http://localhost:5173",
 ];
 
@@ -77,6 +78,7 @@ export const getExpenseDashboard = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "expenses.view_dashboard", { companyId });
 
     try {
       const cref = companyRef(companyId);
@@ -209,6 +211,7 @@ interface CreateExpensePayload {
   assetRecordId?: string;
   assetRecordCode?: string;
   assetRecordName?: string;
+  assetMaintenanceId?: string;
   expenseDate?: string;
   vendorName?: string;
   spenderName?: string;
@@ -225,7 +228,7 @@ interface CreateExpensePayload {
   supportData?: string;
 }
 
-async function generateExpenseNumber(companyId: string): Promise<string> {
+export async function generateExpenseNumber(companyId: string): Promise<string> {
   const now = new Date();
   const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
   const prefix = `GTO-${yearMonth}-`;
@@ -263,6 +266,7 @@ export const createExpenseRecord = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "expenses.create_expense", { companyId });
 
     const payload = request.data as CreateExpensePayload;
 
@@ -297,6 +301,7 @@ export const createExpenseRecord = onCall(
         assetRecordId: payload.assetRecordId || "",
         assetRecordCode: payload.assetRecordCode || "",
         assetRecordName: payload.assetRecordName || "",
+        assetMaintenanceId: payload.assetMaintenanceId || "",
         expenseDate: payload.expenseDate || now.split("T")[0],
         vendorName: payload.vendorName?.trim() || "",
         spenderName: payload.spenderName?.trim() || "",
@@ -343,6 +348,7 @@ interface UpdateExpensePayload {
   assetRecordId?: string;
   assetRecordCode?: string;
   assetRecordName?: string;
+  assetMaintenanceId?: string;
   expenseDate?: string;
   vendorName?: string;
   spenderName?: string;
@@ -372,6 +378,7 @@ export const updateExpenseRecord = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "expenses.edit_expense", { companyId });
 
     const payload = request.data as UpdateExpensePayload;
     if (!payload.expenseId) {
@@ -401,6 +408,7 @@ export const updateExpenseRecord = onCall(
       if (payload.assetRecordId !== undefined) updateData.assetRecordId = payload.assetRecordId || "";
       if (payload.assetRecordCode !== undefined) updateData.assetRecordCode = payload.assetRecordCode || "";
       if (payload.assetRecordName !== undefined) updateData.assetRecordName = payload.assetRecordName || "";
+      if (payload.assetMaintenanceId !== undefined) updateData.assetMaintenanceId = payload.assetMaintenanceId || "";
       if (payload.expenseDate !== undefined) updateData.expenseDate = payload.expenseDate;
       if (payload.vendorName !== undefined) updateData.vendorName = payload.vendorName.trim();
       if (payload.spenderName !== undefined) updateData.spenderName = payload.spenderName.trim();
@@ -466,6 +474,7 @@ export const deleteExpenseRecord = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "expenses.delete_expense", { companyId });
 
     const { expenseId } = request.data as DeleteExpensePayload;
     if (!expenseId) {
@@ -511,6 +520,7 @@ export const createExpenseBackup = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "expenses.create_backup", { companyId });
 
     const payload = request.data as CreateExpenseBackupPayload;
     if (!payload.backupName?.trim()) {

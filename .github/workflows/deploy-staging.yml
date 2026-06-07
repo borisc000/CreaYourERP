@@ -22,13 +22,37 @@ jobs:
           cd ../functions && npm ci
 
       - name: Build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY_STAGING }}
+          VITE_FIREBASE_AUTH_DOMAIN: your-erp-staging.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: your-erp-staging
+          VITE_FIREBASE_STORAGE_BUCKET: your-erp-staging.firebasestorage.app
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "737679125978"
+          VITE_FIREBASE_APP_ID: "1:737679125978:web:7f82aeb37a28950fa764e3"
+          VITE_FIREBASE_MEASUREMENT_ID: G-Y2S9EJX3EY
+          VITE_APP_ENV: staging
         run: |
           cd web && npm run build
           cd ../functions && npm run build
 
+      - name: Delete conflicting functions (trigger type changed)
+        uses: w9jds/firebase-action@master
+        with:
+          args: functions:delete onSignatureRequestCreated onBillingDocumentSiiAccepted onSafetyMatrixGenerated --project staging --force
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}
+        continue-on-error: true
+
       - name: Deploy to Firebase Staging
         uses: w9jds/firebase-action@master
         with:
-          args: deploy --project staging
+          args: deploy --project staging --only functions,firestore:rules,firestore:indexes,storage --force
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}
+
+      - name: Deploy Hosting to Firebase Staging
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --project staging --only hosting
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}

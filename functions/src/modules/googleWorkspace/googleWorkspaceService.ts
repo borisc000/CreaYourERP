@@ -1,7 +1,9 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
+import { parseServiceAccount, getGoogleAccessToken, listDriveFiles } from "./googleAuth";
 
-const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app"];
+const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function nowIso() { return new Date().toISOString(); }
 function companyRef(companyId: string) { return db.collection("companies").doc(companyId); }
 
@@ -13,6 +15,7 @@ export const getGoogleWorkspaceDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "google_workspace.view", { companyId });
     const accounts = await companyRef(companyId).collection("googleWorkspaceAccounts").get();
     const list = accounts.docs.map((d) => ({ id: d.id, ...d.data() }));
     return {
@@ -31,7 +34,8 @@ export const createGoogleWorkspaceAccount = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, ...data } = request.data;
+    await assertAction(request, "google_workspace.create", { companyId });
+    const { companyId: _, ...data } = request.data;
     if (!data.name) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
       const existing = await companyRef(companyId).collection("googleWorkspaceAccounts").where("isDefault", "==", true).get();
@@ -56,7 +60,8 @@ export const updateGoogleWorkspaceAccount = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, id, ...data } = request.data;
+    await assertAction(request, "google_workspace.edit", { companyId });
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     if (data.isDefault) {
       const existing = await companyRef(companyId).collection("googleWorkspaceAccounts").where("isDefault", "==", true).get();
@@ -75,13 +80,33 @@ export const testGoogleWorkspaceAccount = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "google_workspace.edit", { companyId });
     const { id } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
-    // TODO: Implement real Google API connection test
-    await companyRef(companyId).collection("googleWorkspaceAccounts").doc(id).update({
-      lastTestStatus: "ok", lastTestMessage: "Conexión simulada exitosa", lastTestedAt: nowIso(), updatedAt: nowIso(),
-    });
-    return { status: "ok", message: "Conexión simulada exitosa" };
+    const accountRef = companyRef(companyId).collection("googleWorkspaceAccounts").doc(id);
+    const accountSnap = await accountRef.get();
+    if (!accountSnap.exists) throw new HttpsError("not-found", "Cuenta no encontrada");
+    const account = accountSnap.data()!;
+
+    const credentials = parseServiceAccount(account.serviceAccountJson || "");
+    if (!credentials) {
+      await accountRef.update({ lastTestStatus: "error", lastTestMessage: "serviceAccountJson inválido", lastTestedAt: nowIso(), updatedAt: nowIso() });
+      throw new HttpsError("failed-precondition", "serviceAccountJson inválido");
+    }
+
+    try {
+      const token = await getGoogleAccessToken(credentials, account.scopes || ["https://www.googleapis.com/auth/drive"]);
+      await accountRef.update({
+        lastTestStatus: "ok", lastTestMessage: "Conexión exitosa", lastTestedAt: nowIso(), updatedAt: nowIso(),
+      });
+      return { status: "ok", message: "Conexión exitosa", tokenType: token.token_type };
+    } catch (err: any) {
+      const msg = err.message || "Error de conexión";
+      await accountRef.update({
+        lastTestStatus: "error", lastTestMessage: msg, lastTestedAt: nowIso(), updatedAt: nowIso(),
+      });
+      throw new HttpsError("internal", msg);
+    }
   }
 );
 
@@ -93,15 +118,27 @@ export const listGoogleDriveFiles = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "google_workspace.view", { companyId });
     const { accountId, query: _query } = request.data;
     if (!accountId) throw new HttpsError("invalid-argument", "Datos incompletos");
-    // TODO: Implement real Google Drive API call
-    return {
-      files: [
-        { id: "1", name: "Documento de ejemplo", mimeType: "application/vnd.google-apps.document", webViewLink: "#" },
-        { id: "2", name: "Hoja de cálculo", mimeType: "application/vnd.google-apps.spreadsheet", webViewLink: "#" },
-      ],
-      simulated: true,
-    };
+    const accountRef = companyRef(companyId).collection("googleWorkspaceAccounts").doc(accountId);
+    const accountSnap = await accountRef.get();
+    if (!accountSnap.exists) throw new HttpsError("not-found", "Cuenta no encontrada");
+    const account = accountSnap.data()!;
+
+    const credentials = parseServiceAccount(account.serviceAccountJson || "");
+    if (!credentials) throw new HttpsError("failed-precondition", "serviceAccountJson inválido");
+
+    try {
+      const token = await getGoogleAccessToken(credentials, account.scopes || ["https://www.googleapis.com/auth/drive"]);
+      const files = await listDriveFiles(token.access_token, {
+        query: _query,
+        pageSize: 20,
+        folderId: account.defaultDriveFolderId || undefined,
+      });
+      return { files };
+    } catch (err: any) {
+      throw new HttpsError("internal", err.message || "Error listando archivos de Drive");
+    }
   }
 );

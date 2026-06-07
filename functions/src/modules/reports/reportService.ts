@@ -1,7 +1,9 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { uploadBase64ToStorage } from "../../shared/storageService";
+import { assertAction } from "../../shared/rbac";
 
-const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app"];
+const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function nowIso() { return new Date().toISOString(); }
 function companyRef(companyId: string) { return db.collection("companies").doc(companyId); }
 function randomToken() { return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15); }
@@ -14,6 +16,7 @@ export const getReportDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "reports.view_dashboard", { companyId });
     const [reports, checkpoints] = await Promise.all([
       companyRef(companyId).collection("reports").get(),
       companyRef(companyId).collection("reportCheckpoints").get(),
@@ -37,7 +40,8 @@ export const createReport = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, leadId, ...data } = request.data;
+    await assertAction(request, "reports.create_report", { companyId });
+    const { companyId: _, leadId, ...data } = request.data;
     if (!leadId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("reports").add({
       companyId, leadId, status: "abierto", publicToken: randomToken(),
@@ -66,7 +70,8 @@ export const updateReport = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, id, ...data } = request.data;
+    await assertAction(request, "reports.edit_report", { companyId });
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("reports").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
@@ -81,6 +86,7 @@ export const closeReport = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "reports.close_report", { companyId });
     const { id } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     await companyRef(companyId).collection("reports").doc(id).update({
@@ -98,7 +104,8 @@ export const createCheckpoint = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, reportId, ...data } = request.data;
+    await assertAction(request, "reports.create_checkpoint", { companyId });
+    const { companyId: _, reportId, ...data } = request.data;
     if (!reportId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const ref = await companyRef(companyId).collection("reportCheckpoints").add({
       companyId, reportId, checkpointType: data.checkpointType || "control",
@@ -118,7 +125,8 @@ export const updateCheckpoint = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, id, ...data } = request.data;
+    await assertAction(request, "reports.edit_checkpoint", { companyId });
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };
     if (data.completed === true) {
@@ -138,14 +146,54 @@ export const addReportPhoto = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, reportId, checkpointId, photoUrl, ...data } = request.data;
-    if (!reportId || !checkpointId || !photoUrl) throw new HttpsError("invalid-argument", "Datos incompletos");
+    await assertAction(request, "reports.add_photo", { companyId });
+    const { companyId: _, reportId, checkpointId, photoUrl, photoBase64, ...data } = request.data;
+    if (!reportId || !checkpointId) throw new HttpsError("invalid-argument", "Datos incompletos");
+
+    let finalPhotoUrl = photoUrl || "";
+    let finalThumbnailUrl = data.thumbnailUrl || photoUrl || "";
+    let storagePath = "";
+    let thumbnailStoragePath = "";
+
+    // If base64 provided, upload to Storage
+    if (photoBase64 && typeof photoBase64 === "string") {
+      const contentType = data.contentType || "image/jpeg";
+      const ext = contentType.includes("png") ? "png" : "jpg";
+      const timestamp = Date.now();
+      const uploadResult = await uploadBase64ToStorage(
+        companyId,
+        photoBase64,
+        `reports/${reportId}/photos/${timestamp}.${ext}`,
+        contentType
+      );
+      finalPhotoUrl = uploadResult.downloadUrl;
+      storagePath = uploadResult.storagePath;
+
+      // Thumbnail: if thumbnailBase64 provided, upload it too
+      if (data.thumbnailBase64 && typeof data.thumbnailBase64 === "string") {
+        const thumbResult = await uploadBase64ToStorage(
+          companyId,
+          data.thumbnailBase64,
+          `reports/${reportId}/photos/${timestamp}_thumb.${ext}`,
+          contentType
+        );
+        finalThumbnailUrl = thumbResult.downloadUrl;
+        thumbnailStoragePath = thumbResult.storagePath;
+      } else {
+        finalThumbnailUrl = finalPhotoUrl;
+        thumbnailStoragePath = storagePath;
+      }
+    }
+
+    if (!finalPhotoUrl) throw new HttpsError("invalid-argument", "photoUrl o photoBase64 requerido");
+
     const ref = await companyRef(companyId).collection("reportPhotos").add({
-      companyId, reportId, checkpointId, photoUrl,
-      thumbnailUrl: data.thumbnailUrl || photoUrl, caption: data.caption || "",
+      companyId, reportId, checkpointId, photoUrl: finalPhotoUrl,
+      thumbnailUrl: finalThumbnailUrl || finalPhotoUrl, caption: data.caption || "",
+      storagePath, thumbnailStoragePath,
       takenAt: data.takenAt || nowIso(), takenByUserId: request.auth?.uid || "",
       createdAt: nowIso(),
     });
-    return { id: ref.id };
+    return { id: ref.id, photoUrl: finalPhotoUrl, storagePath };
   }
 );

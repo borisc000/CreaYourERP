@@ -7,6 +7,7 @@
  */
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 function companyRef(companyId: string) {
@@ -31,7 +32,7 @@ interface CreateTaskPayload {
 export const createTask = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -42,6 +43,7 @@ export const createTask = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "tasks.create", { companyId });
 
     const payload = request.data as CreateTaskPayload;
     if (!payload.title?.trim()) {
@@ -95,7 +97,7 @@ interface UpdateTaskPayload {
 export const updateTask = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -106,6 +108,7 @@ export const updateTask = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "tasks.edit", { companyId });
 
     const { id, ...payload } = request.data as UpdateTaskPayload;
     if (!id) {
@@ -150,7 +153,7 @@ interface CompleteTaskPayload {
 export const completeTask = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -161,6 +164,7 @@ export const completeTask = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "tasks.edit", { companyId });
 
     const { id } = request.data as CompleteTaskPayload;
     if (!id) {
@@ -196,7 +200,7 @@ interface DeleteTaskPayload {
 export const deleteTask = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -207,6 +211,7 @@ export const deleteTask = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "tasks.delete", { companyId });
 
     const { id } = request.data as DeleteTaskPayload;
     if (!id) {

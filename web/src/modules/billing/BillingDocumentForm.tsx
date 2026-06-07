@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import type { BillingDocument, BillingLine, Customer } from "@/types";
+import { toCents, formatCurrency } from "@/lib/money";
 import {
   ArrowLeftIcon,
   PlusIcon,
@@ -36,22 +37,22 @@ function emptyLine(): BillingLine {
 
 function computeLineTotal(line: BillingLine) {
   const qty = Math.max(0, Number(line.quantity) || 0);
-  const price = Math.max(0, Number(line.unitPrice) || 0);
+  const priceCents = Math.max(0, Math.round(Number(line.unitPrice) || 0));
   const disc = Math.max(0, Math.min(100, Number(line.discountPct) || 0));
-  return Math.round(qty * price * (1 - disc / 100) * 100) / 100;
+  return Math.round(qty * priceCents * (1 - disc / 100));
 }
 
 function computeTotals(lines: BillingLine[], documentType: string, taxRate: number) {
   const factor = documentType === "61" ? -1 : 1;
   const isExempt = documentType === "34";
   const rate = isExempt ? 0 : Math.max(0, taxRate || 19);
-  const subtotal = lines.reduce((sum, l) => sum + (l.lineTotal || 0), 0);
-  const taxAmount = Math.round(subtotal * rate) / 100;
-  const total = Math.round((subtotal + taxAmount) * factor * 100) / 100;
+  const subtotalCents = lines.reduce((sum, l) => sum + (l.lineTotal || 0), 0);
+  const taxAmountCents = Math.round((subtotalCents * rate) / 100);
+  const totalCents = Math.round((subtotalCents + taxAmountCents) * factor);
   return {
-    subtotalAmount: Math.round(subtotal * factor * 100) / 100,
-    taxAmount: Math.round(taxAmount * factor * 100) / 100,
-    totalAmount: total,
+    subtotalAmount: Math.round(subtotalCents * factor),
+    taxAmount: Math.round(taxAmountCents * factor),
+    totalAmount: totalCents,
     taxRate: rate,
   };
 }
@@ -90,6 +91,7 @@ export function BillingDocumentForm() {
   });
 
   const [lines, setLines] = useState<BillingLine[]>([]);
+  const currency = form.currency || "CLP";
 
   // Load customers
   useEffect(() => {
@@ -229,7 +231,7 @@ export function BillingDocumentForm() {
       const payloadLines = lines.map((l) => ({
         description: l.description,
         quantity: l.quantity,
-        unitPrice: l.unitPrice,
+        unitPrice: toCents(Number(l.unitPrice) || 0),
         discountPct: l.discountPct,
         isExempt: l.isExempt,
       }));
@@ -585,7 +587,7 @@ export function BillingDocumentForm() {
                       type="number"
                       placeholder="Precio"
                       min={0}
-                      step="any"
+                      step="0.01"
                       value={line.unitPrice}
                       onChange={(e) => updateLine(line.id, { unitPrice: Number(e.target.value) })}
                       className={`${fieldClass} text-xs`}
@@ -659,15 +661,15 @@ export function BillingDocumentForm() {
             <div className="space-y-2.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-400">Subtotal</span>
-                <span className="text-white">${Math.round(totals.subtotalAmount).toLocaleString("es-CL")}</span>
+                <span className="text-white">{formatCurrency(totals.subtotalAmount, currency)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Impuesto ({form.documentType === "34" ? 0 : form.taxRate}%)</span>
-                <span className="text-white">${Math.round(totals.taxAmount).toLocaleString("es-CL")}</span>
+                <span className="text-white">{formatCurrency(totals.taxAmount, currency)}</span>
               </div>
               <div className="flex justify-between pt-2 border-t border-gray-800">
                 <span className="text-white font-bold text-base">Total</span>
-                <span className="text-blue-400 font-bold text-base">${Math.round(totals.totalAmount).toLocaleString("es-CL")}</span>
+                <span className="text-blue-400 font-bold text-base">{formatCurrency(totals.totalAmount, currency)}</span>
               </div>
               {form.documentType === "61" && (
                 <p className="text-xs text-amber-400">Nota de Crédito: montos negativos</p>

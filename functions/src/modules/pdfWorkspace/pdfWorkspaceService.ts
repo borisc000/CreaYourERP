@@ -1,7 +1,8 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
-const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app"];
+const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function nowIso() { return new Date().toISOString(); }
 function companyRef(companyId: string) { return db.collection("companies").doc(companyId); }
 
@@ -13,6 +14,7 @@ export const getPdfWorkspace = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "pdf_workspace.view", { companyId });
     const { documentId, documentType } = request.data;
     if (!documentId || !documentType) throw new HttpsError("invalid-argument", "Datos incompletos");
 
@@ -45,6 +47,7 @@ export const savePdfWorkspace = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "pdf_workspace.edit", { companyId });
     const { documentId, documentType, signatureFields } = request.data;
     if (!documentId || !documentType || !Array.isArray(signatureFields)) {
       throw new HttpsError("invalid-argument", "Datos incompletos");

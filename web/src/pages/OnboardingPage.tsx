@@ -1,20 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/firebase/config";
-import { doc, setDoc } from "firebase/firestore";
-import { httpsCallable, getFunctions } from "firebase/functions";
+import { functions } from "@/firebase/config";
+import { httpsCallable } from "firebase/functions";
 
 export function OnboardingPage() {
   const { user, companyId } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
   const [companyName, setCompanyName] = useState("");
   const [taxId, setTaxId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Si ya tiene companyId, redirigir
   useEffect(() => {
     if (companyId) {
       navigate("/dashboard");
@@ -29,33 +26,17 @@ export function OnboardingPage() {
     try {
       if (!user) throw new Error("No hay usuario autenticado");
 
-      // Crear empresa en Firestore
-      const companyRef = doc(db, "companies", user.uid); // Usamos uid del creador como ID inicial
-      await setDoc(companyRef, {
-        name: companyName,
+      const createCompany = httpsCallable(functions, "createInitialCompany");
+      await createCompany({
+        companyName,
         taxId,
-        email: user.email,
-        plan: "free",
-        isActive: true,
-        defaultTaxRate: 19.0,
-        createdAt: new Date().toISOString(),
       });
 
-      // Crear usuario admin dentro de la empresa
-      await setDoc(doc(db, "companies", user.uid, "users", user.uid), {
-        email: user.email,
-        name: user.displayName || companyName,
-        role: "admin",
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      });
-
-      // Setear custom claims vía Cloud Function (en producción)
-      // Por ahora, forzamos refresh del token en el cliente
-      navigate("/dashboard");
-      window.location.reload(); // Para recargar claims
-    } catch (err: any) {
-      setError(err.message || "Error creando empresa");
+      await user.getIdToken(true);
+      window.location.assign("/dashboard");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error creando empresa";
+      setError(message);
     } finally {
       setIsLoading(false);
     }

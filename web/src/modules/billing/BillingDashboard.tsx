@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatCurrency } from "@/lib/money";
 import {
   DocumentTextIcon,
   CurrencyDollarIcon,
@@ -167,7 +168,7 @@ export function BillingDashboard() {
             <div>
               <p className="text-gray-400 text-sm">Cobranza Pendiente</p>
               <p className="text-2xl font-bold text-white mt-1">
-                ${Math.round(stats?.pendingCollection ?? 0).toLocaleString("es-CL")}
+                {formatCurrency(stats?.pendingCollection ?? 0, "CLP")}
               </p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
@@ -191,7 +192,7 @@ export function BillingDashboard() {
             <div>
               <p className="text-gray-400 text-sm">Total Mes Actual</p>
               <p className="text-2xl font-bold text-white mt-1">
-                ${Math.round(stats?.currentMonthTotal ?? 0).toLocaleString("es-CL")}
+                {formatCurrency(stats?.currentMonthTotal ?? 0, "CLP")}
               </p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
@@ -267,7 +268,7 @@ export function BillingDashboard() {
                       {paymentLabel[d.paymentStatus]}
                     </span>
                     <span className="text-white text-sm font-medium">
-                      ${Math.round(d.totalAmount).toLocaleString("es-CL")}
+                      {formatCurrency(d.totalAmount, "CLP")}
                     </span>
                   </div>
                 </div>
@@ -303,7 +304,7 @@ export function BillingDashboard() {
                   </div>
                 </div>
                 <span className="text-red-400 font-medium text-sm">
-                  ${Math.round(d.balanceDue).toLocaleString("es-CL")}
+                  {formatCurrency(d.balanceDue, "CLP")}
                 </span>
               </div>
             ))}

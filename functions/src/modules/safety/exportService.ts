@@ -5,6 +5,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -16,8 +17,8 @@ interface ExportPayload {
 }
 
 function escapeCsv(value: any): string {
-  const str = String(value ?? "").replace(/"/g, '""');
-  if (str.includes(",") || str.includes("\n") || str.includes('"')) {
+  const str = String(value ?? "").replace(/"/g, "\"\"");
+  if (str.includes(",") || str.includes("\n") || str.includes("\"")) {
     return `"${str}"`;
   }
   return str;
@@ -119,7 +120,7 @@ function buildMIPERHTML(rows: any[], folder: any, matrix: any): string {
 export const exportMIPER = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -130,6 +131,8 @@ export const exportMIPER = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.export_miper", { companyId });
 
     const { folderId, format = "both" } = request.data as ExportPayload;
     if (!folderId) {

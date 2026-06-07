@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { doc, getDoc, collection, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { doc, getDoc, collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/config";
+import { createQuote, updateQuote } from "@/services/quotes";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Quote, QuoteLine, Lead, Customer } from "@/types";
+import type { Quote, QuoteLine, Lead, Customer, CatalogItem } from "@/types";
 import {
   ArrowLeftIcon,
   PlusIcon,
@@ -42,12 +43,14 @@ function emptyLine(sectionType: QuoteLine["sectionType"]): QuoteLine {
 export function QuoteForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
   const { companyId, user } = useAuth();
   const isEdit = Boolean(id);
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
 
   const [form, setForm] = useState<Partial<Quote>>({
     title: "",
@@ -63,7 +66,7 @@ export function QuoteForm() {
     quoteDate: new Date().toISOString().split("T")[0],
   });
 
-  // Load leads & customers
+  // Load leads & customers & catalogs
   useEffect(() => {
     if (!companyId) return;
     const unsubLeads = onSnapshot(
@@ -74,9 +77,24 @@ export function QuoteForm() {
       query(collection(db, "companies", companyId, "customers"), where("active", "==", true), orderBy("name")),
       (snap) => setCustomers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Customer)))
     );
+    const unsubServiceCatalog = onSnapshot(
+      query(collection(db, "companies", companyId, "serviceCatalog"), where("isActive", "==", true)),
+      (snap) => setCatalogItems((prev) => [...prev.filter((i) => i.catalogType !== "service"), ...snap.docs.map((d) => ({ id: d.id, ...d.data() } as CatalogItem))])
+    );
+    const unsubWorkerCatalog = onSnapshot(
+      query(collection(db, "companies", companyId, "workerCatalog"), where("isActive", "==", true)),
+      (snap) => setCatalogItems((prev) => [...prev.filter((i) => i.catalogType !== "worker"), ...snap.docs.map((d) => ({ id: d.id, ...d.data() } as CatalogItem))])
+    );
+    const unsubItemCatalog = onSnapshot(
+      query(collection(db, "companies", companyId, "itemCatalog"), where("isActive", "==", true)),
+      (snap) => setCatalogItems((prev) => [...prev.filter((i) => i.catalogType !== "item"), ...snap.docs.map((d) => ({ id: d.id, ...d.data() } as CatalogItem))])
+    );
     return () => {
       unsubLeads();
       unsubCustomers();
+      unsubServiceCatalog();
+      unsubWorkerCatalog();
+      unsubItemCatalog();
     };
   }, [companyId]);
 
@@ -103,6 +121,35 @@ export function QuoteForm() {
       }
     });
   }, [id, companyId]);
+
+  // Load from template when creating new
+  useEffect(() => {
+    if (isEdit || !location.state?.template) return;
+    const t = location.state.template as any;
+    setForm({
+      title: t.name || "",
+      description: t.description || "",
+      leadId: "",
+      customerId: "",
+      status: "draft",
+      lines: (t.lines || []).map((l: any) => ({
+        id: crypto.randomUUID(),
+        sectionType: l.sectionType || "SERVICIOS",
+        catalogItemId: l.catalogItemId || undefined,
+        description: l.description || "",
+        quantity: l.quantity || 1,
+        unitPrice: l.unitPrice || 0,
+        subtotalLine: (l.quantity || 1) * (l.unitPrice || 0),
+      })),
+      taxPct: t.taxPct ?? 19,
+      admMarginPct: t.admMarginPct ?? 5,
+      profitMarginPct: t.profitMarginPct ?? 10,
+      notes: t.notes || "",
+      quoteDate: new Date().toISOString().split("T")[0],
+    });
+    // Clear state so reload doesn't reapply
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [isEdit, location.state, location.pathname, navigate]);
 
   // Auto-set customer when lead changes
   useEffect(() => {
@@ -148,6 +195,24 @@ export function QuoteForm() {
     }));
   }, []);
 
+  const applyCatalogItem = useCallback((lineId: string, catalogItemId: string) => {
+    const item = catalogItems.find((c) => c.id === catalogItemId);
+    if (!item) return;
+    setForm((prev) => ({
+      ...prev,
+      lines: (prev.lines || []).map((l) => {
+        if (l.id !== lineId) return l;
+        return {
+          ...l,
+          catalogItemId: item.id,
+          description: item.name + (item.description ? ` - ${item.description}` : ""),
+          unitPrice: item.unitPrice,
+          subtotalLine: l.quantity * item.unitPrice,
+        };
+      }),
+    }));
+  }, [catalogItems]);
+
   const handleSubmit = async (e: React.FormEvent, statusOverride?: Quote["status"]) => {
     e.preventDefault();
     if (!form.title?.trim() || !form.leadId || !companyId || !user) {
@@ -161,22 +226,12 @@ export function QuoteForm() {
         ...form,
         ...totals,
         status: statusOverride || form.status || "draft",
-        companyId,
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
       };
 
       if (isEdit && id) {
-        await getDoc(doc(db, "companies", companyId, "quotes", id)); // verify exists
-        // Use updateDoc directly
-        const { updateDoc: firestoreUpdateDoc } = await import("firebase/firestore");
-        await firestoreUpdateDoc(doc(db, "companies", companyId, "quotes", id), {
-          ...payload,
-          updatedAt: serverTimestamp(),
-        });
+        await updateQuote(id, payload);
       } else {
-        const { addDoc } = await import("firebase/firestore");
-        await addDoc(collection(db, "companies", companyId, "quotes"), payload);
+        await createQuote(payload);
       }
       navigate("/quotes");
     } catch (err) {
@@ -290,7 +345,16 @@ export function QuoteForm() {
 
         {/* Lines */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-6">
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Líneas de Cotización</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Líneas de Cotización</h2>
+            <button
+              type="button"
+              onClick={() => navigate("/quotes/catalog/service")}
+              className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              Administrar catálogos →
+            </button>
+          </div>
 
           {SECTIONS.map((section) => {
             const sectionLines = (form.lines || []).filter((l) => l.sectionType === section.key);
@@ -314,7 +378,27 @@ export function QuoteForm() {
                   <div className="space-y-2">
                     {sectionLines.map((line) => (
                       <div key={line.id} className="grid grid-cols-12 gap-2 items-center">
-                        <div className="col-span-6">
+                        <div className="col-span-12 md:col-span-3">
+                          <select
+                            value={line.catalogItemId || ""}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                applyCatalogItem(line.id, e.target.value);
+                              } else {
+                                updateLine(line.id, { catalogItemId: undefined });
+                              }
+                            }}
+                            className={`${fieldClass} text-xs`}
+                          >
+                            <option value="">Seleccionar del catálogo...</option>
+                            {catalogItems
+                              .filter((c) => c.catalogType === (section.key === "SERVICIOS" ? "service" : section.key === "PERSONAL" ? "worker" : "item"))
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
+                              ))}
+                          </select>
+                        </div>
+                        <div className="col-span-12 md:col-span-4">
                           <input
                             type="text"
                             placeholder="Descripción"
@@ -323,7 +407,7 @@ export function QuoteForm() {
                             className={`${fieldClass} text-xs`}
                           />
                         </div>
-                        <div className="col-span-2">
+                        <div className="col-span-5 md:col-span-2">
                           <input
                             type="number"
                             placeholder="Cant."
@@ -334,7 +418,7 @@ export function QuoteForm() {
                             className={`${fieldClass} text-xs`}
                           />
                         </div>
-                        <div className="col-span-3">
+                        <div className="col-span-5 md:col-span-2">
                           <input
                             type="number"
                             placeholder="Precio unit."
@@ -345,7 +429,7 @@ export function QuoteForm() {
                             className={`${fieldClass} text-xs`}
                           />
                         </div>
-                        <div className="col-span-1 flex justify-end">
+                        <div className="col-span-2 md:col-span-1 flex justify-end">
                           <button
                             type="button"
                             onClick={() => removeLine(line.id)}

@@ -11,6 +11,11 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
+import { toCents, taxFromSubtotalCents } from "../../shared/money";
+import { simulateSiiSubmission } from "./siiProviderService";
+import { deleteStorageObject } from "../../shared/storageService";
+import { sendEmailViaSmtp, downloadAttachmentFromStorage } from "../../shared/mailSender";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -20,9 +25,9 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function paymentStatusFromBalance(balanceDue: number, paidAmount: number, dueDate: string) {
-  if (balanceDue <= 0) return "paid";
-  if (paidAmount > 0) return "partial";
+function paymentStatusFromBalance(balanceDueCents: number, paidAmountCents: number, dueDate: string) {
+  if (balanceDueCents <= 0) return "paid";
+  if (paidAmountCents > 0) return "partial";
   const today = new Date().toISOString().split("T")[0];
   if (dueDate < today) return "overdue";
   return "pending";
@@ -37,35 +42,35 @@ function computeDocumentTotals(
   const isExempt = documentType === "34";
   const taxRate = isExempt ? 0 : Math.max(0, taxRateInput || 19);
 
-  let subtotalAmount = 0;
+  let subtotalAmountCents = 0;
   const computedLines = lines.map((l) => {
     const quantity = Math.max(0, Number(l.quantity) || 0);
-    const unitPrice = Math.max(0, Number(l.unitPrice) || 0);
+    // unitPrice is now expected in cents from frontend
+    const unitPriceCents = Math.max(0, Math.round(Number(l.unitPrice) || 0));
     const discountPct = Math.max(0, Math.min(100, Number(l.discountPct) || 0));
-    const lineSub = quantity * unitPrice * (1 - discountPct / 100);
-    const lineTotal = Math.round(lineSub * 100) / 100;
-    subtotalAmount += lineTotal;
+    const lineSubCents = Math.round(quantity * unitPriceCents * (1 - discountPct / 100));
+    subtotalAmountCents += lineSubCents;
     return {
       ...l,
       quantity,
-      unitPrice,
+      unitPrice: unitPriceCents,
       discountPct,
-      lineTotal,
+      lineTotal: lineSubCents,
     };
   });
 
-  subtotalAmount = Math.round(subtotalAmount * 100) / 100;
-  const taxAmount = Math.round(subtotalAmount * taxRate) / 100;
-  const totalAmount = Math.round((subtotalAmount + taxAmount) * factor * 100) / 100;
-  const absTotal = Math.abs(totalAmount);
+  subtotalAmountCents = Math.round(subtotalAmountCents);
+  const taxAmountCents = taxFromSubtotalCents(subtotalAmountCents, taxRate);
+  const totalAmountCents = Math.round((subtotalAmountCents + taxAmountCents) * factor);
+  const absTotalCents = Math.abs(totalAmountCents);
 
   return {
     lines: computedLines,
     taxRate,
-    subtotalAmount: Math.round(subtotalAmount * factor * 100) / 100,
-    taxAmount: Math.round(taxAmount * factor * 100) / 100,
-    totalAmount,
-    balanceDue: absTotal,
+    subtotalAmount: Math.round(subtotalAmountCents * factor),
+    taxAmount: Math.round(taxAmountCents * factor),
+    totalAmount: totalAmountCents,
+    balanceDue: absTotalCents,
     paidAmount: 0,
     factor,
   };
@@ -111,7 +116,7 @@ async function addBillingEvent(
 export const getBillingDashboard = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -121,6 +126,7 @@ export const getBillingDashboard = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.view_dashboard", { companyId });
 
     try {
       const cref = companyRef(companyId);
@@ -189,9 +195,9 @@ export const getBillingDashboard = onCall(
         stats: {
           totalDocuments,
           siiCounts,
-          pendingCollection: Math.round(pendingCollection * 100) / 100,
+          pendingCollection,
           overdueCount,
-          currentMonthTotal: Math.round(currentMonthTotal * 100) / 100,
+          currentMonthTotal,
         },
         recentDocuments,
         overdueDocuments,
@@ -244,7 +250,7 @@ interface CreateBillingDocumentPayload {
 export const createBillingDocument = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -254,6 +260,7 @@ export const createBillingDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.create_document", { companyId });
 
     const payload = request.data as CreateBillingDocumentPayload;
     if (!payload.documentNumber?.trim() || !payload.documentType || !payload.customerName?.trim() || !payload.issueDate || !payload.dueDate) {
@@ -374,7 +381,7 @@ interface UpdateBillingDocumentPayload {
 export const updateBillingDocument = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -384,6 +391,7 @@ export const updateBillingDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.edit_document", { companyId });
 
     const payload = request.data as UpdateBillingDocumentPayload;
     if (!payload.documentId) {
@@ -488,7 +496,7 @@ interface DeleteBillingDocumentPayload {
 export const deleteBillingDocument = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -498,9 +506,7 @@ export const deleteBillingDocument = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
-    if (request.auth.token.role !== "admin") {
-      throw new HttpsError("permission-denied", "Solo administradores pueden eliminar documentos");
-    }
+    await assertAction(request, "billing.delete_document", { companyId });
 
     const { documentId } = request.data as DeleteBillingDocumentPayload;
     if (!documentId) {
@@ -517,6 +523,11 @@ export const deleteBillingDocument = onCall(
       const data = snap.data() as any;
       if (data.status === "issued" || data.siiStatus === "accepted") {
         throw new HttpsError("failed-precondition", "No se pueden eliminar documentos emitidos o aceptados por el SII");
+      }
+
+      // Delete PDF from Storage if exists
+      if (data.pdfStoragePath) {
+        try { await deleteStorageObject(data.pdfStoragePath); } catch (e) { console.warn("[deleteBillingDocument] Failed to delete PDF from storage:", e); }
       }
 
       const batch = db.batch();
@@ -550,7 +561,7 @@ interface SimulateSiiPayload {
 export const simulateSii = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -560,6 +571,7 @@ export const simulateSii = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.simulate_sii", { companyId });
 
     const payload = request.data as SimulateSiiPayload;
     if (!payload.documentId || !payload.profile) {
@@ -577,62 +589,25 @@ export const simulateSii = onCall(
       if (doc.siiStatus === "accepted") {
         throw new HttpsError("failed-precondition", "El documento ya fue aceptado por el SII");
       }
-
-      const now = nowIso();
-      let newSiiStatus = doc.siiStatus;
-      let newStatus = doc.status;
-      let eventTitle = "";
-      let eventDetail = "";
-
-      switch (payload.profile) {
-        case "auto_accept":
-          newSiiStatus = "accepted";
-          newStatus = "issued";
-          eventTitle = "SII - Aceptado";
-          eventDetail = "El documento fue aceptado automáticamente por el SII (simulación)";
-          break;
-        case "observed_then_accept":
-          if (doc.siiStatus === "observed") {
-            newSiiStatus = "accepted";
-            newStatus = "issued";
-            eventTitle = "SII - Observación resuelta";
-            eventDetail = "El documento fue aceptado tras resolver observaciones";
-          } else {
-            newSiiStatus = "observed";
-            newStatus = "observed";
-            eventTitle = "SII - Observado";
-            eventDetail = "El SII observó el documento; requiere corrección";
-          }
-          break;
-        case "rejected_then_accept":
-          if (doc.siiStatus === "rejected") {
-            newSiiStatus = "accepted";
-            newStatus = "issued";
-            eventTitle = "SII - Rechazo revertido";
-            eventDetail = "El documento fue aceptado tras corregir el rechazo";
-          } else {
-            newSiiStatus = "rejected";
-            newStatus = "rejected";
-            eventTitle = "SII - Rechazado";
-            eventDetail = "El SII rechazó el documento; edítalo y reenvía";
-          }
-          break;
-        case "manual":
-          newSiiStatus = "queued";
-          eventTitle = "SII - En cola";
-          eventDetail = "El documento fue puesto en cola de envío al SII";
-          break;
+      if (doc.status === "draft") {
+        throw new HttpsError("failed-precondition", "El documento debe ser enviado al cliente o marcado como listo antes de simular SII");
       }
 
-      await docRef.update({
-        siiStatus: newSiiStatus,
-        status: newStatus,
-        updatedAt: now,
-      });
+      const result = await simulateSiiSubmission(
+        companyId,
+        payload.documentId,
+        doc.documentType,
+        payload.profile
+      );
 
-      await addBillingEvent(companyId, payload.documentId, "sii_simulated", eventTitle, eventDetail, request.auth.token.name || "", { profile: payload.profile, newSiiStatus });
-
-      return { success: true, siiStatus: newSiiStatus, status: newStatus };
+      return {
+        success: true,
+        siiStatus: result.siiStatus,
+        status: result.status,
+        trackId: result.trackId,
+        folio: result.folio,
+        glosa: result.glosa,
+      };
     } catch (error: any) {
       console.error("[simulateSii] Error:", error);
       if (error instanceof HttpsError) throw error;
@@ -656,7 +631,7 @@ interface RegisterPaymentPayload {
 export const registerPayment = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -666,13 +641,14 @@ export const registerPayment = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.register_payment", { companyId });
 
     const payload = request.data as RegisterPaymentPayload;
     if (!payload.documentId || payload.amount === undefined || payload.amount === null) {
       throw new HttpsError("invalid-argument", "documentId y amount son requeridos");
     }
-    const amount = Math.max(0, Number(payload.amount) || 0);
-    if (amount <= 0) {
+    const amountCents = toCents(Math.max(0, Number(payload.amount) || 0));
+    if (amountCents <= 0) {
       throw new HttpsError("invalid-argument", "El monto debe ser mayor a 0");
     }
 
@@ -684,19 +660,19 @@ export const registerPayment = onCall(
         throw new HttpsError("not-found", "Documento no encontrado");
       }
       const doc = snap.data() as any;
-      const absoluteTotal = Math.abs(doc.totalAmount || 0);
-      const currentPaid = doc.paidAmount || 0;
-      const newPaid = currentPaid + amount;
-      let balanceDue = Math.round((absoluteTotal - newPaid) * 100) / 100;
-      if (balanceDue < 0) balanceDue = 0;
+      const absoluteTotalCents = Math.abs(doc.totalAmount || 0);
+      const currentPaidCents = doc.paidAmount || 0;
+      const newPaidCents = currentPaidCents + amountCents;
+      let balanceDueCents = absoluteTotalCents - newPaidCents;
+      if (balanceDueCents < 0) balanceDueCents = 0;
 
       const today = new Date().toISOString().split("T")[0];
-      const newPaymentStatus = paymentStatusFromBalance(balanceDue, newPaid, doc.dueDate || today);
+      const newPaymentStatus = paymentStatusFromBalance(balanceDueCents, newPaidCents, doc.dueDate || today);
       const paidAt = newPaymentStatus === "paid" ? (payload.paidAt || nowIso()) : doc.paidAt || "";
 
       await docRef.update({
-        paidAmount: Math.round(newPaid * 100) / 100,
-        balanceDue,
+        paidAmount: newPaidCents,
+        balanceDue: balanceDueCents,
         paymentStatus: newPaymentStatus,
         paidAt,
         updatedAt: nowIso(),
@@ -707,12 +683,12 @@ export const registerPayment = onCall(
         payload.documentId,
         "payment_registered",
         "Pago registrado",
-        `Abono de $${amount.toLocaleString("es-CL")}${payload.notes ? ` - ${payload.notes}` : ""}`,
+        `Abono de $${(amountCents / 100).toLocaleString("es-CL")}${payload.notes ? ` - ${payload.notes}` : ""}`,
         request.auth.token.name || "",
-        { amount, paymentMethod: payload.paymentMethod || "", newBalance: balanceDue }
+        { amountCents, paymentMethod: payload.paymentMethod || "", newBalanceCents: balanceDueCents }
       );
 
-      return { success: true, paidAmount: newPaid, balanceDue, paymentStatus: newPaymentStatus };
+      return { success: true, paidAmount: newPaidCents, balanceDue: balanceDueCents, paymentStatus: newPaymentStatus };
     } catch (error: any) {
       console.error("[registerPayment] Error:", error);
       if (error instanceof HttpsError) throw error;
@@ -732,7 +708,7 @@ interface SendDocumentPayload {
 export const sendDocumentToCustomer = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -742,6 +718,7 @@ export const sendDocumentToCustomer = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+    await assertAction(request, "billing.send_document", { companyId });
 
     const { documentId } = request.data as SendDocumentPayload;
     if (!documentId) {
@@ -755,17 +732,42 @@ export const sendDocumentToCustomer = onCall(
       if (!snap.exists) {
         throw new HttpsError("not-found", "Documento no encontrado");
       }
+      const doc = snap.data() as any;
+
+      // Ensure PDF exists
+      if (!doc.pdfStoragePath) {
+        throw new HttpsError("failed-precondition", "El documento no tiene PDF generado. Genérelo primero.");
+      }
+
+      if (!doc.customerEmail) {
+        throw new HttpsError("failed-precondition", "El documento no tiene email de cliente registrado");
+      }
+
+      const { buffer, filename, contentType } = await downloadAttachmentFromStorage(doc.pdfStoragePath);
+
+      // Send email
+      const emailResult = await sendEmailViaSmtp(companyId, {
+        to: [doc.customerEmail],
+        subject: `Documento ${doc.documentNumber || ""} - ${doc.customerName || ""}`,
+        text: `Estimado/a ${doc.customerName || ""},\n\nAdjuntamos el documento ${doc.documentNumber || ""}.\n\nSaludos,\nYourERP`,
+        attachments: [{ filename, content: buffer, contentType }],
+      });
+
+      if (!emailResult.success) {
+        throw new HttpsError("internal", emailResult.error || "Error al enviar email al cliente");
+      }
 
       const now = nowIso();
       await docRef.update({
         sentToCustomerAt: now,
         deliveryStatus: "sent",
+        customerEmailMessageId: emailResult.messageId,
         updatedAt: now,
       });
 
-      await addBillingEvent(companyId, documentId, "sent_to_customer", "Enviado al cliente", "El documento fue enviado al cliente", request.auth.token.name || "");
+      await addBillingEvent(companyId, documentId, "sent_to_customer", "Enviado al cliente", `Documento enviado por email a ${doc.customerEmail}`, request.auth.token.name || "");
 
-      return { success: true, sentAt: now };
+      return { success: true, sentAt: now, messageId: emailResult.messageId };
     } catch (error: any) {
       console.error("[sendDocumentToCustomer] Error:", error);
       if (error instanceof HttpsError) throw error;

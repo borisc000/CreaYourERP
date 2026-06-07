@@ -5,6 +5,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -24,7 +25,7 @@ interface PPEDeliveryPayload {
 export const savePPEDelivery = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -35,6 +36,8 @@ export const savePPEDelivery = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.save_ppe_delivery", { companyId });
 
     const { id, folderId, employeeId, deliveryDate, status, items, notes, documentTemplateId } =
       request.data as PPEDeliveryPayload;
@@ -95,7 +98,7 @@ export const savePPEDelivery = onCall(
 export const deletePPEDelivery = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -106,6 +109,8 @@ export const deletePPEDelivery = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.delete_ppe_delivery", { companyId });
 
     const { id } = request.data as { id: string };
     if (!id) {

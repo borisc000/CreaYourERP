@@ -11,6 +11,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 interface GenerateMatrixPayload {
   folderId: string;
@@ -167,7 +168,7 @@ function generateRowsFromProfile(
 export const generateRiskMatrix = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -178,6 +179,8 @@ export const generateRiskMatrix = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.generate_risk_matrix", { companyId });
 
     const { folderId } = request.data as GenerateMatrixPayload;
     if (!folderId) {

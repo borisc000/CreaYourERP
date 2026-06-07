@@ -1,10 +1,12 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
+import { sendEmailViaSmtp, downloadAttachmentFromStorage } from "../../shared/mailSender";
 
 const cors = [
   "http://localhost:5173",
   "http://localhost:5000",
-  "https://your-erp.web.app",
+  "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com",
 ];
 
 function nowIso() {
@@ -25,6 +27,7 @@ export const getMailStatus = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "mail.view", { companyId });
 
     const accounts = await db.collection("companies").doc(companyId).collection("mailAccounts").get();
     const active = accounts.docs.find((d) => d.data().isActive);
@@ -46,6 +49,7 @@ export const saveMailAccount = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "mail.edit", { companyId });
     const { id, ...data } = request.data;
 
     if (data.isDefault) {
@@ -77,15 +81,55 @@ export const sendEmail = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { accountId, recipients, subject, bodyText, bodyHtml } = request.data;
+    await assertAction(request, "mail.create", { companyId });
+    const { accountId, recipients, subject, bodyText, bodyHtml, attachmentStoragePaths } = request.data;
     if (!recipients?.length || !subject) throw new HttpsError("invalid-argument", "Datos incompletos");
+
+    // Validate attachment paths belong to company
+    const storagePaths: string[] = [];
+    if (Array.isArray(attachmentStoragePaths)) {
+      for (const path of attachmentStoragePaths) {
+        if (typeof path === "string" && path.startsWith(`companies/${companyId}/`)) {
+          storagePaths.push(path);
+        }
+      }
+    }
 
     const logRef = await db.collection("companies").doc(companyId).collection("emailLogs").add({
       companyId, accountId: accountId || "", recipients, subject, bodyText: bodyText || "", bodyHtml: bodyHtml || "",
-      status: "queued", createdAt: nowIso(),
+      attachmentStoragePaths: storagePaths,
+      status: "sending", createdAt: nowIso(),
     });
 
-    return { queued: true, logId: logRef.id, message: "Email encolado para envío" };
+    // Download attachments from Storage
+    const attachments = [];
+    for (const path of storagePaths) {
+      try {
+        const att = await downloadAttachmentFromStorage(path);
+        attachments.push({ filename: att.filename, content: att.buffer, contentType: att.contentType });
+      } catch (e) {
+        console.warn("[sendEmail] Failed to download attachment:", path, e);
+      }
+    }
+
+    // Send via SMTP
+    const result = await sendEmailViaSmtp(
+      companyId,
+      {
+        to: recipients,
+        subject,
+        text: bodyText || "",
+        html: bodyHtml || undefined,
+        attachments,
+      },
+      logRef
+    );
+
+    if (!result.success) {
+      throw new HttpsError("internal", result.error || "Error al enviar email");
+    }
+
+    return { sent: true, logId: logRef.id, messageId: result.messageId };
   }
 );
 
@@ -97,9 +141,63 @@ export const getEmailLogs = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "mail.view", { companyId });
     const { limit = 50 } = request.data;
 
     const snap = await db.collection("companies").doc(companyId).collection("emailLogs").orderBy("createdAt", "desc").limit(limit).get();
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }
+);
+
+export const resendEmail = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "mail.create", { companyId });
+
+    const logId = request.data?.logId;
+    if (!logId) throw new HttpsError("invalid-argument", "logId requerido");
+
+    const logSnap = await db.collection("companies").doc(companyId).collection("emailLogs").doc(logId).get();
+    if (!logSnap.exists) throw new HttpsError("not-found", "Log no encontrado");
+    const logData = logSnap.data() || {};
+
+    const attachments = [];
+    if (Array.isArray(logData.attachmentStoragePaths)) {
+      for (const path of logData.attachmentStoragePaths) {
+        try {
+          const att = await downloadAttachmentFromStorage(path);
+          attachments.push({ filename: att.filename, content: att.buffer, contentType: att.contentType });
+        } catch (e) {
+          console.warn("[resendEmail] Failed to download attachment:", path, e);
+        }
+      }
+    }
+
+    const result = await sendEmailViaSmtp(
+      companyId,
+      {
+        to: logData.recipients,
+        subject: logData.subject,
+        text: logData.bodyText || "",
+        html: logData.bodyHtml || undefined,
+        attachments,
+      }
+    );
+
+    await logSnap.ref.update({
+      resentAt: nowIso(),
+      resentMessageId: result.messageId || null,
+      resentError: result.error || null,
+      resentSuccess: result.success,
+    });
+
+    if (!result.success) {
+      throw new HttpsError("internal", result.error || "Error al reenviar email");
+    }
+
+    return { resent: true, messageId: result.messageId };
   }
 );

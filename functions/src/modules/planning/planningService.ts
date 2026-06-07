@@ -1,10 +1,11 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
 const cors = [
   "http://localhost:5173",
   "http://localhost:5000",
-  "https://your-erp.web.app",
+  "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com",
 ];
 
 function nowIso() {
@@ -19,6 +20,10 @@ function companyRef(companyId: string) {
 // getPlanningDashboard
 // ==========================================
 
+function sumMonthlyAmounts(amounts: Record<string, number> | undefined): number {
+  return Object.values(amounts || {}).reduce((a, b) => a + (typeof b === "number" ? b : 0), 0);
+}
+
 export const getPlanningDashboard = onCall(
   { region: "us-central1", cors },
   async (request) => {
@@ -27,6 +32,7 @@ export const getPlanningDashboard = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.view", { companyId });
     const { year } = request.data;
 
     const cref = companyRef(companyId);
@@ -44,72 +50,173 @@ export const getPlanningDashboard = onCall(
     const budgetIds = new Set(budgets.map((b: any) => b.id));
     const budgetLines = lines.filter((l: any) => budgetIds.has(l.budgetId));
 
-    const monthlyInflow: Record<string, number> = {};
-    const monthlyOutflow: Record<string, number> = {};
-    const monthlyNet: Record<string, number> = {};
+    // Initialize monthly aggregates
+    const monthlyPlanInflow: Record<string, number> = {};
+    const monthlyPlanOutflow: Record<string, number> = {};
+    const monthlyActualInflow: Record<string, number> = {};
+    const monthlyActualOutflow: Record<string, number> = {};
+    const monthlyCommittedInflow: Record<string, number> = {};
+    const monthlyCommittedOutflow: Record<string, number> = {};
+    const monthlyForecastInflow: Record<string, number> = {};
+    const monthlyForecastOutflow: Record<string, number> = {};
 
     for (let m = 1; m <= 12; m++) {
       const key = String(m);
-      monthlyInflow[key] = 0;
-      monthlyOutflow[key] = 0;
+      monthlyPlanInflow[key] = 0;
+      monthlyPlanOutflow[key] = 0;
+      monthlyActualInflow[key] = 0;
+      monthlyActualOutflow[key] = 0;
+      monthlyCommittedInflow[key] = 0;
+      monthlyCommittedOutflow[key] = 0;
+      monthlyForecastInflow[key] = 0;
+      monthlyForecastOutflow[key] = 0;
     }
+
+    let totalPlanInflow = 0;
+    let totalPlanOutflow = 0;
+    let totalActualInflow = 0;
+    let totalActualOutflow = 0;
+    let totalCommittedInflow = 0;
+    let totalCommittedOutflow = 0;
+    let totalForecastInflow = 0;
+    let totalForecastOutflow = 0;
 
     budgetLines.forEach((line: any) => {
       const isInflow = line.lineType === "inflow";
+
+      // Planned
       Object.entries(line.plannedAmounts || {}).forEach(([month, amount]) => {
         const num = typeof amount === "number" ? amount : 0;
         if (isInflow) {
-          monthlyInflow[month] = (monthlyInflow[month] || 0) + num;
+          monthlyPlanInflow[month] = (monthlyPlanInflow[month] || 0) + num;
+          totalPlanInflow += num;
         } else {
-          monthlyOutflow[month] = (monthlyOutflow[month] || 0) + num;
+          monthlyPlanOutflow[month] = (monthlyPlanOutflow[month] || 0) + num;
+          totalPlanOutflow += num;
+        }
+      });
+
+      // Actual
+      Object.entries(line.actualAmounts || {}).forEach(([month, amount]) => {
+        const num = typeof amount === "number" ? amount : 0;
+        if (isInflow) {
+          monthlyActualInflow[month] = (monthlyActualInflow[month] || 0) + num;
+          totalActualInflow += num;
+        } else {
+          monthlyActualOutflow[month] = (monthlyActualOutflow[month] || 0) + num;
+          totalActualOutflow += num;
+        }
+      });
+
+      // Committed
+      Object.entries(line.committedAmounts || {}).forEach(([month, amount]) => {
+        const num = typeof amount === "number" ? amount : 0;
+        if (isInflow) {
+          monthlyCommittedInflow[month] = (monthlyCommittedInflow[month] || 0) + num;
+          totalCommittedInflow += num;
+        } else {
+          monthlyCommittedOutflow[month] = (monthlyCommittedOutflow[month] || 0) + num;
+          totalCommittedOutflow += num;
+        }
+      });
+
+      // Forecast
+      Object.entries(line.forecastAmounts || {}).forEach(([month, amount]) => {
+        const num = typeof amount === "number" ? amount : 0;
+        if (isInflow) {
+          monthlyForecastInflow[month] = (monthlyForecastInflow[month] || 0) + num;
+          totalForecastInflow += num;
+        } else {
+          monthlyForecastOutflow[month] = (monthlyForecastOutflow[month] || 0) + num;
+          totalForecastOutflow += num;
         }
       });
     });
 
+    const openingCash = activeBudget?.openingCash || 0;
+    const projectedClosing = openingCash + totalForecastInflow - totalForecastOutflow;
+
+    // Monthly comparison: plan vs actual vs committed vs forecast
+    const monthlyComparison: Record<string, any> = {};
     for (let m = 1; m <= 12; m++) {
       const key = String(m);
-      monthlyNet[key] = (monthlyInflow[key] || 0) - (monthlyOutflow[key] || 0);
+      const planNet = (monthlyPlanInflow[key] || 0) - (monthlyPlanOutflow[key] || 0);
+      const actualNet = (monthlyActualInflow[key] || 0) - (monthlyActualOutflow[key] || 0);
+      const committedNet = (monthlyCommittedInflow[key] || 0) - (monthlyCommittedOutflow[key] || 0);
+      const forecastNet = (monthlyForecastInflow[key] || 0) - (monthlyForecastOutflow[key] || 0);
+      monthlyComparison[key] = {
+        planInflow: monthlyPlanInflow[key] || 0,
+        planOutflow: monthlyPlanOutflow[key] || 0,
+        planNet,
+        actualInflow: monthlyActualInflow[key] || 0,
+        actualOutflow: monthlyActualOutflow[key] || 0,
+        actualNet,
+        committedInflow: monthlyCommittedInflow[key] || 0,
+        committedOutflow: monthlyCommittedOutflow[key] || 0,
+        committedNet,
+        forecastInflow: monthlyForecastInflow[key] || 0,
+        forecastOutflow: monthlyForecastOutflow[key] || 0,
+        forecastNet,
+        executionPct: planNet !== 0 ? Math.round((actualNet / planNet) * 100) : 0,
+      };
     }
 
-    const totalInflow = Object.values(monthlyInflow).reduce((a, b) => a + b, 0);
-    const totalOutflow = Object.values(monthlyOutflow).reduce((a, b) => a + b, 0);
-    const openingCash = activeBudget?.openingCash || 0;
-    const projectedClosing = openingCash + totalInflow - totalOutflow;
-
-    // Simple variance: compare planned vs forecast if available
+    // Variance analysis: plan vs actual vs committed
     const linesWithVariance = budgetLines
-      .filter((l: any) => l.forecastAmounts)
       .map((l: any) => {
-        const plannedTotal = Object.values(l.plannedAmounts || {}).reduce((a: number, b: any) => a + (typeof b === "number" ? b : 0), 0);
-        const forecastTotal = Object.values(l.forecastAmounts || {}).reduce((a: number, b: any) => a + (typeof b === "number" ? b : 0), 0);
+        const plannedTotal = sumMonthlyAmounts(l.plannedAmounts);
+        const actualTotal = sumMonthlyAmounts(l.actualAmounts);
+        const committedTotal = sumMonthlyAmounts(l.committedAmounts);
+        const forecastTotal = sumMonthlyAmounts(l.forecastAmounts);
+        const consumed = actualTotal + committedTotal;
         return {
           id: l.id,
           lineName: l.lineName,
-          variance: forecastTotal - plannedTotal,
-          variancePct: plannedTotal !== 0 ? Math.round(((forecastTotal - plannedTotal) / plannedTotal) * 100) : 0,
+          lineType: l.lineType,
+          plannedTotal: Math.round(plannedTotal),
+          actualTotal: Math.round(actualTotal),
+          committedTotal: Math.round(committedTotal),
+          consumedTotal: Math.round(consumed),
+          forecastTotal: Math.round(forecastTotal),
+          remaining: Math.round(plannedTotal - consumed),
+          executionPct: plannedTotal !== 0 ? Math.round((consumed / plannedTotal) * 100) : 0,
+          variance: Math.round(forecastTotal - plannedTotal),
         };
       })
-      .sort((a: any, b: any) => Math.abs(b.variance) - Math.abs(a.variance))
-      .slice(0, 10);
+      .sort((a: any, b: any) => Math.abs(b.executionPct - 100) - Math.abs(a.executionPct - 100))
+      .slice(0, 15);
 
     return {
       year: targetYear,
       stats: {
         totalBudgets: budgets.length,
         activeBudgets: budgets.filter((b: any) => b.status === "active").length,
-        totalInflow: Math.round(totalInflow),
-        totalOutflow: Math.round(totalOutflow),
-        netCashflow: Math.round(totalInflow - totalOutflow),
         openingCash: Math.round(openingCash),
+        // Planned
+        totalPlanInflow: Math.round(totalPlanInflow),
+        totalPlanOutflow: Math.round(totalPlanOutflow),
+        totalPlanNet: Math.round(totalPlanInflow - totalPlanOutflow),
+        // Actual
+        totalActualInflow: Math.round(totalActualInflow),
+        totalActualOutflow: Math.round(totalActualOutflow),
+        totalActualNet: Math.round(totalActualInflow - totalActualOutflow),
+        // Committed
+        totalCommittedInflow: Math.round(totalCommittedInflow),
+        totalCommittedOutflow: Math.round(totalCommittedOutflow),
+        totalCommittedNet: Math.round(totalCommittedInflow - totalCommittedOutflow),
+        // Consumed (actual + committed)
+        totalConsumedInflow: Math.round(totalActualInflow + totalCommittedInflow),
+        totalConsumedOutflow: Math.round(totalActualOutflow + totalCommittedOutflow),
+        totalConsumedNet: Math.round(totalActualInflow + totalCommittedInflow - totalActualOutflow - totalCommittedOutflow),
+        // Forecast
+        totalForecastInflow: Math.round(totalForecastInflow),
+        totalForecastOutflow: Math.round(totalForecastOutflow),
+        totalForecastNet: Math.round(totalForecastInflow - totalForecastOutflow),
         projectedClosing: Math.round(projectedClosing),
       },
-      monthlyProjection: {
-        inflow: monthlyInflow,
-        outflow: monthlyOutflow,
-        net: monthlyNet,
-      },
-      budgets,
+      monthlyComparison,
       topVariances: linesWithVariance,
+      budgets,
     };
   }
 );
@@ -126,6 +233,7 @@ export const createPlanningBudget = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.create", { companyId });
     const { name, year, scenarioType, openingCash, notes } = request.data;
     if (!name || !year) throw new HttpsError("invalid-argument", "name y year requeridos");
 
@@ -170,6 +278,7 @@ export const updatePlanningBudget = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.edit", { companyId });
     const { id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
@@ -212,7 +321,8 @@ export const createBudgetLine = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { budgetId, lineType, originType, lineName, category, costCenter, leadId, monthStart, monthEnd, plannedAmounts, forecastAmounts, notes } = request.data;
+    await assertAction(request, "planning.create", { companyId });
+    const { budgetId, lineType, originType, lineName, category, costCenter, leadId, monthStart, monthEnd, plannedAmounts, forecastAmounts, actualAmounts, committedAmounts, notes } = request.data;
     if (!budgetId || !lineType || !lineName) {
       throw new HttpsError("invalid-argument", "budgetId, lineType y lineName requeridos");
     }
@@ -230,6 +340,8 @@ export const createBudgetLine = onCall(
       monthEnd: monthEnd || 12,
       plannedAmounts: plannedAmounts || {},
       forecastAmounts: forecastAmounts || {},
+      actualAmounts: actualAmounts || {},
+      committedAmounts: committedAmounts || {},
       notes: notes || "",
       createdAt: nowIso(),
       updatedAt: nowIso(),
@@ -251,6 +363,7 @@ export const updateBudgetLine = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.edit", { companyId });
     const { id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
@@ -274,10 +387,110 @@ export const deleteBudgetLine = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.delete", { companyId });
     const { id } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "id requerido");
 
     await companyRef(companyId).collection("planningBudgetLines").doc(id).delete();
     return { deleted: true };
+  }
+);
+
+// ==========================================
+// registerActualAmount
+// ==========================================
+
+export const registerActualAmount = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.edit", { companyId });
+    const { lineId, month, amount, sourceDocumentId, sourceDocumentType, notes } = request.data;
+    if (!lineId || !month || typeof amount !== "number") {
+      throw new HttpsError("invalid-argument", "lineId, month y amount requeridos");
+    }
+
+    const lineRef = companyRef(companyId).collection("planningBudgetLines").doc(lineId);
+    const lineSnap = await lineRef.get();
+    if (!lineSnap.exists) throw new HttpsError("not-found", "Línea no encontrada");
+
+    const line = lineSnap.data()!;
+    const currentActual = (line.actualAmounts as Record<string, number>) || {};
+    const currentMonth = currentActual[String(month)] || 0;
+    const newActual = { ...currentActual, [String(month)]: currentMonth + amount };
+
+    await lineRef.update({
+      actualAmounts: newActual,
+      updatedAt: nowIso(),
+    });
+
+    // Log the actual registration
+    await companyRef(companyId).collection("planningActualLogs").add({
+      companyId,
+      lineId,
+      budgetId: line.budgetId,
+      month: String(month),
+      amount,
+      sourceDocumentId: sourceDocumentId || null,
+      sourceDocumentType: sourceDocumentType || null,
+      notes: notes || "",
+      registeredBy: request.auth.uid,
+      createdAt: nowIso(),
+    });
+
+    return { updated: true, lineId, month, newTotal: newActual[String(month)] };
+  }
+);
+
+// ==========================================
+// registerCommittedAmount
+// ==========================================
+
+export const registerCommittedAmount = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "planning.edit", { companyId });
+    const { lineId, month, amount, sourceDocumentId, sourceDocumentType, notes } = request.data;
+    if (!lineId || !month || typeof amount !== "number") {
+      throw new HttpsError("invalid-argument", "lineId, month y amount requeridos");
+    }
+
+    const lineRef = companyRef(companyId).collection("planningBudgetLines").doc(lineId);
+    const lineSnap = await lineRef.get();
+    if (!lineSnap.exists) throw new HttpsError("not-found", "Línea no encontrada");
+
+    const line = lineSnap.data()!;
+    const currentCommitted = (line.committedAmounts as Record<string, number>) || {};
+    const currentMonth = currentCommitted[String(month)] || 0;
+    const newCommitted = { ...currentCommitted, [String(month)]: currentMonth + amount };
+
+    await lineRef.update({
+      committedAmounts: newCommitted,
+      updatedAt: nowIso(),
+    });
+
+    await companyRef(companyId).collection("planningCommittedLogs").add({
+      companyId,
+      lineId,
+      budgetId: line.budgetId,
+      month: String(month),
+      amount,
+      sourceDocumentId: sourceDocumentId || null,
+      sourceDocumentType: sourceDocumentType || null,
+      notes: notes || "",
+      registeredBy: request.auth.uid,
+      createdAt: nowIso(),
+    });
+
+    return { updated: true, lineId, month, newTotal: newCommitted[String(month)] };
   }
 );

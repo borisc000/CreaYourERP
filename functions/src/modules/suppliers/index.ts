@@ -4,3 +4,8 @@ export {
   updateSupplier,
   deleteSupplier,
 } from "./supplierService";
+export {
+  listSuppliers,
+  getSupplier,
+  getSupplierReferenceData,
+} from "./suppliersReadService";

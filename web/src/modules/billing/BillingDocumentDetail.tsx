@@ -5,7 +5,9 @@ import { db } from "@/firebase/config";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import type { BillingDocument, BillingLine, BillingEvent } from "@/types";
+import { toCents, formatCurrency } from "@/lib/money";
 import {
   ArrowLeftIcon,
   PencilIcon,
@@ -76,6 +78,7 @@ export function BillingDocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
   const [docData, setDocData] = useState<BillingDocument | null>(null);
   const [lines, setLines] = useState<BillingLine[]>([]);
   const [events, setEvents] = useState<BillingEvent[]>([]);
@@ -158,14 +161,14 @@ export function BillingDocumentDetail() {
   const handleRegisterPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !paymentAmount) return;
-    const amount = Number(paymentAmount);
-    if (amount <= 0) {
+    const amountCents = toCents(Number(paymentAmount));
+    if (amountCents <= 0) {
       alert("El monto debe ser mayor a 0");
       return;
     }
     setActionLoading("payment");
     try {
-      await httpsCallable(functions, "registerPayment")({ documentId: id, amount });
+      await httpsCallable(functions, "registerPayment")({ documentId: id, amount: amountCents });
       setPaymentAmount("");
       setShowPaymentForm(false);
     } catch (err: any) {
@@ -227,7 +230,7 @@ export function BillingDocumentDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {editable && (
+          {editable && hasPermission("billing.edit_document") && (
             <button
               onClick={() => navigate(`/billing/documents/${id}/edit`)}
               className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-lg transition-colors"
@@ -236,14 +239,16 @@ export function BillingDocumentDetail() {
               Editar
             </button>
           )}
-          <button
-            onClick={handleSendToCustomer}
-            disabled={actionLoading === "send" || !!docData.sentToCustomerAt}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <PaperAirplaneIcon className="w-4 h-4" />
-            {docData.sentToCustomerAt ? "Enviado" : "Enviar Cliente"}
-          </button>
+          {hasPermission("billing.send_document") && (
+            <button
+              onClick={handleSendToCustomer}
+              disabled={actionLoading === "send" || !!docData.sentToCustomerAt}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <PaperAirplaneIcon className="w-4 h-4" />
+              {docData.sentToCustomerAt ? "Enviado" : "Enviar Cliente"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -265,19 +270,19 @@ export function BillingDocumentDetail() {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-500 text-xs uppercase tracking-wider">Total</p>
           <p className="text-xl font-bold text-white mt-1">
-            ${Math.round(docData.totalAmount).toLocaleString("es-CL")}
+            {formatCurrency(docData.totalAmount, docData.currency)}
           </p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-500 text-xs uppercase tracking-wider">Pagado</p>
           <p className="text-xl font-bold text-emerald-400 mt-1">
-            ${Math.round(docData.paidAmount).toLocaleString("es-CL")}
+            {formatCurrency(docData.paidAmount, docData.currency)}
           </p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-500 text-xs uppercase tracking-wider">Saldo</p>
           <p className="text-xl font-bold text-amber-400 mt-1">
-            ${Math.round(docData.balanceDue).toLocaleString("es-CL")}
+            {formatCurrency(docData.balanceDue, docData.currency)}
           </p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -314,11 +319,11 @@ export function BillingDocumentDetail() {
                         <td className="py-2 text-white">{line.description}</td>
                         <td className="py-2 text-right text-gray-400">{line.quantity}</td>
                         <td className="py-2 text-right text-gray-400">
-                          ${Math.round(line.unitPrice).toLocaleString("es-CL")}
+                          {formatCurrency(line.unitPrice, docData.currency)}
                         </td>
                         <td className="py-2 text-right text-gray-400">{line.discountPct}%</td>
                         <td className="py-2 text-right text-white font-medium">
-                          ${Math.round(line.lineTotal).toLocaleString("es-CL")}
+                          {formatCurrency(line.lineTotal, docData.currency)}
                         </td>
                       </tr>
                     ))}
@@ -327,19 +332,19 @@ export function BillingDocumentDetail() {
                     <tr className="border-t border-gray-700">
                       <td colSpan={4} className="pt-3 text-right text-gray-400">Subtotal</td>
                       <td className="pt-3 text-right text-white font-medium">
-                        ${Math.round(docData.subtotalAmount).toLocaleString("es-CL")}
+                        {formatCurrency(docData.subtotalAmount, docData.currency)}
                       </td>
                     </tr>
                     <tr>
                       <td colSpan={4} className="py-1 text-right text-gray-400">Impuesto ({docData.taxRate}%)</td>
                       <td className="py-1 text-right text-white font-medium">
-                        ${Math.round(docData.taxAmount).toLocaleString("es-CL")}
+                        {formatCurrency(docData.taxAmount, docData.currency)}
                       </td>
                     </tr>
                     <tr>
                       <td colSpan={4} className="pt-2 text-right text-white font-bold text-base">Total</td>
                       <td className="pt-2 text-right text-blue-400 font-bold text-base">
-                        ${Math.round(docData.totalAmount).toLocaleString("es-CL")}
+                        {formatCurrency(docData.totalAmount, docData.currency)}
                       </td>
                     </tr>
                   </tfoot>
@@ -402,7 +407,7 @@ export function BillingDocumentDetail() {
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-3">
             <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-2">Acciones</h2>
 
-            {docData.siiStatus !== "accepted" && (
+            {docData.siiStatus !== "accepted" && hasPermission("billing.simulate_sii") && (
               <div className="space-y-2">
                 <p className="text-xs text-gray-500 uppercase tracking-wider">Simular SII</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -438,7 +443,7 @@ export function BillingDocumentDetail() {
               </div>
             )}
 
-            {docData.totalAmount > 0 && docData.paymentStatus !== "paid" && (
+            {docData.totalAmount > 0 && docData.paymentStatus !== "paid" && hasPermission("billing.register_payment") && (
               <div className="pt-3 border-t border-gray-800">
                 <button
                   onClick={() => setShowPaymentForm((s) => !s)}

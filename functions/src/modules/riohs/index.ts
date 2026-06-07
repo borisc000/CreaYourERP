@@ -3,3 +3,7 @@ export {
   getRiohsConfig,
   generateRiohsDocument,
 } from "./riohsService";
+export {
+  getRiohsConfigById,
+  deleteRiohsConfig,
+} from "./riohsReadService";

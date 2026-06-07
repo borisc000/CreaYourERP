@@ -2,9 +2,11 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { orderBy } from "firebase/firestore";
 import { useFirestoreCollection } from "@/hooks/useFirestore";
+import { usePermission } from "@/hooks/usePermission";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import type { BillingDocument } from "@/types";
+import { formatCurrency } from "@/lib/money";
 import {
   DocumentTextIcon,
   PlusIcon,
@@ -54,6 +56,7 @@ const typeLabel: Record<string, string> = {
 
 export function BillingDocumentList() {
   const navigate = useNavigate();
+  const { hasPermission } = usePermission();
   const { data: documents, isLoading } = useFirestoreCollection<BillingDocument>("billingDocuments", [
     orderBy("createdAt", "desc"),
   ]);
@@ -122,13 +125,15 @@ export function BillingDocumentList() {
             {documents.length} {documents.length === 1 ? "documento" : "documentos"} registrados
           </p>
         </div>
-        <button
-          onClick={() => navigate("/billing/documents/new")}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <PlusIcon className="w-4 h-4" />
-          Nuevo DTE
-        </button>
+        {hasPermission("billing.create_document") && (
+          <button
+            onClick={() => navigate("/billing/documents/new")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Nuevo DTE
+          </button>
+        )}
       </div>
 
       {/* Quick Stats */}
@@ -140,13 +145,13 @@ export function BillingDocumentList() {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-500 text-xs uppercase tracking-wider">Cobranza Pendiente</p>
           <p className="text-2xl font-bold text-amber-400 mt-1">
-            ${Math.round(totals.pending).toLocaleString("es-CL")}
+            {formatCurrency(totals.pending, "CLP")}
           </p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <p className="text-gray-500 text-xs uppercase tracking-wider">Aceptados SII</p>
           <p className="text-2xl font-bold text-emerald-400 mt-1">
-            ${Math.round(totals.accepted).toLocaleString("es-CL")}
+            {formatCurrency(totals.accepted, "CLP")}
           </p>
         </div>
       </div>
@@ -252,13 +257,13 @@ export function BillingDocumentList() {
                     </span>
                   </div>
                   <p className="text-gray-500 text-sm mt-0.5">
-                    {doc.customerName} • ${Math.round(doc.totalAmount).toLocaleString("es-CL")} •{" "}
+                    {doc.customerName} • {formatCurrency(doc.totalAmount, doc.currency)} •{" "}
                     {new Date(doc.issueDate).toLocaleDateString("es-CL")} • Vence{" "}
                     {new Date(doc.dueDate).toLocaleDateString("es-CL")}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {doc.siiStatus !== "accepted" && (
+                  {doc.siiStatus !== "accepted" && hasPermission("billing.delete_document") && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

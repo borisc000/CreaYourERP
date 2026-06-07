@@ -120,12 +120,12 @@ Credenciales demo:
 | Remuneraciones | ✅ Productivo | Perfiles, períodos, liquidaciones (valores UTM/UF hardcodeados) |
 | Reportes de Terreno | ✅ Productivo | Reportes, checkpoints, fotos |
 | Gantt | ✅ Productivo | Planes de trabajo por lead, tareas dependientes |
-| Facturación | ⚠️ Parcial | CRUD documentos tributarios, líneas, totales. **SII: simulación local** (no envía DTE reales) |
-| Notificaciones | ⚠️ Fachada | Templates, logs. **No envía emails/SMS reales** |
-| Correo | ⚠️ Fachada | Configuración SMTP. **No envía emails reales** |
+| Facturación | ⚠️ Parcial alta | CRUD documentos tributarios, líneas, totales, PDF y CAF/folios. **SII: simulación local** (no envía DTE reales) |
+| Notificaciones | ⚠️ Parcial | Templates, logs, preferencias y cola/reintentos. **SMS real pendiente** |
+| Correo | ✅ Productivo local | Configuración SMTP, test de conexión, adjuntos, envío real con `nodemailer` y reintentos |
 | AI / Agentes | ⚠️ Fachada | Gestión de providers, prompts, ejecuciones planificadas. **No llama a OpenAI** |
-| Google Workspace | ⚠️ Fachada | Configuración de cuentas. **No conecta con Drive/Calendar reales** |
-| Correspondencia | ⚠️ Parcial | CRUD de correspondencia. **Firma externa: stub** |
+| Google Workspace | ⚠️ Parcial | Configuración de cuentas y conexión real a Drive por service account. Docs/Sheets/Calendar siguen pendientes |
+| Correspondencia | ⚠️ Parcial | CRUD de correspondencia y envío a firma interna; falta validación end-to-end completa |
 | PDF Workspace | ✅ Productivo | Editor de campos de firma sobre PDFs |
 | Cross-Correspondence | ✅ Productivo | Seguimiento de correspondencia entrante/saliente |
 
@@ -152,16 +152,16 @@ Credenciales demo:
 - ✅ Firestore indexes definidos (~40 índices compuestos)
 - ✅ Security Rules por colección (catch-all como fallback)
 - ✅ `companyId` forzado desde auth token (no desde client)
-- ⚠️ Email/Notificaciones: solo guardan logs (no envían)
+- ⚠️ Email: envío SMTP real disponible si existe cuenta activa configurada; SMS pendiente
 - ⚠️ Facturación SII: simulación de estado local
 
 ### Producción real (requiere integraciones)
-- 🔴 **Email**: Configurar SMTP/SendGrid/Resend en `functions/.env`
+- 🟡 **Email**: configurar cuentas SMTP por empresa y secretos de producción
 - 🔴 **Notificaciones SMS**: Twilio o similar
 - 🔴 **SII Chile**: Integrador (BoletaCloud, E-Boleta) o SOAP directo
 - 🔴 **Stripe**: Webhook `onRequest` + verificación de firma
 - 🔴 **AI**: API key de OpenAI u otro proveedor
-- 🔴 **Google Workspace**: OAuth2 o cuenta de servicio real
+- 🟡 **Google Workspace**: Drive por service account disponible; Docs/Sheets/Calendar pendientes
 
 ## Deploy a Staging
 

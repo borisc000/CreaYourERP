@@ -13,7 +13,7 @@ import { db } from "../../config";
 export const onQuoteAccepted = onDocumentUpdated(
   {
     document: "companies/{companyId}/quotes/{quoteId}",
-    region: "us-central1",
+    region: "southamerica-west1",
   },
   async (event) => {
     const { companyId, quoteId } = event.params;
@@ -95,7 +95,7 @@ export const onQuoteAccepted = onDocumentUpdated(
           companyId,
           leadId: after.leadId,
           type: "status_changed",
-          message: `Cotización aceptada. Oportunidad ganada.`,
+          message: "Cotización aceptada. Oportunidad ganada.",
           userId: after.updatedBy || after.createdBy || null,
           metadata: { quoteId, serviceCode, serviceId },
           createdAt: new Date().toISOString(),

@@ -1,7 +1,8 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { assertAction } from "../../shared/rbac";
 import { db } from "../../config";
 
-const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app"];
+const cors = ["http://localhost:5173", "http://localhost:5000", "https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com"];
 function nowIso() { return new Date().toISOString(); }
 function companyRef(companyId: string) { return db.collection("companies").doc(companyId); }
 
@@ -15,6 +16,7 @@ export const getOrCreateGanttPlan = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "gantt.view", { companyId });
     const { leadId } = request.data;
     if (!leadId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
@@ -43,6 +45,7 @@ export const importProcedureToGantt = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "gantt.create", { companyId });
     const { planId, procedureId, mode = "replace" } = request.data;
     if (!planId || !procedureId) throw new HttpsError("invalid-argument", "Datos incompletos");
 
@@ -52,7 +55,7 @@ export const importProcedureToGantt = onCall(
     }
 
     const steps = await companyRef(companyId).collection("safetyProcedureSteps").where("procedureId", "==", procedureId).where("active", "==", true).orderBy("displayOrder").get();
-    let currentDate = new Date();
+    const currentDate = new Date();
     const tasks: any[] = [];
 
     for (const step of steps.docs) {
@@ -86,7 +89,8 @@ export const createGanttTask = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, planId, ...data } = request.data;
+    await assertAction(request, "gantt.create", { companyId });
+    const { companyId: _, planId, ...data } = request.data;
     if (!planId) throw new HttpsError("invalid-argument", "Datos incompletos");
     const plan = await companyRef(companyId).collection("leadGanttPlans").doc(planId).get();
     const ref = await companyRef(companyId).collection("leadGanttTasks").add({
@@ -110,13 +114,30 @@ export const updateGanttTask = onCall(
     }
     const companyId = request.auth.token.companyId as string;
     if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
-    const { companyId: _c, id, ...data } = request.data;
+    await assertAction(request, "gantt.edit", { companyId });
+    const { companyId: _, id, ...data } = request.data;
     if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
     const update: any = { ...data, updatedAt: nowIso() };
     if (data.progressPct !== undefined) {
       update.status = data.progressPct >= 100 ? "done" : data.progressPct > 0 ? "in_progress" : "pending";
     }
     await companyRef(companyId).collection("leadGanttTasks").doc(id).update(update);
+    return { updated: true };
+  }
+);
+
+export const updateGanttPlan = onCall(
+  { region: "us-central1", cors },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Debes iniciar sesión");
+    }
+    const companyId = request.auth.token.companyId as string;
+    if (!companyId) throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
+    await assertAction(request, "gantt.edit", { companyId });
+    const { companyId: _, id, ...data } = request.data;
+    if (!id) throw new HttpsError("invalid-argument", "Datos incompletos");
+    await companyRef(companyId).collection("leadGanttPlans").doc(id).update({ ...data, updatedAt: nowIso() });
     return { updated: true };
   }
 );

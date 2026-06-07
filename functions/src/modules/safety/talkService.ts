@@ -5,6 +5,7 @@
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../config";
+import { assertAction } from "../../shared/rbac";
 
 function companyRef(companyId: string) {
   return db.collection("companies").doc(companyId);
@@ -23,7 +24,7 @@ interface TalkPayload {
 export const saveTalk = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -34,6 +35,8 @@ export const saveTalk = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.save_talk", { companyId });
 
     const { id, folderId, talkDate, topic, speakerUserId, attendeeIds, notes } =
       request.data as TalkPayload;
@@ -82,7 +85,7 @@ export const saveTalk = onCall(
 export const deleteTalk = onCall(
   {
     region: "us-central1",
-    cors: ["https://your-erp.web.app", "http://localhost:5173"],
+    cors: ["https://your-erp.web.app", "https://your-erp-staging.web.app", "https://your-erp-staging.firebaseapp.com", "http://localhost:5173"],
   },
   async (request) => {
     if (!request.auth) {
@@ -93,6 +96,8 @@ export const deleteTalk = onCall(
     if (!companyId) {
       throw new HttpsError("failed-precondition", "Usuario no tiene empresa asignada");
     }
+
+    await assertAction(request, "safety.delete_talk", { companyId });
 
     const { id } = request.data as { id: string };
     if (!id) {

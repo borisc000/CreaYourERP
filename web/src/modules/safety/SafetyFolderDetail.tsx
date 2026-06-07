@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/firebase/config";
 import type {
@@ -59,6 +60,7 @@ export function SafetyFolderDetail() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { companyId } = useAuth();
+  const { hasPermission } = usePermission();
 
   const [folder, setFolder] = useState<SafetyFolder | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
@@ -413,20 +415,24 @@ export function SafetyFolderDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleExport("csv")}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-          >
-            <ArrowDownTrayIcon className="w-4 h-4" />
-            Excel
-          </button>
-          <button
-            onClick={() => handleExport("html")}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-          >
-            <EyeIcon className="w-4 h-4" />
-            PDF
-          </button>
+          {hasPermission("safety.export_miper") && (
+            <>
+              <button
+                onClick={() => handleExport("csv")}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <ArrowDownTrayIcon className="w-4 h-4" />
+                Excel
+              </button>
+              <button
+                onClick={() => handleExport("html")}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <EyeIcon className="w-4 h-4" />
+                PDF
+              </button>
+            </>
+          )}
           <button
             onClick={() => navigate(`/safety/${id}/edit`)}
             className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
@@ -636,7 +642,9 @@ export function SafetyFolderDetail() {
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
                           <button onClick={() => selectIrlForEdit(irl)} className="text-gray-400 hover:text-white"><PencilIcon className="w-4 h-4" /></button>
-                          <button onClick={() => removeIRL(irl.id)} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                          {hasPermission("safety.delete_irl") && (
+                            <button onClick={() => removeIRL(irl.id)} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -717,7 +725,7 @@ export function SafetyFolderDetail() {
               />
             </div>
             <div className="flex gap-2">
-              {!irlForm.id && (
+              {!irlForm.id && hasPermission("safety.generate_irl") && (
                 <button
                   onClick={generateIRL}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium"
@@ -725,7 +733,7 @@ export function SafetyFolderDetail() {
                   Generar desde carpeta
                 </button>
               )}
-              {irlForm.id && (
+              {irlForm.id && hasPermission("safety.save_irl") && (
                 <button
                   onClick={saveIRL}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
@@ -774,7 +782,9 @@ export function SafetyFolderDetail() {
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
                           <button onClick={() => setPpeForm({ ...d })} className="text-gray-400 hover:text-white"><PencilIcon className="w-4 h-4" /></button>
-                          <button onClick={() => removePPE(d.id)} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                          {hasPermission("safety.delete_ppe_delivery") && (
+                            <button onClick={() => removePPE(d.id)} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -846,12 +856,14 @@ export function SafetyFolderDetail() {
               />
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={savePPE}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
-              >
-                Guardar entrega
-              </button>
+              {hasPermission("safety.save_ppe_delivery") && (
+                <button
+                  onClick={savePPE}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
+                >
+                  Guardar entrega
+                </button>
+              )}
               <button
                 onClick={() => setPpeForm({ status: "delivered", items: [] })}
                 className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm"
@@ -893,7 +905,9 @@ export function SafetyFolderDetail() {
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
                           <button onClick={() => setTalkForm({ ...t })} className="text-gray-400 hover:text-white"><PencilIcon className="w-4 h-4" /></button>
-                          <button onClick={() => removeTalk(t.id)} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                          {hasPermission("safety.delete_talk") && (
+                            <button onClick={() => removeTalk(t.id)} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -956,12 +970,14 @@ export function SafetyFolderDetail() {
               />
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={saveTalk}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
-              >
-                Guardar charla
-              </button>
+              {hasPermission("safety.save_talk") && (
+                <button
+                  onClick={saveTalk}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
+                >
+                  Guardar charla
+                </button>
+              )}
               <button
                 onClick={() => setTalkForm({})}
                 className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm"
@@ -1005,7 +1021,9 @@ export function SafetyFolderDetail() {
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
                           <button onClick={() => setChecklistForm({ ...c })} className="text-gray-400 hover:text-white"><PencilIcon className="w-4 h-4" /></button>
-                          <button onClick={() => removeChecklist(c.id)} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                          {hasPermission("safety.delete_checklist") && (
+                            <button onClick={() => removeChecklist(c.id)} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1093,12 +1111,14 @@ export function SafetyFolderDetail() {
               />
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={saveChecklist}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
-              >
-                Guardar checklist
-              </button>
+              {hasPermission("safety.save_checklist") && (
+                <button
+                  onClick={saveChecklist}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium"
+                >
+                  Guardar checklist
+                </button>
+              )}
               <button
                 onClick={() => setChecklistForm({ result: "pending" })}
                 className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm"
