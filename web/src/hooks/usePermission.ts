@@ -237,7 +237,12 @@ type ServiceAction =
   // Storage
   | "storage.upload"
   | "storage.download"
-  | "storage.delete";
+  | "storage.delete"
+  // Auth / Users
+  | "users.view"
+  | "users.manage"
+  | "profile.view"
+  | "profile.edit";
 
 const moduleMap: Record<ServiceAction, string[]> = {
   "service.view_internal": ["crm", "reports", "finance", "expenses", "safety", "accreditation", "document_center"],
@@ -469,6 +474,10 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "storage.upload": ["system"],
   "storage.download": ["system"],
   "storage.delete": ["system"],
+  "users.view": ["system"],
+  "users.manage": ["system"],
+  "profile.view": ["system"],
+  "profile.edit": ["system"],
 };
 
 function fallbackModulesForRole(role: string | null): string[] {

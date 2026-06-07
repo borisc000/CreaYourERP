@@ -276,6 +276,11 @@ export const SERVICE_ACTIONS = [
   "storage.upload",
   "storage.download",
   "storage.delete",
+  // Users / Profile
+  "users.view",
+  "users.manage",
+  "profile.view",
+  "profile.edit",
 ] as const;
 
 export type ServiceAction = (typeof SERVICE_ACTIONS)[number];
@@ -555,6 +560,11 @@ const moduleMap: Record<ServiceAction, string[]> = {
   "storage.upload": ["system"],
   "storage.download": ["system"],
   "storage.delete": ["system"],
+  // Users / Profile
+  "users.view": ["system"],
+  "users.manage": ["system"],
+  "profile.view": ["system"],
+  "profile.edit": ["system"],
 };
 
 // ==========================================

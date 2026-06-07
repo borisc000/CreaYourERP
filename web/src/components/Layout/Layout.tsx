@@ -25,6 +25,8 @@ import {
   CalendarDaysIcon,
   MapIcon,
   CurrencyDollarIcon,
+  UserCircleIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 
 const menuGroups = [
@@ -112,6 +114,8 @@ const menuGroups = [
   {
     title: "Configuración",
     items: [
+      { to: "/users", label: "Usuarios", icon: UserGroupIcon },
+      { to: "/profile", label: "Mi Perfil", icon: UserCircleIcon },
       { to: "/notifications", label: "Notificaciones", icon: EnvelopeIcon },
       { to: "/mail", label: "Correo", icon: EnvelopeIcon },
     ],

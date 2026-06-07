@@ -156,6 +156,7 @@ export { triggerDocumentGeneration };
 export { bulkAssignCrew };
 export { checkExpiringDocuments };
 export { verifyAccreditationDocument };
+export { listUsers, getUser, createUser, updateUser, deleteUser, inviteUser, getProfile, updateProfile } from "./modules/auth/userService";
 export { scheduledCheckExpiringDocuments } from "./modules/accreditation/scheduledCheckExpiring";
 export {
   listServiceOrders,

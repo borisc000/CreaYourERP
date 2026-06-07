@@ -6,6 +6,11 @@ import { Layout } from "./components/Layout/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { UsersPage } from "./pages/UsersPage";
+import { UserFormPage } from "./pages/UserFormPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { QuoteList } from "./modules/quotes/QuoteList";
 import { QuoteForm } from "./modules/quotes/QuoteForm";
 import { QuoteDetail } from "./modules/quotes/QuoteDetail";
@@ -157,6 +162,8 @@ function App() {
           {/* Públicas */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<LoginPage mode="register" />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/mirror/report/:token" element={<ReportMirror />} />
 
@@ -335,6 +342,11 @@ function App() {
                 {/* Cross Correspondence */}
                 <Route path="/cross-correspondence" element={<CrossCorrespondenceList />} />
                 <Route path="/cross-correspondence/new" element={<CrossCorrespondenceForm />} />
+
+                <Route path="/users" element={<UsersPage />} />
+                <Route path="/users/new" element={<UserFormPage />} />
+                <Route path="/users/:id/edit" element={<UserFormPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
 
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Route>
